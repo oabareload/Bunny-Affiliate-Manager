@@ -1,0 +1,410 @@
+/**
+ * Bunny Affiliate Manager — Post Links Styles
+ *
+ * Se cargan SOLO en post.php / post-new.php cuando el post type es soportado.
+ *
+ * @package WP_AffiliateManager
+ * @since   3.0.0
+ * @version 0.0.3
+ */
+
+/* ==========================================================================
+   Variables
+   ========================================================================== */
+
+:root {
+	--wpam-primary:        #6c47ff;
+	--wpam-primary-light:  #ede9ff;
+	--wpam-primary-dark:   #5535e0;
+	--wpam-gray-100:       #f8f8fc;
+	--wpam-gray-200:       #ececf4;
+	--wpam-gray-400:       #a0a0b8;
+	--wpam-gray-700:       #3d3d5c;
+	--wpam-gray-900:       #1a1a2e;
+	--wpam-danger:         #e0375a;
+	--wpam-danger-light:   #fdeef2;
+	--wpam-warning:        #c87000;
+	--wpam-warning-light:  #fff8e6;
+	--wpam-warning-border: #f0c060;
+	--wpam-success:        #1aad5e;
+	--wpam-radius:         8px;
+	--wpam-radius-sm:      5px;
+	--wpam-transition:     0.16s ease;
+}
+
+/* ==========================================================================
+   Contenedor principal
+   ========================================================================== */
+
+#wpam-post-links-wrap {
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	font-size: 13px;
+	color: var(--wpam-gray-900);
+}
+
+/* ==========================================================================
+   Estado: sin afiliados activos
+   ========================================================================== */
+
+.wpam-post-links-empty-providers {
+	padding: 16px 18px;
+	background: var(--wpam-gray-100);
+	border-radius: var(--wpam-radius-sm);
+	border: 1px solid var(--wpam-gray-200);
+	color: var(--wpam-gray-700);
+	line-height: 1.5;
+}
+
+.wpam-post-links-empty-providers a {
+	color: var(--wpam-primary);
+	font-weight: 600;
+}
+
+/* ==========================================================================
+   Lista de links
+   ========================================================================== */
+
+.wpam-links-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-bottom: 14px;
+}
+
+/* ==========================================================================
+   Placeholder: sin links aún
+   ========================================================================== */
+
+.wpam-links-placeholder {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+	padding: 24px 16px;
+	color: var(--wpam-gray-400);
+	background: var(--wpam-gray-100);
+	border: 2px dashed var(--wpam-gray-200);
+	border-radius: var(--wpam-radius);
+	font-size: 13px;
+}
+
+.wpam-placeholder-icon {
+	font-size: 20px;
+	line-height: 1;
+	opacity: 0.6;
+}
+
+/* ==========================================================================
+   Fila de link individual
+   ========================================================================== */
+
+.wpam-link-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	background: #fff;
+	border: 1px solid var(--wpam-gray-200);
+	border-radius: var(--wpam-radius);
+	padding: 14px 12px;
+	position: relative;
+	transition: border-color var(--wpam-transition), box-shadow var(--wpam-transition);
+}
+
+.wpam-link-row:hover {
+	border-color: #c5b8ff;
+	box-shadow: 0 2px 8px rgba(108, 71, 255, 0.07);
+}
+
+/* Fila huérfana (provider eliminado o inactivo) */
+.wpam-link-row--orphan {
+	border-color: var(--wpam-warning-border);
+	background: var(--wpam-warning-light);
+}
+
+.wpam-link-row--orphan:hover {
+	border-color: var(--wpam-warning);
+	box-shadow: 0 2px 8px rgba(200, 112, 0, 0.10);
+}
+
+/* Animación al eliminar */
+.wpam-link-row.wpam-row-removing {
+	opacity: 0;
+	transform: translateX(8px);
+	transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* ==========================================================================
+   Aviso de provider huérfano
+   ========================================================================== */
+
+.wpam-orphan-notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	padding: 8px 12px;
+	background: var(--wpam-warning-light);
+	border: 1px solid var(--wpam-warning-border);
+	border-radius: var(--wpam-radius-sm);
+	color: var(--wpam-warning);
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.wpam-orphan-icon {
+	flex-shrink: 0;
+	font-size: 14px;
+	line-height: 1.5;
+}
+
+.wpam-orphan-text {
+	flex: 1;
+}
+
+/* Select con estado huérfano */
+.wpam-select--orphan {
+	border-color: var(--wpam-warning-border) !important;
+	background: #fffdf5 !important;
+}
+
+/* ==========================================================================
+   Handle de drag & drop (preparado FASE 4)
+   ========================================================================== */
+
+.wpam-link-row-handle {
+	flex-shrink: 0;
+	cursor: grab;
+	padding: 4px 2px;
+	color: var(--wpam-gray-400);
+	user-select: none;
+	margin-top: 22px;
+}
+
+.wpam-link-row-handle:active { cursor: grabbing; }
+.wpam-handle-icon            { font-size: 18px; line-height: 1; display: block; }
+
+/* ==========================================================================
+   Campos del link
+   ========================================================================== */
+
+.wpam-link-row-fields {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.wpam-link-row-top {
+	display: grid;
+	grid-template-columns: 200px 1fr;
+	gap: 10px;
+	align-items: end;
+}
+
+.wpam-link-row-middle {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 10px;
+}
+
+.wpam-link-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.wpam-link-field label {
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--wpam-gray-400);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.wpam-input,
+.wpam-select {
+	width: 100%;
+	padding: 7px 10px;
+	border: 1px solid var(--wpam-gray-200);
+	border-radius: var(--wpam-radius-sm);
+	font-size: 13px;
+	color: var(--wpam-gray-900);
+	background: #fff;
+	box-sizing: border-box;
+	transition: border-color var(--wpam-transition), box-shadow var(--wpam-transition);
+	height: 34px;
+}
+
+.wpam-input:focus,
+.wpam-select:focus {
+	outline: none;
+	border-color: var(--wpam-primary);
+	box-shadow: 0 0 0 2px var(--wpam-primary-light);
+}
+
+.wpam-optional {
+	font-weight: 400;
+	text-transform: none;
+	color: var(--wpam-gray-400);
+	font-size: 10px;
+}
+
+/* ==========================================================================
+   Preview de URL final
+   ========================================================================== */
+
+.wpam-link-preview {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 8px 12px;
+	background: var(--wpam-gray-100);
+	border: 1px solid var(--wpam-gray-200);
+	border-radius: var(--wpam-radius-sm);
+	min-height: 34px;
+	transition: background var(--wpam-transition), border-color var(--wpam-transition);
+}
+
+/* Resaltado cuando hay URL generada */
+.wpam-link-preview:has(.wpam-preview-url:not(.wpam-preview-url--warning)) {
+	background: var(--wpam-primary-light);
+	border-color: #c5b8ff;
+}
+
+/* Estado warning (URL sin afiliado aplicado) */
+.wpam-link-preview:has(.wpam-preview-url--warning) {
+	background: var(--wpam-warning-light);
+	border-color: var(--wpam-warning-border);
+}
+
+.wpam-preview-label {
+	font-size: 10px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--wpam-gray-400);
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+
+.wpam-preview-label--warning { color: var(--wpam-warning); }
+
+.wpam-preview-url {
+	font-size: 12px;
+	font-family: 'SFMono-Regular', Consolas, monospace;
+	color: var(--wpam-primary-dark);
+	word-break: break-all;
+	flex: 1;
+	background: transparent;
+	border: none;
+	padding: 0;
+}
+
+.wpam-preview-url--warning { color: var(--wpam-warning); }
+
+.wpam-preview-open {
+	flex-shrink: 0;
+	color: var(--wpam-primary);
+	font-size: 14px;
+	text-decoration: none;
+	font-weight: 700;
+	transition: color var(--wpam-transition);
+}
+
+.wpam-preview-open:hover { color: var(--wpam-primary-dark); }
+
+.wpam-preview-placeholder {
+	font-size: 12px;
+	color: var(--wpam-gray-400);
+	font-style: italic;
+}
+
+.wpam-preview-placeholder--error { color: var(--wpam-danger); font-style: normal; }
+
+/* ==========================================================================
+   Botón eliminar
+   ========================================================================== */
+
+.wpam-remove-link-btn {
+	flex-shrink: 0;
+	width: 26px;
+	height: 26px;
+	border: 1px solid var(--wpam-gray-200);
+	border-radius: 50%;
+	background: #fff;
+	color: var(--wpam-gray-400);
+	font-size: 12px;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-top: 22px;
+	transition: background var(--wpam-transition), color var(--wpam-transition), border-color var(--wpam-transition);
+	line-height: 1;
+	padding: 0;
+}
+
+.wpam-remove-link-btn:hover {
+	background: var(--wpam-danger-light);
+	color: var(--wpam-danger);
+	border-color: var(--wpam-danger);
+}
+
+/* ==========================================================================
+   Footer del meta box
+   ========================================================================== */
+
+.wpam-links-footer {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	flex-wrap: wrap;
+	padding-top: 4px;
+}
+
+.wpam-add-link-btn {
+	background: var(--wpam-primary) !important;
+	color: #fff !important;
+	border-color: var(--wpam-primary-dark) !important;
+	border-radius: var(--wpam-radius-sm) !important;
+	font-weight: 600 !important;
+	font-size: 13px !important;
+	height: auto !important;
+	padding: 6px 16px !important;
+	transition: background var(--wpam-transition) !important;
+}
+
+.wpam-add-link-btn:hover:not(:disabled) {
+	background: var(--wpam-primary-dark) !important;
+}
+
+.wpam-add-link-btn:disabled {
+	opacity: 0.5 !important;
+	cursor: not-allowed !important;
+}
+
+.wpam-links-count-info {
+	font-size: 12px;
+	color: var(--wpam-gray-400);
+}
+
+.wpam-footer-warning {
+	font-size: 12px;
+	color: var(--wpam-warning);
+}
+
+.wpam-footer-warning a {
+	color: var(--wpam-warning);
+	font-weight: 600;
+	text-decoration: underline;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media screen and (max-width: 900px) {
+	.wpam-link-row-top { grid-template-columns: 1fr; }
+	.wpam-link-row     { flex-wrap: wrap; }
+}

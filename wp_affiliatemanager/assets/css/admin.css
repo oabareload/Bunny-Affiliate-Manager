@@ -1,0 +1,438 @@
+/**
+ * Bunny Affiliate Manager — Admin Styles
+ *
+ * @package WP_AffiliateManager
+ * @since   1.0.0 (ampliado en 2.0.0)
+ */
+
+/* ==========================================================================
+   Variables CSS
+   ========================================================================== */
+
+:root {
+	--wpam-primary:        #6c47ff;
+	--wpam-primary-dark:   #5535e0;
+	--wpam-primary-light:  #ede9ff;
+	--wpam-accent:         #ff6b35;
+	--wpam-gray-100:       #f8f8fc;
+	--wpam-gray-200:       #ececf4;
+	--wpam-gray-400:       #a0a0b8;
+	--wpam-gray-700:       #3d3d5c;
+	--wpam-gray-900:       #1a1a2e;
+	--wpam-success:        #1aad5e;
+	--wpam-success-light:  #e6f9f0;
+	--wpam-danger:         #e0375a;
+	--wpam-danger-light:   #fdeef2;
+	--wpam-warning:        #f0a500;
+	--wpam-warning-light:  #fff8e6;
+	--wpam-radius:         10px;
+	--wpam-radius-sm:      6px;
+	--wpam-shadow:         0 2px 12px rgba(108, 71, 255, 0.10);
+	--wpam-shadow-hover:   0 6px 24px rgba(108, 71, 255, 0.18);
+	--wpam-font:           'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	--wpam-transition:     0.18s ease;
+}
+
+/* ==========================================================================
+   Wrapper general
+   ========================================================================== */
+
+.wpam-admin-wrap {
+	margin: 0;
+	padding: 0;
+	font-family: var(--wpam-font);
+	color: var(--wpam-gray-900);
+}
+
+/* ==========================================================================
+   Header
+   ========================================================================== */
+
+.wpam-admin-header {
+	background: #fff;
+	border-bottom: 1px solid var(--wpam-gray-200);
+	margin: 0 0 0 -20px;
+	padding: 0 30px;
+	position: sticky;
+	top: 32px;
+	z-index: 100;
+	box-shadow: var(--wpam-shadow);
+}
+
+.wpam-admin-header-inner {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 16px 0 12px;
+}
+
+.wpam-logo-icon       { font-size: 32px; line-height: 1; flex-shrink: 0; }
+.wpam-admin-title     { display: flex; flex-direction: column; gap: 2px; }
+
+.wpam-admin-plugin-name {
+	margin: 0 !important; padding: 0 !important;
+	font-size: 18px !important; font-weight: 700 !important;
+	color: var(--wpam-gray-900) !important; line-height: 1.2 !important;
+	border: none !important;
+}
+
+.wpam-admin-page-name {
+	font-size: 12px; color: var(--wpam-gray-400); font-weight: 500;
+	letter-spacing: 0.04em; text-transform: uppercase;
+}
+
+.wpam-version-badge {
+	margin-left: auto;
+	background: var(--wpam-primary-light); color: var(--wpam-primary);
+	font-size: 11px; font-weight: 700; padding: 3px 9px;
+	border-radius: 20px; letter-spacing: 0.04em;
+}
+
+/* ==========================================================================
+   Navegación secundaria
+   ========================================================================== */
+
+.wpam-admin-nav {
+	display: flex; gap: 2px;
+	border-top: 1px solid var(--wpam-gray-200); margin-top: 4px;
+}
+
+.wpam-nav-item {
+	display: inline-flex; align-items: center;
+	padding: 10px 16px; font-size: 13px; font-weight: 500;
+	color: var(--wpam-gray-700); text-decoration: none;
+	border-bottom: 2px solid transparent;
+	transition: color var(--wpam-transition), border-color var(--wpam-transition);
+}
+
+.wpam-nav-item:hover          { color: var(--wpam-primary); text-decoration: none; }
+.wpam-nav-item.wpam-nav-active { color: var(--wpam-primary); border-bottom-color: var(--wpam-primary); font-weight: 600; }
+
+/* ==========================================================================
+   Contenido de páginas
+   ========================================================================== */
+
+.wpam-page-content { padding: 30px 10px 40px; max-width: 1100px; }
+
+/* ==========================================================================
+   Dashboard — Welcome
+   ========================================================================== */
+
+.wpam-dashboard-welcome {
+	background: linear-gradient(135deg, var(--wpam-primary) 0%, #9f7aff 100%);
+	border-radius: var(--wpam-radius); padding: 40px 48px; color: #fff;
+	margin-bottom: 30px; display: flex; flex-direction: column;
+	align-items: flex-start; gap: 14px; position: relative; overflow: hidden;
+}
+
+.wpam-dashboard-welcome::before {
+	content: ''; position: absolute; top: -40px; right: -40px;
+	width: 200px; height: 200px; background: rgba(255,255,255,0.07); border-radius: 50%;
+}
+
+.wpam-welcome-icon   { font-size: 48px; line-height: 1; }
+.wpam-dashboard-welcome h2 { margin: 0; font-size: 24px; font-weight: 700; color: #fff; }
+.wpam-dashboard-welcome p  { margin: 0; font-size: 15px; color: rgba(255,255,255,0.85); max-width: 480px; }
+
+.wpam-dashboard-welcome .button-hero {
+	background: #fff !important; color: var(--wpam-primary) !important;
+	border: none !important; border-radius: var(--wpam-radius-sm) !important;
+	font-weight: 600 !important; padding: 10px 24px !important;
+	height: auto !important; font-size: 14px !important;
+	transition: box-shadow var(--wpam-transition), transform var(--wpam-transition) !important;
+}
+
+.wpam-dashboard-welcome .button-hero:hover {
+	box-shadow: 0 4px 16px rgba(0,0,0,0.18) !important; transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   Dashboard — Stats grid
+   ========================================================================== */
+
+.wpam-stats-grid {
+	display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 16px; margin-bottom: 24px;
+}
+
+.wpam-stat-card {
+	background: #fff; border: 1px solid var(--wpam-gray-200);
+	border-radius: var(--wpam-radius); padding: 24px 20px;
+	display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+	transition: box-shadow var(--wpam-transition), transform var(--wpam-transition);
+}
+
+.wpam-stat-card:hover { box-shadow: var(--wpam-shadow-hover); transform: translateY(-2px); }
+.wpam-stat-icon       { font-size: 28px; line-height: 1; }
+.wpam-stat-value      { font-size: 32px; font-weight: 800; color: var(--wpam-primary); line-height: 1; }
+.wpam-stat-label      { font-size: 12px; font-weight: 600; color: var(--wpam-gray-400); text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* ==========================================================================
+   Notices
+   ========================================================================== */
+
+.wpam-phase-notice {
+	background: var(--wpam-gray-100); border-left: 3px solid var(--wpam-primary);
+	border-radius: var(--wpam-radius-sm); padding: 12px 16px;
+	font-size: 13px; color: var(--wpam-gray-700); margin-top: 10px;
+}
+
+.wpam-notice { border-radius: var(--wpam-radius-sm) !important; }
+
+/* ==========================================================================
+   Settings
+   ========================================================================== */
+
+.wpam-page-content .form-table th  { font-weight: 600; color: var(--wpam-gray-700); }
+.wpam-page-content .form-table td select,
+.wpam-page-content .form-table td input[type="text"],
+.wpam-page-content .form-table td input[type="url"]  { border-radius: var(--wpam-radius-sm); border-color: var(--wpam-gray-200); }
+.wpam-page-content h2.hndle,
+.wpam-page-content h3 { border-left: 3px solid var(--wpam-primary); padding-left: 10px; color: var(--wpam-gray-900); }
+
+/* ==========================================================================
+   FASE 2 — Affiliates Screen Header
+   ========================================================================== */
+
+.wpam-screen-header {
+	display: flex; align-items: center; justify-content: space-between;
+	margin-bottom: 24px;
+}
+
+.wpam-screen-title {
+	font-size: 20px !important; font-weight: 700 !important;
+	color: var(--wpam-gray-900) !important; margin: 0 !important;
+	display: flex; align-items: center; gap: 10px;
+}
+
+.wpam-count-badge {
+	background: var(--wpam-primary-light); color: var(--wpam-primary);
+	font-size: 12px; font-weight: 700; padding: 2px 9px;
+	border-radius: 20px; vertical-align: middle;
+}
+
+.wpam-btn-primary {
+	background: var(--wpam-primary) !important; color: #fff !important;
+	border-color: var(--wpam-primary-dark) !important;
+	border-radius: var(--wpam-radius-sm) !important;
+	font-weight: 600 !important; font-size: 13px !important;
+	padding: 6px 16px !important; height: auto !important;
+	transition: background var(--wpam-transition), transform var(--wpam-transition) !important;
+}
+
+.wpam-btn-primary:hover {
+	background: var(--wpam-primary-dark) !important; transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   FASE 2 — Affiliates Table
+   ========================================================================== */
+
+.wpam-table-wrap {
+	background: #fff; border: 1px solid var(--wpam-gray-200);
+	border-radius: var(--wpam-radius); overflow: hidden;
+}
+
+.wpam-table {
+	width: 100%; border-collapse: collapse; font-size: 13px;
+}
+
+.wpam-table thead { background: var(--wpam-gray-100); border-bottom: 1px solid var(--wpam-gray-200); }
+
+.wpam-table thead th {
+	padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 700;
+	color: var(--wpam-gray-400); text-transform: uppercase; letter-spacing: 0.06em;
+	white-space: nowrap;
+}
+
+.wpam-table tbody tr {
+	border-bottom: 1px solid var(--wpam-gray-200);
+	transition: background var(--wpam-transition);
+}
+
+.wpam-table tbody tr:last-child { border-bottom: none; }
+.wpam-table tbody tr:hover      { background: var(--wpam-gray-100); }
+.wpam-table tbody tr.wpam-row--inactive { opacity: 0.65; }
+
+.wpam-table td { padding: 14px 16px; vertical-align: middle; }
+
+/* Column widths */
+.wpam-col-logo    { width: 56px; }
+.wpam-col-name    { min-width: 160px; }
+.wpam-col-param   { width: 120px; }
+.wpam-col-value   { width: 140px; }
+.wpam-col-status  { width: 100px; }
+.wpam-col-actions { width: 110px; }
+
+/* Logo cell */
+.wpam-table-logo {
+	width: 40px; height: 40px; border-radius: var(--wpam-radius-sm);
+	overflow: hidden; border: 2px solid transparent; display: flex;
+	align-items: center; justify-content: center;
+}
+
+.wpam-table-logo img { width: 100%; height: 100%; object-fit: contain; }
+
+.wpam-table-logo-placeholder {
+	width: 40px; height: 40px; border-radius: var(--wpam-radius-sm);
+	display: flex; align-items: center; justify-content: center;
+	font-size: 13px; font-weight: 800; color: #fff; letter-spacing: 0.02em;
+}
+
+/* Affiliate name cell */
+.wpam-affiliate-name {
+	display: block; font-weight: 600; color: var(--wpam-gray-900);
+	text-decoration: none; font-size: 14px;
+	transition: color var(--wpam-transition);
+}
+
+.wpam-affiliate-name:hover { color: var(--wpam-primary); }
+
+.wpam-affiliate-slug {
+	display: block; font-size: 11px; color: var(--wpam-gray-400);
+	font-family: monospace; margin-top: 2px;
+}
+
+/* Code */
+.wpam-code {
+	background: var(--wpam-gray-100); border: 1px solid var(--wpam-gray-200);
+	border-radius: 4px; padding: 2px 7px; font-size: 12px;
+	color: var(--wpam-primary-dark); font-family: monospace;
+}
+
+.wpam-empty { color: var(--wpam-gray-400); font-size: 18px; }
+
+/* Status badges */
+.wpam-status-badge {
+	display: inline-flex; align-items: center; gap: 5px;
+	padding: 3px 10px; border-radius: 20px;
+	font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.wpam-status-badge--active   { background: var(--wpam-success-light); color: var(--wpam-success); }
+.wpam-status-badge--inactive { background: var(--wpam-gray-200); color: var(--wpam-gray-400); }
+
+/* Row actions */
+.wpam-row-actions { display: flex; align-items: center; gap: 4px; }
+
+.wpam-action-btn {
+	display: inline-flex; align-items: center; justify-content: center;
+	width: 32px; height: 32px; border-radius: var(--wpam-radius-sm);
+	text-decoration: none; font-size: 16px; transition: background var(--wpam-transition);
+}
+
+.wpam-action-btn:hover            { background: var(--wpam-gray-200); }
+.wpam-action-btn--delete:hover    { background: var(--wpam-danger-light); }
+
+/* Empty state */
+.wpam-empty-state {
+	background: #fff; border: 1px solid var(--wpam-gray-200);
+	border-radius: var(--wpam-radius); padding: 60px 40px;
+	text-align: center;
+}
+
+.wpam-empty-state-icon { font-size: 56px; display: block; margin-bottom: 16px; }
+.wpam-empty-state h3   { font-size: 18px; font-weight: 700; color: var(--wpam-gray-900); margin: 0 0 10px; }
+.wpam-empty-state p    { color: var(--wpam-gray-400); font-size: 14px; margin-bottom: 24px; }
+
+/* ==========================================================================
+   FASE 2 — Meta Boxes (CPT edit screen)
+   ========================================================================== */
+
+.wpam-meta-box { padding: 4px 0; }
+
+.wpam-field-row { margin-bottom: 20px; }
+.wpam-field-row:last-child { margin-bottom: 0; }
+
+.wpam-field-row label {
+	display: block; font-size: 12px; font-weight: 700;
+	color: var(--wpam-gray-700); text-transform: uppercase;
+	letter-spacing: 0.05em; margin-bottom: 7px;
+}
+
+.wpam-input {
+	width: 100%; padding: 8px 12px;
+	border: 1px solid var(--wpam-gray-200); border-radius: var(--wpam-radius-sm);
+	font-size: 14px; color: var(--wpam-gray-900); background: #fff;
+	transition: border-color var(--wpam-transition), box-shadow var(--wpam-transition);
+	box-sizing: border-box;
+}
+
+.wpam-input:focus {
+	outline: none; border-color: var(--wpam-primary);
+	box-shadow: 0 0 0 3px var(--wpam-primary-light);
+}
+
+.wpam-input--url   { flex: 1; }
+.wpam-input--hex   { width: 90px; font-family: monospace; }
+
+.wpam-description  { font-size: 12px; color: var(--wpam-gray-400); margin: 6px 0 0; }
+
+/* Two-column layout inside meta box */
+.wpam-field-row--cols  { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.wpam-field-col        {}
+
+/* URL Preview inside meta box */
+.wpam-url-preview {
+	background: var(--wpam-gray-100); border: 1px solid var(--wpam-gray-200);
+	border-radius: var(--wpam-radius-sm); padding: 10px 14px;
+	display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px;
+}
+
+.wpam-url-preview-label { font-size: 11px; font-weight: 700; color: var(--wpam-gray-400); text-transform: uppercase; white-space: nowrap; }
+.wpam-url-preview-code  { font-size: 12px; font-family: monospace; color: var(--wpam-gray-700); word-break: break-all; }
+.wpam-url-preview-code strong { color: var(--wpam-primary); }
+
+/* Logo field */
+.wpam-logo-field        { display: flex; flex-direction: column; gap: 10px; }
+.wpam-logo-preview      { width: 80px; height: 80px; border-radius: var(--wpam-radius-sm); overflow: hidden; border: 1px solid var(--wpam-gray-200); }
+.wpam-logo-preview img  { width: 100%; height: 100%; object-fit: contain; }
+.wpam-logo-input-wrap   { display: flex; align-items: center; gap: 10px; }
+
+/* Color field */
+.wpam-color-field       { display: flex; align-items: center; gap: 10px; }
+.wpam-color-input       { width: 40px; height: 36px; border: 1px solid var(--wpam-gray-200); border-radius: var(--wpam-radius-sm); cursor: pointer; padding: 2px; }
+
+/* Status meta box */
+.wpam-meta-box--status  { padding: 8px 0; }
+
+.wpam-toggle-label {
+	display: flex; align-items: center; gap: 12px; cursor: pointer;
+}
+
+.wpam-toggle-input { display: none; }
+
+.wpam-toggle-slider {
+	position: relative; width: 44px; height: 24px; flex-shrink: 0;
+	background: var(--wpam-gray-400); border-radius: 12px;
+	transition: background var(--wpam-transition);
+}
+
+.wpam-toggle-slider::after {
+	content: ''; position: absolute; top: 3px; left: 3px;
+	width: 18px; height: 18px; border-radius: 50%; background: #fff;
+	transition: transform var(--wpam-transition);
+	box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+}
+
+.wpam-toggle-input:checked ~ .wpam-toggle-slider               { background: var(--wpam-success); }
+.wpam-toggle-input:checked ~ .wpam-toggle-slider::after        { transform: translateX(20px); }
+
+.wpam-toggle-text { font-size: 14px; font-weight: 600; color: var(--wpam-gray-900); }
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media screen and (max-width: 782px) {
+	.wpam-admin-header { margin-left: -10px; padding: 0 16px; top: 46px; }
+	.wpam-admin-header-inner { flex-wrap: wrap; }
+	.wpam-version-badge { margin-left: 0; }
+	.wpam-dashboard-welcome { padding: 28px 24px; }
+	.wpam-dashboard-welcome h2 { font-size: 20px; }
+	.wpam-stats-grid { grid-template-columns: 1fr 1fr; }
+	.wpam-screen-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+	.wpam-field-row--cols { grid-template-columns: 1fr; }
+	.wpam-col-param, .wpam-col-value { display: none; }
+}
