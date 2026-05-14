@@ -40,27 +40,29 @@ A modular and scalable affiliate link management plugin for WordPress that allow
 ## File structure
 
 ```text
-wp_affiliatemanager/
-├── assets/
-│   ├── css/
-│   ├── js/
-│   └── images/
-├── includes/
-│   ├── admin/
-│   ├── affiliates/
-│   ├── api/
-│   ├── frontend/
-│   ├── posts/
-│   ├── settings/
-│   ├── templates/
-│   ├── class-activator.php
-│   ├── class-deactivator.php
-│   ├── class-loader.php
-│   ├── class-plugin.php
-│   └── helpers.php
-├── languages/
-├── uninstall.php
-└── wp_affiliatemanager.php
+Bunny-Affiliate-Manager/
+├── readme.md
+├── wp_affiliatemanager/
+│   ├── assets/
+│   │   ├── css/
+│   │   ├── js/
+│   │   └── images/
+│   ├── includes/
+│   │   ├── admin/
+│   │   ├── affiliates/
+│   │   ├── api/
+│   │   ├── frontend/
+│   │   ├── posts/
+│   │   ├── settings/
+│   │   ├── templates/
+│   │   ├── class-activator.php
+│   │   ├── class-deactivator.php
+│   │   ├── class-loader.php
+│   │   ├── class-plugin.php
+│   │   └── helpers.php
+│   ├── languages/
+│   ├── uninstall.php
+│   └── wp_affiliatemanager.php
 ```
 
 ## Architecture decisions
