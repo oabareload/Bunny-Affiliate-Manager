@@ -19,9 +19,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Class Frontend_Assets
  *
  * Gestiona el enqueue de assets CSS/JS en el frontend público.
- * Solo carga assets cuando son necesarios (single posts con afiliados).
+ * FASE 4: Carga real y condicional — solo si el post tiene links activos
+ * y el render_mode no está desactivado.
  *
  * @since 1.0.0
+ * @since 4.0.0 Carga condicional real por post y render_mode.
  */
 class Frontend_Assets {
 
@@ -48,11 +50,10 @@ class Frontend_Assets {
 	 * Se ejecuta en 'wp_enqueue_scripts'.
 	 *
 	 * @since  1.0.0
+	 * @since  4.0.0 Carga condicional real: solo si el post tiene links activos.
 	 * @return void
 	 */
 	public function enqueue_styles(): void {
-		// FASE 1: Carga condicional preparada.
-		// En FASE 2: solo cargar si el post actual tiene afiliados asignados.
 		if ( ! $this->should_load_assets() ) {
 			return;
 		}
@@ -70,6 +71,7 @@ class Frontend_Assets {
 	 * Se ejecuta en 'wp_enqueue_scripts'.
 	 *
 	 * @since  1.0.0
+	 * @since  4.0.0 Carga condicional real.
 	 * @return void
 	 */
 	public function enqueue_scripts(): void {
@@ -80,7 +82,7 @@ class Frontend_Assets {
 		wp_enqueue_script(
 			'wpam-frontend-scripts',
 			WPAM_PLUGIN_URL . 'assets/js/frontend.js',
-			array(),  // Sin jQuery en el frontend para mantener bajo el peso.
+			array(), // Sin jQuery para mantener bajo el peso.
 			$this->version,
 			true
 		);
@@ -89,15 +91,30 @@ class Frontend_Assets {
 	/**
 	 * Determina si se deben cargar los assets del plugin en la página actual.
 	 *
-	 * FASE 1: Solo carga en single posts (preparado para lógica real en FASE 2).
-	 * FASE 2: Verificar también si el post tiene afiliados asignados.
+	 * FASE 4: Verifica render_mode, singularidad y existencia de links activos.
 	 *
 	 * @since  1.0.0
+	 * @since  4.0.0 Verificación real de links activos y render_mode.
 	 * @return bool
 	 */
 	private function should_load_assets(): bool {
-		// Por ahora, solo cargamos en single posts/pages.
-		// En FASE 2 esto verificará si el post tiene afiliados reales.
-		return is_singular();
+		// No cargar si el renderizado está desactivado globalmente.
+		$render_mode = wpam_get_option( 'general.render_mode', 'after_content' );
+		if ( 'disabled' === $render_mode ) {
+			return false;
+		}
+
+		// Solo en entradas/páginas individuales.
+		if ( ! is_singular() ) {
+			return false;
+		}
+
+		$post_id = get_the_ID();
+		if ( ! $post_id ) {
+			return false;
+		}
+
+		// Solo cargar si el post tiene al menos un link activo (excluye orphans).
+		return wpam_post_has_links( $post_id, true );
 	}
 }

@@ -20,7 +20,9 @@ require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-frontend.php';
 require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-frontend-assets.php';
 require_once WPAM_PLUGIN_PATH . 'includes/settings/class-settings.php';
 require_once WPAM_PLUGIN_PATH . 'includes/templates/class-templates.php';
-require_once WPAM_PLUGIN_PATH . 'includes/posts/class-post-affiliates.php';
+// Nota: class-post-affiliates.php (placeholder FASE 1) fue reemplazado por
+// class-post-links.php en FASE 3. Ya no se carga. El archivo se conserva
+// como referencia histórica hasta que se decida eliminarlo formalmente.
 require_once WPAM_PLUGIN_PATH . 'includes/api/class-api.php';
 
 // --- FASE 2: Affiliates system ---
@@ -34,6 +36,10 @@ require_once WPAM_PLUGIN_PATH . 'includes/admin/class-affiliates-screen.php';
 // --- FASE 3: Post links system ---
 require_once WPAM_PLUGIN_PATH . 'includes/posts/class-post-links.php';
 require_once WPAM_PLUGIN_PATH . 'includes/posts/helpers-post-links.php';
+
+// --- FASE 4: Render Engine ---
+require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-render-engine.php';
+require_once WPAM_PLUGIN_PATH . 'includes/frontend/helpers-render.php';
 
 /**
  * Class Plugin

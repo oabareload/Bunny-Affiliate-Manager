@@ -79,8 +79,16 @@ class Settings {
 		);
 
 		add_settings_field(
+			'wpam_field_render_mode',
+			__( 'Modo de renderizado', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_render_mode' ),
+			self::PAGE_SLUG,
+			'wpam_section_general'
+		);
+
+		add_settings_field(
 			'wpam_field_display_mode',
-			__( 'Modo de visualización', 'wp-affiliatemanager' ),
+			__( 'Modo de visualización (legacy)', 'wp-affiliatemanager' ),
 			array( $this, 'render_field_display_mode' ),
 			self::PAGE_SLUG,
 			'wpam_section_general'
@@ -113,9 +121,49 @@ class Settings {
 		);
 
 		add_settings_field(
+			'wpam_field_link_style',
+			__( 'Estilo de template', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_link_style' ),
+			self::PAGE_SLUG,
+			'wpam_section_appearance'
+		);
+
+		add_settings_field(
 			'wpam_field_button_style',
 			__( 'Estilo de botón', 'wp-affiliatemanager' ),
 			array( $this, 'render_field_button_style' ),
+			self::PAGE_SLUG,
+			'wpam_section_appearance'
+		);
+
+		add_settings_field(
+			'wpam_field_display_content',
+			__( 'Contenido de la card', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_display_content' ),
+			self::PAGE_SLUG,
+			'wpam_section_appearance'
+		);
+
+		add_settings_field(
+			'wpam_field_cta_text',
+			__( 'Texto del botón CTA', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_cta_text' ),
+			self::PAGE_SLUG,
+			'wpam_section_appearance'
+		);
+
+		add_settings_field(
+			'wpam_field_cta_hidden',
+			__( 'Ocultar botón CTA', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_cta_hidden' ),
+			self::PAGE_SLUG,
+			'wpam_section_appearance'
+		);
+
+		add_settings_field(
+			'wpam_field_frontend_order',
+			__( 'Orden en frontend', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_frontend_order' ),
 			self::PAGE_SLUG,
 			'wpam_section_appearance'
 		);
@@ -148,6 +196,40 @@ class Settings {
 	// ---------------------------------------------------------------------------
 	// Callbacks de campos
 	// ---------------------------------------------------------------------------
+
+	/**
+	 * Renderiza el campo 'render_mode'.
+	 *
+	 * Controla cómo se inyectan los links en el frontend:
+	 * - disabled:      no se renderiza nada automáticamente.
+	 * - after_content: se añade al final del contenido del post.
+	 * - before_content: se añade al principio del contenido.
+	 * - shortcode_only: solo se muestra si se usa [wpam_links].
+	 *
+	 * @since  4.0.0
+	 * @return void
+	 */
+	public function render_field_render_mode(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['general']['render_mode'] ?? 'after_content';
+		?>
+		<select name="<?php echo esc_attr( self::OPTION_NAME . '[general][render_mode]' ); ?>">
+			<option value="disabled" <?php selected( $value, 'disabled' ); ?>>
+				<?php esc_html_e( 'Desactivado (no renderizar)', 'wp-affiliatemanager' ); ?>
+			</option>
+			<option value="after_content" <?php selected( $value, 'after_content' ); ?>>
+				<?php esc_html_e( 'Después del contenido (automático)', 'wp-affiliatemanager' ); ?>
+			</option>
+			<option value="before_content" <?php selected( $value, 'before_content' ); ?>>
+				<?php esc_html_e( 'Antes del contenido (automático)', 'wp-affiliatemanager' ); ?>
+			</option>
+			<option value="shortcode_only" <?php selected( $value, 'shortcode_only' ); ?>>
+				<?php esc_html_e( 'Solo shortcode [wpam_links]', 'wp-affiliatemanager' ); ?>
+			</option>
+		</select>
+		<p class="description"><?php esc_html_e( 'Define dónde y cómo se muestran los bloques de afiliados en el frontend.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
 
 	/**
 	 * Renderiza el campo 'display_mode'.
@@ -216,6 +298,133 @@ class Settings {
 	}
 
 	/**
+	 * Renderiza el campo 'link_style'.
+	 *
+	 * @since  4.0.0
+	 * @return void
+	 */
+	public function render_field_link_style(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['appearance']['link_style'] ?? 'vertical';
+		?>
+		<select name="<?php echo esc_attr( self::OPTION_NAME . '[appearance][link_style]' ); ?>">
+			<option value="vertical" <?php selected( $value, 'vertical' ); ?>>
+				<?php esc_html_e( 'Vertical (lista apilada)', 'wp-affiliatemanager' ); ?>
+			</option>
+			<option value="horizontal" <?php selected( $value, 'horizontal' ); ?>>
+				<?php esc_html_e( 'Horizontal (fila)', 'wp-affiliatemanager' ); ?>
+			</option>
+		</select>
+		<p class="description"><?php esc_html_e( 'Disposición visual de los links de afiliado en el frontend.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'display_content'.
+	 *
+	 * Controla qué elementos visuales se muestran en la card:
+	 * - show_logo_and_name: logo + nombre (por defecto).
+	 * - show_logo_only:     solo el logo del afiliado.
+	 * - show_name_only:     solo el nombre del afiliado.
+	 *
+	 * @since  0.0.5
+	 * @return void
+	 */
+	public function render_field_display_content(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['appearance']['display_content'] ?? 'show_logo_and_name';
+		?>
+		<select name="<?php echo esc_attr( self::OPTION_NAME . '[appearance][display_content]' ); ?>">
+			<option value="show_logo_and_name" <?php selected( $value, 'show_logo_and_name' ); ?>>
+				<?php esc_html_e( 'Logo + Nombre', 'wp-affiliatemanager' ); ?>
+			</option>
+			<option value="show_logo_only" <?php selected( $value, 'show_logo_only' ); ?>>
+				<?php esc_html_e( 'Solo logo', 'wp-affiliatemanager' ); ?>
+			</option>
+			<option value="show_name_only" <?php selected( $value, 'show_name_only' ); ?>>
+				<?php esc_html_e( 'Solo nombre', 'wp-affiliatemanager' ); ?>
+			</option>
+		</select>
+		<p class="description"><?php esc_html_e( 'Qué elementos se muestran dentro de cada card de afiliado.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'cta_text'.
+	 *
+	 * @since  0.0.5
+	 * @return void
+	 */
+	public function render_field_cta_text(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['appearance']['cta_text'] ?? 'Ver oferta';
+		?>
+		<input
+			type="text"
+			name="<?php echo esc_attr( self::OPTION_NAME . '[appearance][cta_text]' ); ?>"
+			value="<?php echo esc_attr( $value ); ?>"
+			class="regular-text"
+			placeholder="<?php esc_attr_e( 'Ver oferta', 'wp-affiliatemanager' ); ?>"
+		/>
+		<p class="description"><?php esc_html_e( 'Texto del botón CTA. Ejemplos: "Ver oferta", "Comprar", "Disponible aquí".', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'cta_hidden'.
+	 *
+	 * Cuando está activo, el botón CTA no se renderiza.
+	 * La card sigue siendo completamente clicable.
+	 *
+	 * @since  0.0.5
+	 * @return void
+	 */
+	public function render_field_cta_hidden(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['appearance']['cta_hidden'] ?? false;
+		?>
+		<label>
+			<input
+				type="checkbox"
+				name="<?php echo esc_attr( self::OPTION_NAME . '[appearance][cta_hidden]' ); ?>"
+				value="1"
+				<?php checked( (bool) $value ); ?>
+			/>
+			<?php esc_html_e( 'Ocultar el botón CTA en las cards', 'wp-affiliatemanager' ); ?>
+		</label>
+		<p class="description"><?php esc_html_e( 'La card seguirá siendo completamente clicable aunque el botón esté oculto.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'frontend_order'.
+	 *
+	 * Controla el orden visual de las cards en el frontend:
+	 * - preserve_post_order: respeta el orden guardado en cada post (drag/drop).
+	 * - alphabetical:        ordena por nombre de afiliado al renderizar.
+	 *
+	 * NOTA: No modifica el orden guardado en DB ni el drag/drop del admin.
+	 *
+	 * @since  0.0.5
+	 * @return void
+	 */
+	public function render_field_frontend_order(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['appearance']['frontend_order'] ?? 'preserve_post_order';
+		?>
+		<select name="<?php echo esc_attr( self::OPTION_NAME . '[appearance][frontend_order]' ); ?>">
+			<option value="preserve_post_order" <?php selected( $value, 'preserve_post_order' ); ?>>
+				<?php esc_html_e( 'Respetar orden del post (drag & drop)', 'wp-affiliatemanager' ); ?>
+			</option>
+			<option value="alphabetical" <?php selected( $value, 'alphabetical' ); ?>>
+				<?php esc_html_e( 'Orden alfabético por nombre', 'wp-affiliatemanager' ); ?>
+			</option>
+		</select>
+		<p class="description"><?php esc_html_e( 'Solo afecta el orden visual en el frontend. No modifica el orden guardado en el editor.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
 	 * Renderiza el campo 'button_style'.
 	 *
 	 * @since  1.0.0
@@ -260,6 +469,14 @@ class Settings {
 		}
 
 		// General.
+		if ( isset( $input['general']['render_mode'] ) ) {
+			$sanitized['general']['render_mode'] = in_array(
+				$input['general']['render_mode'],
+				array( 'disabled', 'after_content', 'before_content', 'shortcode_only' ),
+				true
+			) ? $input['general']['render_mode'] : 'after_content';
+		}
+
 		if ( isset( $input['general']['display_mode'] ) ) {
 			$sanitized['general']['display_mode'] = in_array(
 				$input['general']['display_mode'],
@@ -279,12 +496,45 @@ class Settings {
 		$sanitized['general']['nofollow'] = ! empty( $input['general']['nofollow'] );
 
 		// Appearance.
+		if ( isset( $input['appearance']['link_style'] ) ) {
+			$sanitized['appearance']['link_style'] = in_array(
+				$input['appearance']['link_style'],
+				array( 'vertical', 'horizontal' ),
+				true
+			) ? $input['appearance']['link_style'] : 'vertical';
+		}
+
 		if ( isset( $input['appearance']['button_style'] ) ) {
 			$sanitized['appearance']['button_style'] = in_array(
 				$input['appearance']['button_style'],
 				array( 'minimal', 'card', 'banner' ),
 				true
 			) ? $input['appearance']['button_style'] : 'minimal';
+		}
+
+		// display_content.
+		if ( isset( $input['appearance']['display_content'] ) ) {
+			$sanitized['appearance']['display_content'] = in_array(
+				$input['appearance']['display_content'],
+				array( 'show_logo_and_name', 'show_logo_only', 'show_name_only' ),
+				true
+			) ? $input['appearance']['display_content'] : 'show_logo_and_name';
+		}
+
+		// cta_text: texto libre, sanitizado como texto plano. Fallback a 'Ver oferta' si queda vacío.
+		$cta_text = sanitize_text_field( $input['appearance']['cta_text'] ?? '' );
+		$sanitized['appearance']['cta_text'] = '' !== $cta_text ? $cta_text : 'Ver oferta';
+
+		// cta_hidden.
+		$sanitized['appearance']['cta_hidden'] = ! empty( $input['appearance']['cta_hidden'] );
+
+		// frontend_order.
+		if ( isset( $input['appearance']['frontend_order'] ) ) {
+			$sanitized['appearance']['frontend_order'] = in_array(
+				$input['appearance']['frontend_order'],
+				array( 'preserve_post_order', 'alphabetical' ),
+				true
+			) ? $input['appearance']['frontend_order'] : 'preserve_post_order';
 		}
 
 		return $sanitized;
@@ -299,14 +549,20 @@ class Settings {
 	private function get_defaults(): array {
 		return array(
 			'general' => array(
+				'render_mode'  => 'after_content',
 				'display_mode' => 'automatic',
 				'link_target'  => '_blank',
 				'nofollow'     => true,
 				'track_clicks' => false,
 			),
 			'appearance' => array(
-				'template'     => 'default',
-				'button_style' => 'minimal',
+				'link_style'      => 'vertical',
+				'template'        => 'default',
+				'button_style'    => 'minimal',
+				'display_content' => 'show_logo_and_name',
+				'cta_text'        => 'Ver oferta',
+				'cta_hidden'      => false,
+				'frontend_order'  => 'preserve_post_order',
 			),
 		);
 	}
