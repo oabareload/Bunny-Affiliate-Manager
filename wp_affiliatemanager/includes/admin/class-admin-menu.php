@@ -81,8 +81,8 @@ class Admin_Menu {
 				<div class="wpam-welcome-icon">🐰</div>
 				<h2><?php esc_html_e( 'Bunny Affiliate Manager', 'wp-affiliatemanager' ); ?></h2>
 				<p><?php esc_html_e( 'Manage your affiliate programs and generate tracked links for any post.', 'wp-affiliatemanager' ); ?></p>
-				<a href="<?php echo esc_url( admin_url( 'post-new.php?post_type=' . CPT::POST_TYPE ) ); ?>" class="button button-primary button-hero">
-					+ <?php esc_html_e( 'Add New Affiliate', 'wp-affiliatemanager' ); ?>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wpam-affiliates' ) ); ?>" class="button button-primary button-hero">
+					+ <?php esc_html_e( 'Manage Affiliates', 'wp-affiliatemanager' ); ?>
 				</a>
 			</div>
 
@@ -212,9 +212,13 @@ class Admin_Menu {
 	}
 
 	/**
-	 * Cuenta los posts que tienen afiliados asignados via post meta.
+	 * Cuenta los posts publicados que tienen affiliate links asignados via _wpam_links.
+	 *
+	 * Solo cuenta post_type = 'post' con post_status = 'publish'.
+	 * Excluye revisiones, borradores y cualquier meta vacía o inválida.
 	 *
 	 * @since  2.0.0
+	 * @since  0.0.6 Query corregida: usa Post_Links::META_KEY (_wpam_links) y filtra por post real publicado.
 	 * @return int
 	 */
 	private function get_posts_with_affiliates_count(): int {
@@ -223,9 +227,15 @@ class Admin_Menu {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
 		$count = $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta} WHERE meta_key = %s AND meta_value != %s",
-				\WP_AffiliateManager\Affiliates\Meta::KEY_ACTIVE, // reusamos la key como proxy; FASE 3 tendrá su propia tabla.
-				''
+				"SELECT COUNT(DISTINCT pm.post_id)
+				FROM {$wpdb->postmeta} pm
+				INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+				WHERE pm.meta_key = %s
+				  AND pm.meta_value != ''
+				  AND pm.meta_value != 'a:0:{}'
+				  AND p.post_type = 'post'
+				  AND p.post_status = 'publish'",
+				\WP_AffiliateManager\Posts\Post_Links::META_KEY
 			)
 		);
 

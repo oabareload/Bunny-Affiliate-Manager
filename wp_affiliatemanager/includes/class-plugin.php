@@ -120,6 +120,9 @@ final class Plugin {
 		// FASE 2 — Affiliates screen.
 		$affiliates_screen = new Admin\Affiliates_Screen();
 		$this->loader->add_action( 'admin_init', $affiliates_screen, 'handle_actions' );
+		// 0.0.6 — AJAX handlers para inline CRUD.
+		$this->loader->add_action( 'wp_ajax_wpam_save_affiliate',    $affiliates_screen, 'ajax_save' );
+		$this->loader->add_action( 'wp_ajax_wpam_get_edit_row',      $affiliates_screen, 'ajax_get_edit_row' );
 
 		// FASE 2 — Meta boxes del CPT wpam_affiliate.
 		$meta = new Affiliates\Meta();

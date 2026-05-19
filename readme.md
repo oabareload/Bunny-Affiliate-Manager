@@ -18,7 +18,7 @@ A modular and scalable affiliate link management plugin for WordPress that allow
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v0.0.4)
+## Current scope (v0.0.6)
 
 - Custom Post Type `wpam_affiliate` for native WordPress affiliate storage.
 - Full affiliate CRUD: create, edit, delete, activate, deactivate.
@@ -203,6 +203,22 @@ Yes. Set the **Brand Color** field in each affiliate's settings. The CSS variabl
 - All user-facing strings use the `wp_affiliatemanager` text domain.
 
 ## Changelog
+
+### 0.0.6 — Inline CRUD + Bug Fix Dashboard
+
+- New: Inline affiliate creation — "Add Affiliate" now inserts an editable row at the top of the table without leaving the page.
+- New: Inline affiliate editing — the ✏️ button replaces the row with an editable form in-place; no separate screen.
+- New: Affiliate field `domains` — free-text field to note associated domains (e.g. `amazon.com, amzn.to`). Informational only.
+- New: Affiliate field `visible` — checkbox to mark affiliate visibility, separate from active status.
+- New: AJAX actions `wpam_save_affiliate` and `wpam_get_edit_row` with nonce `wpam_inline_crud`.
+- New: inline notice area `#wpam-ajax-notice` for save feedback without page reload.
+- New: CSS animation flash on newly saved rows.
+- Fix: Dashboard "Posts with Affiliates" counter now correctly queries `_wpam_links` meta key joined against `wp_posts`, filtering by `post_type = 'post'` and `post_status = 'publish'`. Previously it was counting `_wpam_active` records (affiliate CPT meta), not actual posts with links.
+- Fix: Dashboard "Add New Affiliate" button now points to the Affiliates screen instead of the native CPT editor.
+- Improvement: Affiliates table gains two new columns: Domains and Flags (visible indicator).
+- Improvement: `class-repository.php` `save()` and `normalize()` updated to include `domains` and `visible` fields.
+- Improvement: `class-meta.php` adds `KEY_DOMAINS` and `KEY_VISIBLE` constants.
+- Improvement: `wpamAdminData` JS object gains `crudNonce` property.
 
 ### 0.0.4 — FASE 4: Render Engine
 

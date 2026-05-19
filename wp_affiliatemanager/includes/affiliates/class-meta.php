@@ -45,6 +45,10 @@ class Meta {
 	const KEY_LOGO_URL    = '_wpam_logo_url';
 	const KEY_BRAND_COLOR = '_wpam_brand_color';
 	const KEY_ACTIVE      = '_wpam_active';
+	/** @since 0.0.6 */
+	const KEY_DOMAINS     = '_wpam_domains';
+	/** @since 0.0.6 */
+	const KEY_VISIBLE     = '_wpam_visible';
 
 	/**
 	 * Registra los meta boxes en el CPT.

@@ -171,6 +171,8 @@ class Repository {
 		update_post_meta( $post_id, Meta::KEY_LOGO_URL,    esc_url_raw( $data['logo_url'] ?? '' ) );
 		update_post_meta( $post_id, Meta::KEY_BRAND_COLOR, sanitize_hex_color( $data['brand_color'] ?? '#6c47ff' ) ?? '#6c47ff' );
 		update_post_meta( $post_id, Meta::KEY_ACTIVE,      ! empty( $data['active'] ) ? '1' : '0' );
+		update_post_meta( $post_id, Meta::KEY_DOMAINS,     sanitize_textarea_field( $data['domains'] ?? '' ) );
+		update_post_meta( $post_id, Meta::KEY_VISIBLE,     ! empty( $data['visible'] ) ? '1' : '0' );
 
 		return $post_id;
 	}
@@ -229,6 +231,8 @@ class Repository {
 			'logo_url'    => get_post_meta( $post->ID, Meta::KEY_LOGO_URL,    true ),
 			'brand_color' => get_post_meta( $post->ID, Meta::KEY_BRAND_COLOR, true ) ?: '#6c47ff',
 			'active'      => '' === $is_active ? true : '1' === $is_active,
+			'domains'     => get_post_meta( $post->ID, Meta::KEY_DOMAINS,     true ) ?: '',
+			'visible'     => '' === get_post_meta( $post->ID, Meta::KEY_VISIBLE, true ) ? true : '1' === get_post_meta( $post->ID, Meta::KEY_VISIBLE, true ),
 			'edit_url'    => get_edit_post_link( $post->ID, 'raw' ),
 			'created_at'  => $post->post_date,
 		);

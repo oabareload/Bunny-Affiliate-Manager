@@ -436,3 +436,232 @@
 	.wpam-field-row--cols { grid-template-columns: 1fr; }
 	.wpam-col-param, .wpam-col-value { display: none; }
 }
+
+/* ==========================================================================
+   v0.0.6 — Inline CRUD
+   ========================================================================== */
+
+/* Columnas nuevas */
+.wpam-col-domains { min-width: 120px; max-width: 180px; }
+.wpam-col-flags   { width: 60px; text-align: center; }
+
+.wpam-domains-text {
+	font-size: 11px; color: var(--wpam-gray-400);
+	font-family: monospace; word-break: break-all;
+}
+
+/* Flag badge (visible / hidden) */
+.wpam-flag-badge   { font-size: 16px; cursor: default; }
+.wpam-flag--off    { opacity: 0.45; }
+
+/* Empty row cell */
+.wpam-table-empty {
+	text-align: center; color: var(--wpam-gray-400);
+	padding: 40px 20px; font-size: 13px;
+}
+
+/* Edit row */
+.wpam-edit-row { background: var(--wpam-gray-100) !important; }
+
+.wpam-edit-cell { padding: 20px 16px !important; }
+
+.wpam-edit-form {
+	border: 1px solid var(--wpam-primary-light);
+	border-radius: var(--wpam-radius);
+	background: #fff;
+	padding: 20px;
+	box-shadow: var(--wpam-shadow);
+}
+
+.wpam-edit-form-header {
+	margin-bottom: 16px;
+	font-size: 13px; color: var(--wpam-gray-700);
+	border-bottom: 1px solid var(--wpam-gray-200); padding-bottom: 10px;
+}
+
+/* Grid de campos dentro de la fila de edición */
+.wpam-edit-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.wpam-edit-field label {
+	display: block; font-size: 11px; font-weight: 700;
+	color: var(--wpam-gray-400); text-transform: uppercase;
+	letter-spacing: 0.05em; margin-bottom: 5px;
+}
+
+/* Campo name ocupa más espacio */
+.wpam-edit-field--name   { grid-column: span 2; }
+.wpam-edit-field--domains { grid-column: span 2; }
+.wpam-edit-field--checks  { display: flex; align-items: flex-end; gap: 16px; padding-bottom: 2px; }
+
+.wpam-inline-check {
+	display: flex; align-items: center; gap: 6px;
+	font-size: 13px; color: var(--wpam-gray-700);
+	cursor: pointer; font-weight: 500;
+}
+
+.wpam-inline-check input[type="checkbox"] {
+	margin: 0; width: 16px; height: 16px;
+	accentColor: var(--wpam-primary);
+}
+
+/* Input de error */
+.wpam-input--error {
+	border-color: var(--wpam-danger) !important;
+	box-shadow: 0 0 0 3px var(--wpam-danger-light) !important;
+}
+
+/* Acciones de la fila de edición */
+.wpam-edit-actions {
+	display: flex; align-items: center; gap: 10px;
+	padding-top: 14px; border-top: 1px solid var(--wpam-gray-200);
+}
+
+.wpam-saving-indicator {
+	font-size: 12px; color: var(--wpam-gray-400); font-style: italic;
+}
+
+/* Fila recién guardada (flash breve) */
+.wpam-row--saved {
+	animation: wpam-saved-flash 1.8s ease;
+}
+
+@keyframes wpam-saved-flash {
+	0%, 100% { background: transparent; }
+	20%       { background: var(--wpam-success-light); }
+}
+
+/* Notice AJAX inline */
+.wpam-ajax-notice {
+	padding: 10px 16px; border-radius: var(--wpam-radius-sm);
+	font-size: 13px; font-weight: 500; margin-bottom: 16px;
+	border-left: 3px solid transparent;
+}
+
+.wpam-ajax-notice--success {
+	background: var(--wpam-success-light);
+	color: var(--wpam-success);
+	border-left-color: var(--wpam-success);
+}
+
+.wpam-ajax-notice--error {
+	background: var(--wpam-danger-light);
+	color: var(--wpam-danger);
+	border-left-color: var(--wpam-danger);
+}
+
+/* ==========================================================================
+   v0.0.6 — Logo Picker (Media Library)
+   ========================================================================== */
+
+/* Contenedor del campo logo en la fila de edición */
+.wpam-logo-picker {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+}
+
+/* Botón estado vacío */
+.wpam-logo-picker-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 12px;
+	border: 2px dashed var(--wpam-gray-200);
+	border-radius: var(--wpam-radius-sm);
+	background: var(--wpam-gray-100);
+	color: var(--wpam-gray-400);
+	font-size: 12px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: border-color var(--wpam-transition), color var(--wpam-transition), background var(--wpam-transition);
+	width: 100%;
+	justify-content: center;
+	min-height: 72px;
+}
+
+.wpam-logo-picker-btn:hover {
+	border-color: var(--wpam-primary);
+	color: var(--wpam-primary);
+	background: var(--wpam-primary-light);
+}
+
+.wpam-logo-picker-icon { font-size: 18px; }
+
+/* Bloque preview */
+.wpam-logo-picker-preview {
+	position: relative;
+	width: 72px;
+	height: 72px;
+	border-radius: var(--wpam-radius-sm);
+	border: 1px solid var(--wpam-gray-200);
+	overflow: hidden;
+	cursor: pointer;
+	/* Fondo checkerboard para logos con transparencia */
+	background-color: #fff;
+	background-image:
+		linear-gradient(45deg, #e8e8e8 25%, transparent 25%),
+		linear-gradient(-45deg, #e8e8e8 25%, transparent 25%),
+		linear-gradient(45deg, transparent 75%, #e8e8e8 75%),
+		linear-gradient(-45deg, transparent 75%, #e8e8e8 75%);
+	background-size: 10px 10px;
+	background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+	box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+	transition: box-shadow var(--wpam-transition);
+}
+
+.wpam-logo-picker-preview:hover {
+	box-shadow: 0 3px 12px rgba(108,71,255,0.18);
+}
+
+.wpam-logo-picker-preview img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	display: block;
+}
+
+/* Overlay hover */
+.wpam-logo-picker-overlay {
+	position: absolute;
+	inset: 0;
+	background: rgba(108,71,255,0.72);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	transition: opacity var(--wpam-transition);
+	border-radius: inherit;
+}
+
+.wpam-logo-picker-preview:hover .wpam-logo-picker-overlay { opacity: 1; }
+
+.wpam-logo-picker-overlay span {
+	color: #fff;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	text-align: center;
+	padding: 0 6px;
+}
+
+/* Botón "Remove" */
+.wpam-logo-picker-remove {
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	font-size: 11px;
+	color: var(--wpam-gray-400);
+	transition: color var(--wpam-transition);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.wpam-logo-picker-remove:hover { color: var(--wpam-danger); }

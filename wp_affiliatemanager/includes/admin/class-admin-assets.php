@@ -74,20 +74,23 @@ class Admin_Assets {
 				array(
 					'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
 					'nonce'     => wp_create_nonce( 'wpam_admin_nonce' ),
+					'crudNonce' => wp_create_nonce( 'wpam_inline_crud' ),
 					'pluginUrl' => WPAM_PLUGIN_URL,
 					'version'   => $this->version,
 					'i18n'      => array(
-						'confirm_delete' => __( 'Are you sure you want to permanently delete this affiliate?', 'wp-affiliatemanager' ),
+						'confirm_delete' => __( 'Delete this affiliate permanently?', 'wp-affiliatemanager' ),
 						'error_generic'  => __( 'An error occurred. Please try again.', 'wp-affiliatemanager' ),
 						'saving'         => __( 'Saving...', 'wp-affiliatemanager' ),
 						'saved'          => __( 'Saved!', 'wp-affiliatemanager' ),
 						'active'         => __( 'Active', 'wp-affiliatemanager' ),
 						'inactive'       => __( 'Inactive', 'wp-affiliatemanager' ),
+						'cancel'         => __( 'Cancel', 'wp-affiliatemanager' ),
 					),
 				)
 			);
 
-			if ( $this->is_cpt_edit_screen( $hook_suffix ) ) {
+			// Media Library: CPT edit screen + pantalla inline de affiliates (v0.0.6).
+			if ( $this->is_cpt_edit_screen( $hook_suffix ) || 'bunny-affiliates_page_wpam-affiliates' === $hook_suffix ) {
 				wp_enqueue_media();
 			}
 		}
