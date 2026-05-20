@@ -76,7 +76,7 @@ class Admin_Menu {
 
 		$this->render_admin_header( __( 'Dashboard', 'wp-affiliatemanager' ) );
 		?>
-		<div class="wpam-page-content">
+		<div class="bunny-page-content">
 			<div class="wpam-dashboard-welcome">
 				<div class="wpam-welcome-icon">🐰</div>
 				<h2><?php esc_html_e( 'Bunny Affiliate Manager', 'wp-affiliatemanager' ); ?></h2>
@@ -141,7 +141,7 @@ class Admin_Menu {
 
 		$this->render_admin_header( __( 'Settings', 'wp-affiliatemanager' ) );
 		?>
-		<div class="wpam-page-content">
+		<div class="bunny-page-content">
 			<form method="post" action="options.php">
 				<?php
 				settings_fields( 'wpam_settings_group' );
@@ -160,17 +160,17 @@ class Admin_Menu {
 
 	private function render_admin_header( string $page_title ): void {
 		?>
-		<div class="wrap wpam-admin-wrap">
-			<div class="wpam-admin-header">
-				<div class="wpam-admin-header-inner">
-					<span class="wpam-logo-icon">🐰</span>
-					<div class="wpam-admin-title">
-						<h1 class="wpam-admin-plugin-name"><?php esc_html_e( 'Bunny Affiliate Manager', 'wp-affiliatemanager' ); ?></h1>
-						<span class="wpam-admin-page-name"><?php echo esc_html( $page_title ); ?></span>
+		<div class="wrap bunny-wrap wpam-admin-wrap">
+			<div class="bunny-header">
+				<div class="bunny-header-inner">
+					<span class="bunny-logo">🐰</span>
+					<div class="bunny-title-stack">
+						<h1 class="bunny-plugin-name"><?php esc_html_e( 'Bunny Affiliate Manager', 'wp-affiliatemanager' ); ?></h1>
+						<span class="bunny-page-subtitle"><?php echo esc_html( $page_title ); ?></span>
 					</div>
-					<span class="wpam-version-badge">v<?php echo esc_html( WPAM_VERSION ); ?></span>
+					<span class="bunny-version-badge">v<?php echo esc_html( WPAM_VERSION ); ?></span>
 				</div>
-				<nav class="wpam-admin-nav">
+				<nav class="bunny-nav">
 					<?php $this->render_admin_nav(); ?>
 				</nav>
 			</div>
@@ -187,9 +187,9 @@ class Admin_Menu {
 		);
 
 		foreach ( $nav_items as $slug => $label ) {
-			$active = ( $current_page === $slug ) ? ' wpam-nav-active' : '';
+			$active = ( $current_page === $slug ) ? ' bunny-nav-active' : '';
 			printf(
-				'<a href="%s" class="wpam-nav-item%s">%s</a>',
+				'<a href="%s" class="bunny-nav-item%s">%s</a>',
 				esc_url( admin_url( 'admin.php?page=' . $slug ) ),
 				esc_attr( $active ),
 				esc_html( $label )

@@ -181,7 +181,7 @@ class Affiliates_Screen {
 		$total      = $result['total'];
 		$message    = isset( $_GET['message'] ) ? sanitize_key( $_GET['message'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		?>
-		<div class="wpam-page-content">
+		<div class="bunny-page-content">
 
 			<?php $this->render_notices( $message ); ?>
 

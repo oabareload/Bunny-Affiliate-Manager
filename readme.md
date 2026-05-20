@@ -18,7 +18,7 @@ A modular and scalable affiliate link management plugin for WordPress that allow
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v0.0.6)
+## Current scope (v0.0.7)
 
 - Custom Post Type `wpam_affiliate` for native WordPress affiliate storage.
 - Full affiliate CRUD: create, edit, delete, activate, deactivate.
@@ -52,6 +52,8 @@ Bunny-Affiliate-Manager/
 ├── wp_affiliatemanager/
 │   ├── assets/
 │   │   ├── css/
+│   │   │   ├── admin.css
+│   │   │   ├── bunny-admin.css
 │   │   │   └── frontend.css
 │   │   ├── js/
 │   │   └── images/
@@ -203,6 +205,18 @@ Yes. Set the **Brand Color** field in each affiliate's settings. The CSS variabl
 - All user-facing strings use the `wp_affiliatemanager` text domain.
 
 ## Changelog
+
+### 0.0.7 — Bunny Admin UI Homologation
+
+- **Bunny Admin UI system:** adopted the shared `bunny-*` admin UI convention used across all Bunny plugins. The admin header, tab navigation, wrappers, badges, and spacing now use `.bunny-*` classes and `--bunny-*` CSS custom properties.
+- **New `bunny-admin.css`:** added a plugin-agnostic stylesheet containing only shared admin chrome: sticky header, horizontal tab nav, version badge, page-content wrapper, and responsive breakpoints. Loaded as a WordPress style dependency before `admin.css`.
+- **Sticky admin header:** the header is now `position: sticky; top: 32px`, keeping the plugin name, tabs, and version badge visible while scrolling any admin page.
+- **Page subtitle:** each admin page now shows the current section name (Dashboard, Affiliates, Settings) as a small uppercase label below the plugin name, using `.bunny-page-subtitle`.
+- **`admin.css` refactored:** the header, nav, wrap, and page-content sections were removed. Plugin-specific `--wpam-*` variables are now declared as aliases of `--bunny-*` tokens so all downstream WPAM styles continue to work without changes.
+- **`class-admin-assets.php`:** `bunny-admin.css` is now enqueued before `admin.css` with an explicit dependency declaration.
+- **`class-admin-menu.php`:** `render_admin_header()` and `render_admin_nav()` updated to emit `bunny-*` classes exclusively; `wpam-admin-wrap` class retained alongside `bunny-wrap` for backward-compatible specificity.
+- **`class-affiliates-screen.php`:** `wpam-page-content` replaced with `bunny-page-content`.
+- **No functional changes:** all plugin logic, AJAX handlers, REST endpoints, affiliate CRUD, meta boxes, and frontend rendering are unchanged.
 
 ### 0.0.6 — Inline CRUD + Bug Fix Dashboard
 

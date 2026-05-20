@@ -9,110 +9,45 @@
    Variables CSS
    ========================================================================== */
 
+/* ==========================================================================
+   Header, nav, tabs, wrap, page-content — see bunny-admin.css (shared base)
+   Plugin-specific variables below override/extend the bunny-* base.
+   ========================================================================== */
+
 :root {
-	--wpam-primary:        #6c47ff;
-	--wpam-primary-dark:   #5535e0;
-	--wpam-primary-light:  #ede9ff;
-	--wpam-accent:         #ff6b35;
-	--wpam-gray-100:       #f8f8fc;
-	--wpam-gray-200:       #ececf4;
-	--wpam-gray-400:       #a0a0b8;
-	--wpam-gray-700:       #3d3d5c;
-	--wpam-gray-900:       #1a1a2e;
+	/* Semantic status colors — WPAM only */
 	--wpam-success:        #1aad5e;
 	--wpam-success-light:  #e6f9f0;
 	--wpam-danger:         #e0375a;
 	--wpam-danger-light:   #fdeef2;
 	--wpam-warning:        #f0a500;
 	--wpam-warning-light:  #fff8e6;
-	--wpam-radius:         10px;
-	--wpam-radius-sm:      6px;
-	--wpam-shadow:         0 2px 12px rgba(108, 71, 255, 0.10);
-	--wpam-shadow-hover:   0 6px 24px rgba(108, 71, 255, 0.18);
-	--wpam-font:           'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-	--wpam-transition:     0.18s ease;
+	/* Gray scale — WPAM specific UI */
+	--wpam-gray-100:       #f8f8fc;
+	--wpam-gray-200:       #ececf4;
+	--wpam-gray-400:       #a0a0b8;
+	--wpam-gray-700:       #3d3d5c;
+	--wpam-gray-900:       #1a1a2e;
+	/* Aliases for convenience */
+	--wpam-primary:        var(--bunny-accent);
+	--wpam-primary-dark:   var(--bunny-accent-dark);
+	--wpam-primary-light:  var(--bunny-accent-light);
+	--wpam-radius:         var(--bunny-radius);
+	--wpam-radius-sm:      var(--bunny-radius-sm);
+	--wpam-shadow:         var(--bunny-shadow);
+	--wpam-shadow-hover:   var(--bunny-shadow-hover);
+	--wpam-transition:     var(--bunny-transition);
+	--wpam-font:           var(--bunny-font);
 }
 
 /* ==========================================================================
-   Wrapper general
+   Wrapper — WPAM keeps its own class for specificity on plugin pages
    ========================================================================== */
 
 .wpam-admin-wrap {
 	margin: 0;
 	padding: 0;
-	font-family: var(--wpam-font);
-	color: var(--wpam-gray-900);
 }
-
-/* ==========================================================================
-   Header
-   ========================================================================== */
-
-.wpam-admin-header {
-	background: #fff;
-	border-bottom: 1px solid var(--wpam-gray-200);
-	margin: 0 0 0 -20px;
-	padding: 0 30px;
-	position: sticky;
-	top: 32px;
-	z-index: 100;
-	box-shadow: var(--wpam-shadow);
-}
-
-.wpam-admin-header-inner {
-	display: flex;
-	align-items: center;
-	gap: 14px;
-	padding: 16px 0 12px;
-}
-
-.wpam-logo-icon       { font-size: 32px; line-height: 1; flex-shrink: 0; }
-.wpam-admin-title     { display: flex; flex-direction: column; gap: 2px; }
-
-.wpam-admin-plugin-name {
-	margin: 0 !important; padding: 0 !important;
-	font-size: 18px !important; font-weight: 700 !important;
-	color: var(--wpam-gray-900) !important; line-height: 1.2 !important;
-	border: none !important;
-}
-
-.wpam-admin-page-name {
-	font-size: 12px; color: var(--wpam-gray-400); font-weight: 500;
-	letter-spacing: 0.04em; text-transform: uppercase;
-}
-
-.wpam-version-badge {
-	margin-left: auto;
-	background: var(--wpam-primary-light); color: var(--wpam-primary);
-	font-size: 11px; font-weight: 700; padding: 3px 9px;
-	border-radius: 20px; letter-spacing: 0.04em;
-}
-
-/* ==========================================================================
-   Navegación secundaria
-   ========================================================================== */
-
-.wpam-admin-nav {
-	display: flex; gap: 2px;
-	border-top: 1px solid var(--wpam-gray-200); margin-top: 4px;
-}
-
-.wpam-nav-item {
-	display: inline-flex; align-items: center;
-	padding: 10px 16px; font-size: 13px; font-weight: 500;
-	color: var(--wpam-gray-700); text-decoration: none;
-	border-bottom: 2px solid transparent;
-	transition: color var(--wpam-transition), border-color var(--wpam-transition);
-}
-
-.wpam-nav-item:hover          { color: var(--wpam-primary); text-decoration: none; }
-.wpam-nav-item.wpam-nav-active { color: var(--wpam-primary); border-bottom-color: var(--wpam-primary); font-weight: 600; }
-
-/* ==========================================================================
-   Contenido de páginas
-   ========================================================================== */
-
-.wpam-page-content { padding: 30px 10px 40px; max-width: 1100px; }
 
 /* ==========================================================================
    Dashboard — Welcome

@@ -1,0 +1,187 @@
+/**
+ * Bunny Plugins — Shared Admin UI Base
+ *
+ * Header, sticky nav, tabs, wrappers, badges, spacing.
+ * No plugin-specific styles here (no tables, cards, galleries, dashboards).
+ *
+ * Convention:
+ *   - Classes:   .bunny-*
+ *   - Variables: --bunny-*
+ *   - Each plugin keeps its own copy. No cross-plugin dependencies.
+ *
+ * Copy this file as-is to any new Bunny plugin and enqueue it alongside
+ * the plugin's own admin.css.
+ *
+ * @since 1.0.0
+ */
+
+/* ==========================================================================
+   Shared variables
+   ========================================================================== */
+
+:root {
+	--bunny-accent:          #6c47ff;
+	--bunny-accent-dark:     #5535e0;
+	--bunny-accent-light:    #ede9ff;
+	--bunny-border:          #e2e4e7;
+	--bunny-border-strong:   #d0d1d6;
+	--bunny-bg:              #ffffff;
+	--bunny-text-main:       #1a1a2e;
+	--bunny-text-muted:      #6b7280;
+	--bunny-text-subtle:     #a0a0b8;
+	--bunny-radius:          8px;
+	--bunny-radius-sm:       5px;
+	--bunny-radius-pill:     20px;
+	--bunny-shadow:          0 2px 12px rgba(108, 71, 255, 0.10);
+	--bunny-shadow-hover:    0 6px 24px rgba(108, 71, 255, 0.18);
+	--bunny-transition:      0.18s ease;
+	--bunny-font:            -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ==========================================================================
+   Wrap
+   ========================================================================== */
+
+.bunny-wrap {
+	margin: 0;
+	padding: 0;
+	font-family: var(--bunny-font);
+	color: var(--bunny-text-main);
+}
+
+/* ==========================================================================
+   Header block
+   ========================================================================== */
+
+.bunny-header {
+	background: var(--bunny-bg);
+	border-bottom: 1px solid var(--bunny-border);
+	box-shadow: var(--bunny-shadow);
+	margin: 0 0 0 -20px;
+	padding: 0 30px;
+	position: sticky;
+	top: 32px;
+	z-index: 100;
+}
+
+/* Top row: logo + title stack + version badge */
+.bunny-header-inner {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 14px 0 10px;
+}
+
+.bunny-logo {
+	font-size: 30px;
+	line-height: 1;
+	flex-shrink: 0;
+}
+
+.bunny-title-stack {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.bunny-plugin-name {
+	margin: 0 !important;
+	padding: 0 !important;
+	border: none !important;
+	font-size: 17px !important;
+	font-weight: 700 !important;
+	line-height: 1.2 !important;
+	color: var(--bunny-text-main) !important;
+}
+
+/* Optional subtitle shown below plugin name (current page label) */
+.bunny-page-subtitle {
+	font-size: 11px;
+	font-weight: 500;
+	color: var(--bunny-text-subtle);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.bunny-version-badge {
+	margin-left: auto;
+	background: var(--bunny-accent-light);
+	color: var(--bunny-accent);
+	font-size: 11px;
+	font-weight: 700;
+	padding: 3px 10px;
+	border-radius: var(--bunny-radius-pill);
+	letter-spacing: 0.03em;
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Tab navigation
+   ========================================================================== */
+
+.bunny-nav {
+	display: flex;
+	gap: 0;
+	border-top: 1px solid var(--bunny-border);
+	margin-top: 2px;
+	padding: 0 2px;
+}
+
+.bunny-nav-item {
+	display: inline-flex;
+	align-items: center;
+	padding: 10px 16px 8px;
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--bunny-text-muted);
+	text-decoration: none;
+	border-bottom: 3px solid transparent;
+	transition: color var(--bunny-transition), border-color var(--bunny-transition);
+}
+
+.bunny-nav-item:hover {
+	color: var(--bunny-accent);
+	border-bottom-color: var(--bunny-accent-light);
+	text-decoration: none;
+}
+
+.bunny-nav-item.bunny-nav-active {
+	color: var(--bunny-accent);
+	border-bottom-color: var(--bunny-accent);
+	font-weight: 600;
+}
+
+/* ==========================================================================
+   Page content wrapper
+   ========================================================================== */
+
+.bunny-page-content {
+	padding: 28px 0 40px;
+	max-width: 1100px;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 782px) {
+	.bunny-header {
+		margin-left: 0;
+		padding: 0 16px;
+		top: 46px; /* WP mobile admin bar height */
+	}
+
+	.bunny-plugin-name {
+		font-size: 15px !important;
+	}
+
+	.bunny-nav-item {
+		padding: 10px 10px 8px;
+		font-size: 12px;
+	}
+
+	.bunny-page-content {
+		padding: 20px 0 32px;
+	}
+}

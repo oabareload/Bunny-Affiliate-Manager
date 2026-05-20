@@ -37,9 +37,16 @@ class Admin_Assets {
 	public function enqueue_styles( string $hook_suffix ): void {
 		if ( $this->is_plugin_screen( $hook_suffix ) ) {
 			wp_enqueue_style(
+				'bunny-admin',
+				WPAM_PLUGIN_URL . 'assets/css/bunny-admin.css',
+				array(),
+				$this->version
+			);
+
+			wp_enqueue_style(
 				'wpam-admin-styles',
 				WPAM_PLUGIN_URL . 'assets/css/admin.css',
-				array(),
+				array( 'bunny-admin' ),
 				$this->version
 			);
 		}
