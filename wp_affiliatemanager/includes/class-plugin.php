@@ -37,6 +37,9 @@ require_once WPAM_PLUGIN_PATH . 'includes/admin/class-affiliates-screen.php';
 require_once WPAM_PLUGIN_PATH . 'includes/posts/class-post-links.php';
 require_once WPAM_PLUGIN_PATH . 'includes/posts/helpers-post-links.php';
 
+// --- v0.1.0: Post Affiliates board ---
+require_once WPAM_PLUGIN_PATH . 'includes/admin/class-post-affiliates-screen.php';
+
 // --- FASE 4: Render Engine ---
 require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-render-engine.php';
 require_once WPAM_PLUGIN_PATH . 'includes/frontend/helpers-render.php';
@@ -123,6 +126,11 @@ final class Plugin {
 		// 0.0.6 — AJAX handlers para inline CRUD.
 		$this->loader->add_action( 'wp_ajax_wpam_save_affiliate',    $affiliates_screen, 'ajax_save' );
 		$this->loader->add_action( 'wp_ajax_wpam_get_edit_row',      $affiliates_screen, 'ajax_get_edit_row' );
+
+		// v0.1.0 — Post Affiliates board.
+		$post_affiliates_screen = new Admin\Post_Affiliates_Screen();
+		$this->loader->add_action( 'wp_ajax_wpam_load_posts',       $post_affiliates_screen, 'ajax_load_posts' );
+		$this->loader->add_action( 'wp_ajax_wpam_save_post_links',  $post_affiliates_screen, 'ajax_save_post_links' );
 
 		// FASE 2 — Meta boxes del CPT wpam_affiliate.
 		$meta = new Affiliates\Meta();

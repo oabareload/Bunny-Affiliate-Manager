@@ -189,7 +189,6 @@ class Affiliates_Screen {
 				<div class="wpam-screen-header-info">
 					<h2 class="wpam-screen-title">
 						<?php esc_html_e( 'Affiliates', 'wp-affiliatemanager' ); ?>
-						<span class="wpam-count-badge" id="wpam-affiliates-count"><?php echo absint( $total ); ?></span>
 					</h2>
 				</div>
 				<button type="button" class="button button-primary wpam-btn-primary" id="wpam-add-affiliate-btn">

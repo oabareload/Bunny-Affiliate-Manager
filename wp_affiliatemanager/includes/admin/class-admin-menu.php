@@ -51,6 +51,15 @@ class Admin_Menu {
 
 		add_submenu_page(
 			self::PARENT_SLUG,
+			__( 'Post Affiliates — Bunny Affiliate Manager', 'wp-affiliatemanager' ),
+			__( 'Post Affiliates', 'wp-affiliatemanager' ),
+			self::CAPABILITY,
+			'wpam-post-affiliates',
+			array( $this, 'render_post_affiliates_page' )
+		);
+
+		add_submenu_page(
+			self::PARENT_SLUG,
 			__( 'Settings — Bunny Affiliate Manager', 'wp-affiliatemanager' ),
 			__( 'Settings', 'wp-affiliatemanager' ),
 			self::CAPABILITY,
@@ -130,6 +139,19 @@ class Admin_Menu {
 		$this->render_admin_footer();
 	}
 
+	public function render_post_affiliates_page(): void {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'No tienes permisos para acceder a esta página.', 'wp-affiliatemanager' ) );
+		}
+
+		$this->render_admin_header( __( 'Post Affiliates', 'wp-affiliatemanager' ) );
+
+		$screen = new Post_Affiliates_Screen();
+		$screen->render();
+
+		$this->render_admin_footer();
+	}
+
 	// -------------------------------------------------------------------------
 	// Settings
 	// -------------------------------------------------------------------------
@@ -181,9 +203,10 @@ class Admin_Menu {
 		$current_page = isset( $_GET['page'] ) ? sanitize_key( $_GET['page'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 
 		$nav_items = array(
-			'wpam-dashboard'  => __( 'Dashboard', 'wp-affiliatemanager' ),
-			'wpam-affiliates' => __( 'Affiliates', 'wp-affiliatemanager' ),
-			'wpam-settings'   => __( 'Settings', 'wp-affiliatemanager' ),
+			'wpam-dashboard'        => __( 'Dashboard', 'wp-affiliatemanager' ),
+			'wpam-affiliates'       => __( 'Affiliates', 'wp-affiliatemanager' ),
+			'wpam-post-affiliates'  => __( 'Post Affiliates', 'wp-affiliatemanager' ),
+			'wpam-settings'         => __( 'Settings', 'wp-affiliatemanager' ),
 		);
 
 		foreach ( $nav_items as $slug => $label ) {

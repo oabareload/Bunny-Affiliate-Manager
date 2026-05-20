@@ -23,6 +23,7 @@ class Admin_Assets {
 	private array $plugin_screens = array(
 		'toplevel_page_wpam-dashboard',
 		'bunny-affiliates_page_wpam-affiliates',
+		'bunny-affiliates_page_wpam-post-affiliates',
 		'bunny-affiliates_page_wpam-settings',
 	);
 
@@ -56,6 +57,16 @@ class Admin_Assets {
 				'wpam-post-links-styles',
 				WPAM_PLUGIN_URL . 'assets/css/post-links.css',
 				array(),
+				$this->version
+			);
+		}
+
+		// Post Affiliates screen (v0.1.0).
+		if ( 'bunny-affiliates_page_wpam-post-affiliates' === $hook_suffix ) {
+			wp_enqueue_style(
+				'wpam-post-affiliates-styles',
+				WPAM_PLUGIN_URL . 'assets/css/post-affiliates.css',
+				array( 'wpam-admin-styles' ),
 				$this->version
 			);
 		}
@@ -99,6 +110,34 @@ class Admin_Assets {
 			// Media Library: CPT edit screen + pantalla inline de affiliates (v0.0.6).
 			if ( $this->is_cpt_edit_screen( $hook_suffix ) || 'bunny-affiliates_page_wpam-affiliates' === $hook_suffix ) {
 				wp_enqueue_media();
+			}
+
+			// Post Affiliates screen (v0.1.0).
+			if ( 'bunny-affiliates_page_wpam-post-affiliates' === $hook_suffix ) {
+				wp_enqueue_script(
+					'wpam-post-affiliates-scripts',
+					WPAM_PLUGIN_URL . 'assets/js/post-affiliates.js',
+					array( 'jquery' ),
+					$this->version,
+					true
+				);
+
+				wp_localize_script(
+					'wpam-post-affiliates-scripts',
+					'wpamPAData',
+					array(
+						'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
+						'moreLimit'  => 10,
+						'i18n'       => array(
+							'saving'      => __( 'Saving…', 'wp-affiliatemanager' ),
+							'saved'       => __( 'Saved!', 'wp-affiliatemanager' ),
+							'error'       => __( 'Error. Please try again.', 'wp-affiliatemanager' ),
+							'loading'     => __( 'Loading…', 'wp-affiliatemanager' ),
+							'no_more'     => __( 'No more posts.', 'wp-affiliatemanager' ),
+							'confirm_del' => __( 'Remove this link?', 'wp-affiliatemanager' ),
+						),
+					)
+				);
 			}
 		}
 

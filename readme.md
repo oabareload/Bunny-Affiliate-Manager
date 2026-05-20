@@ -18,9 +18,13 @@ A modular and scalable affiliate link management plugin for WordPress that allow
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v0.0.7)
+## Current scope (v0.1.0)
 
-- Custom Post Type `wpam_affiliate` for native WordPress affiliate storage.
+- **Post Affiliates board:** new admin screen to manage affiliate links per post — visual rows with thumbnail, status, date, and affiliate chips. Inline editor (expand/collapse, no modal). Incremental loading (20 initial, +10 Load More). Search by title, filter by category and tag.
+- Affiliate logo picker via WordPress Media Library (inline CRUD).
+- Affiliate fields: `domains` (informational) and `visible` (checkbox).
+
+
 - Full affiliate CRUD: create, edit, delete, activate, deactivate.
 - Per-affiliate fields: name, slug, URL parameter, value, logo, brand color.
 - Admin affiliate table with logo, status, parameter, and value columns.
@@ -205,6 +209,22 @@ Yes. Set the **Brand Color** field in each affiliate's settings. The CSS variabl
 - All user-facing strings use the `wp_affiliatemanager` text domain.
 
 ## Changelog
+
+### 0.1.0 — Post Affiliates Board
+
+- New screen: **Post Affiliates** (`wpam-post-affiliates`) — visual board to manage affiliate links per post from a single place.
+- New file: `includes/admin/class-post-affiliates-screen.php` — renders the board, AJAX handlers.
+- New file: `assets/js/post-affiliates.js` — toolbar search/filter with debounce, load more (append), inline editor expand/collapse, save via AJAX, replace row on response.
+- New file: `assets/css/post-affiliates.css` — board styles: row card with thumbnail, chips, inline editor.
+- New AJAX action: `wpam_load_posts` (unified: initial load + load more + search/filter). Params: `offset`, `limit`, `search`, `category`, `tag`. Returns HTML + `has_more`.
+- New AJAX action: `wpam_save_post_links` — receives full links array from client, validates/sanitizes, writes to `_wpam_links`, returns updated row HTML.
+- `class-admin-menu.php`: added `wpam-post-affiliates` submenu page and nav item.
+- `class-admin-assets.php`: registers and enqueues `post-affiliates.js` + `post-affiliates.css` only on the new screen.
+- `class-plugin.php`: `require_once` for new screen class + two AJAX hooks registered.
+- Fix: removed counter badge `<span class="wpam-count-badge">` from Affiliates screen title (cosmetic zero display).
+- Performance: `query_posts()` uses `fields => ids`, `no_found_rows => true`, `update_post_meta_cache => false`, `update_post_term_cache => false` — safe for 500-1000+ posts.
+- Reutilization: editor inline reuses `.wpam-edit-form`, `.wpam-edit-grid`, `.wpam-input`, `.wpam-saving-indicator` from existing `admin.css`.
+- Version bumped to `0.1.0` in plugin header and `WPAM_VERSION` constant.
 
 ### 0.0.7 — Bunny Admin UI Homologation
 
