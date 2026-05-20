@@ -129,13 +129,20 @@ class Admin_Assets {
 						'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
 						'moreLimit'  => 10,
 						'i18n'       => array(
-							'saving'      => __( 'Saving…', 'wp-affiliatemanager' ),
-							'saved'       => __( 'Saved!', 'wp-affiliatemanager' ),
-							'error'       => __( 'Error. Please try again.', 'wp-affiliatemanager' ),
-							'loading'     => __( 'Loading…', 'wp-affiliatemanager' ),
-							'no_more'     => __( 'No more posts.', 'wp-affiliatemanager' ),
-							'confirm_del' => __( 'Remove this link?', 'wp-affiliatemanager' ),
-						),
+						'saving'             => __( 'Saving…', 'wp-affiliatemanager' ),
+						'saved'              => __( 'Saved!', 'wp-affiliatemanager' ),
+						'error'              => __( 'Error. Please try again.', 'wp-affiliatemanager' ),
+						'loading'            => __( 'Loading…', 'wp-affiliatemanager' ),
+						'no_more'            => __( 'No more posts.', 'wp-affiliatemanager' ),
+						'confirm_del'        => __( 'Remove this link?', 'wp-affiliatemanager' ),
+						 'remove_link'        => __( 'Remove this link', 'wp-affiliatemanager' ),
+						'select_placeholder' => __( '— Select —', 'wp-affiliatemanager' ),
+						'label_affiliate'    => __( 'Affiliate', 'wp-affiliatemanager' ),
+						'label_url'          => __( 'URL', 'wp-affiliatemanager' ),
+						'label_label'        => __( 'Label', 'wp-affiliatemanager' ),
+						'label_optional'     => __( 'opt.', 'wp-affiliatemanager' ),
+						'label_placeholder'  => __( 'e.g. Buy on Amazon', 'wp-affiliatemanager' ),
+					),
 					)
 				);
 			}

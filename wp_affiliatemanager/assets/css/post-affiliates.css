@@ -1,48 +1,76 @@
 /**
  * Bunny Affiliate Manager — Post Affiliates Board
  *
- * Extiende admin.css (que provee las variables CSS y clases base).
- * Aquí solo están los estilos específicos del board de Post Affiliates.
+ * v0.1.1:
+ * - Toolbar rediseñado (search + selects + status pills en mismo nivel).
+ * - Chips visuales con logo, color y label.
+ * - Botón "+" como card-chip coherente.
+ * - Mejor spacing, hover y contraste.
+ * - Load More más visible.
+ *
+ * Extiende admin.css (provee variables CSS y clases base).
  *
  * @package WP_AffiliateManager
  * @since   0.1.0
+ * @version 0.1.1
  */
 
 /* ==========================================================================
-   Toolbar (búsqueda + filtros)
+   Toolbar
    ========================================================================== */
 
 .wpam-pa-toolbar {
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	margin-bottom: 20px;
+	gap: 10px;
+	margin-bottom: 24px;
 	flex-wrap: wrap;
+	background: #fff;
+	border: 1px solid var(--wpam-gray-200);
+	border-radius: var(--wpam-radius);
+	padding: 12px 16px;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 
+/* Buscador */
 .wpam-pa-search-wrap {
+	position: relative;
 	flex: 1;
-	min-width: 200px;
+	min-width: 180px;
+}
+
+.wpam-pa-search-icon {
+	position: absolute;
+	left: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	font-size: 13px;
+	pointer-events: none;
+	opacity: 0.5;
 }
 
 .wpam-pa-search {
 	width: 100%;
-	padding: 8px 14px;
+	padding: 8px 12px 8px 32px;
+	height: 36px;
 	border: 1px solid var(--wpam-gray-200);
 	border-radius: var(--wpam-radius-sm);
 	font-size: 13px;
 	color: var(--wpam-gray-700);
-	background: #fff;
-	transition: border-color var(--wpam-transition), box-shadow var(--wpam-transition);
+	background: var(--wpam-gray-100);
+	transition: border-color var(--wpam-transition), background var(--wpam-transition), box-shadow var(--wpam-transition);
+	box-sizing: border-box;
 	box-shadow: none;
 }
 
 .wpam-pa-search:focus {
 	outline: none;
 	border-color: var(--wpam-primary);
+	background: #fff;
 	box-shadow: 0 0 0 3px var(--wpam-primary-light);
 }
 
+/* Selects de categoría y tag */
 .wpam-pa-filters {
 	display: flex;
 	gap: 8px;
@@ -50,20 +78,58 @@
 }
 
 .wpam-pa-filter-select {
-	padding: 7px 12px;
+	height: 36px;
+	padding: 0 10px;
 	border: 1px solid var(--wpam-gray-200);
 	border-radius: var(--wpam-radius-sm);
 	font-size: 12px;
 	color: var(--wpam-gray-700);
-	background: #fff;
+	background: var(--wpam-gray-100);
 	cursor: pointer;
-	min-width: 140px;
-	transition: border-color var(--wpam-transition);
+	min-width: 130px;
+	transition: border-color var(--wpam-transition), background var(--wpam-transition);
 }
 
 .wpam-pa-filter-select:focus {
 	outline: none;
 	border-color: var(--wpam-primary);
+	background: #fff;
+}
+
+/* Segmented control de status — v0.1.1 */
+.wpam-pa-status-filter {
+	display: flex;
+	gap: 2px;
+	background: var(--wpam-gray-100);
+	border: 1px solid var(--wpam-gray-200);
+	border-radius: var(--wpam-radius-sm);
+	padding: 3px;
+}
+
+.wpam-pa-status-pill {
+	height: 28px;
+	padding: 0 12px;
+	border: none;
+	border-radius: calc(var(--wpam-radius-sm) - 2px);
+	background: transparent;
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--wpam-gray-400);
+	cursor: pointer;
+	transition: background var(--wpam-transition), color var(--wpam-transition);
+	white-space: nowrap;
+}
+
+.wpam-pa-status-pill:hover {
+	color: var(--wpam-gray-700);
+	background: rgba(0,0,0,0.04);
+}
+
+.wpam-pa-status-pill--active {
+	background: #fff;
+	color: var(--wpam-primary);
+	font-weight: 700;
+	box-shadow: 0 1px 4px rgba(0,0,0,0.10);
 }
 
 /* ==========================================================================
@@ -73,7 +139,7 @@
 .wpam-pa-board {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 10px;
 }
 
 /* ==========================================================================
@@ -84,25 +150,21 @@
 	background: #fff;
 	border: 1px solid var(--wpam-gray-200);
 	border-radius: var(--wpam-radius);
-	display: grid;
-	grid-template-columns: 108px 1fr auto;
-	grid-template-rows: auto auto;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: stretch;
 	overflow: hidden;
 	transition: box-shadow var(--wpam-transition), border-color var(--wpam-transition);
-	/* El editor ocupa la fila completa debajo */
-	grid-template-areas:
-		"thumb info  links"
-		"editor editor editor";
 }
 
 .wpam-pa-row:hover {
-	box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+	box-shadow: 0 3px 14px rgba(0,0,0,0.07);
 	border-color: var(--wpam-gray-300, #d0d5dd);
 }
 
 .wpam-pa-row--editing {
-	border-color: var(--wpam-primary-light);
-	box-shadow: 0 2px 14px rgba(108,71,255,0.10);
+	border-color: var(--wpam-primary);
+	box-shadow: 0 3px 18px rgba(108,71,255,0.12);
 }
 
 /* Flash al guardar */
@@ -115,15 +177,14 @@
 	25%       { background: var(--wpam-success-light); }
 }
 
-/* ── Thumbnail ─────────────────────────────────────────────────── */
+/* ── Thumbnail ─── */
 
 .wpam-pa-thumb {
-	grid-area: thumb;
 	width: 108px;
+	flex-shrink: 0;
 	align-self: stretch;
 	overflow: hidden;
 	background: var(--wpam-gray-100);
-	flex-shrink: 0;
 }
 
 .wpam-pa-thumb img {
@@ -136,7 +197,7 @@
 .wpam-pa-thumb-placeholder {
 	width: 100%;
 	height: 100%;
-	min-height: 72px;
+	min-height: 76px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -144,16 +205,17 @@
 	color: var(--wpam-gray-300);
 }
 
-/* ── Info central ──────────────────────────────────────────────── */
+/* ── Info central ── */
 
 .wpam-pa-info {
-	grid-area: info;
-	padding: 14px 16px;
+	flex: 1 1 200px;
+	min-width: 0;
+	max-width: 340px;
+	padding: 14px 18px;
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
-	gap: 5px;
-	min-width: 0; /* evitar overflow del título */
+	gap: 6px;
 }
 
 .wpam-pa-post-title {
@@ -175,7 +237,7 @@
 .wpam-pa-meta {
 	display: flex;
 	align-items: center;
-	gap: 10px;
+	gap: 8px;
 	flex-wrap: wrap;
 }
 
@@ -192,27 +254,25 @@
 	text-transform: uppercase;
 	padding: 2px 8px;
 	border-radius: 20px;
+	display: inline-block;
 }
 
 .wpam-pa-status--publish { background: var(--wpam-success-light); color: var(--wpam-success); }
-.wpam-pa-status--draft   { background: var(--wpam-gray-100);      color: var(--wpam-gray-400); }
+.wpam-pa-status--draft   { background: var(--wpam-gray-100);      color: var(--wpam-gray-400); border: 1px solid var(--wpam-gray-200); }
 .wpam-pa-status--pending { background: #fff3cd;                    color: #856404; }
 .wpam-pa-status--private { background: #f3e8ff;                    color: #7c3aed; }
 .wpam-pa-status--future  { background: #e0f2fe;                    color: #0369a1; }
 
-/* ── Links area (chips + botón "+") ───────────────────────────── */
+/* ── Links area (chips + "+") ── */
 
 .wpam-pa-links-area {
-	grid-area: links;
-	padding: 12px 14px;
+	flex: 1 1 180px;
+	padding: 10px 14px;
 	display: flex;
 	align-items: center;
 	flex-wrap: wrap;
 	gap: 6px;
-	justify-content: flex-end;
 	align-self: center;
-	min-width: 120px;
-	max-width: 320px;
 }
 
 .wpam-pa-no-links {
@@ -221,53 +281,98 @@
 	font-style: italic;
 }
 
-/* Chip */
+/* ==========================================================================
+   Chips visuales — v0.1.1 (revisado)
+   ========================================================================== */
+
 .wpam-pa-chip {
 	display: inline-flex;
 	align-items: center;
-	gap: 4px;
-	padding: 3px 10px;
-	border-radius: 20px;
-	background: var(--wpam-primary-light);
-	color: var(--wpam-primary);
-	font-size: 11px;
+	gap: 6px;
+	padding: 5px 10px 5px 6px;
+	border-radius: 6px;
+	background: var(--chip-bg, #f0eeff);
+	color: var(--chip-color, var(--wpam-primary));
+	font-size: 12px;
 	font-weight: 600;
-	border: 1px solid transparent;
+	border: 1px solid rgba(0,0,0,0.07);
 	cursor: pointer;
 	white-space: nowrap;
-	transition: background var(--wpam-transition), border-color var(--wpam-transition);
-	max-width: 120px;
-	overflow: hidden;
+	max-width: 150px;
+	transition: filter var(--wpam-transition), box-shadow var(--wpam-transition);
 	text-overflow: ellipsis;
+	overflow: hidden;
 }
 
 .wpam-pa-chip:hover {
-	background: var(--wpam-primary);
-	color: #fff;
+	filter: brightness(0.94);
+	box-shadow: 0 1px 6px rgba(0,0,0,0.10);
 }
 
-.wpam-pa-chip--orphan {
-	background: #fff3cd;
-	color: #856404;
+/* Imagen del logo dentro del chip */
+.wpam-pa-chip-logo {
+	width: 18px;
+	height: 18px;
+	border-radius: 3px;
+	object-fit: contain;
+	background: rgba(255,255,255,0.8);
+	flex-shrink: 0;
 }
 
-/* Botón "+" */
-.wpam-pa-add-btn {
-	width: 28px;
-	height: 28px;
-	border-radius: 50%;
-	border: 2px dashed var(--wpam-gray-200);
-	background: transparent;
-	color: var(--wpam-gray-400);
-	font-size: 18px;
-	line-height: 1;
-	cursor: pointer;
+/* Inicial cuando no hay logo */
+.wpam-pa-chip-initial {
+	width: 18px;
+	height: 18px;
+	border-radius: 3px;
+	background: rgba(255,255,255,0.45);
+	font-size: 10px;
+	font-weight: 800;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	transition: border-color var(--wpam-transition), color var(--wpam-transition), background var(--wpam-transition);
 	flex-shrink: 0;
-	padding: 0;
+	line-height: 1;
+}
+
+.wpam-pa-chip-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Chip huérfano */
+.wpam-pa-chip--orphan {
+	background: #fff3cd;
+	color: #856404;
+	border-color: #f0c842;
+}
+
+.wpam-pa-chip-orphan-icon {
+	font-size: 12px;
+	flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Botón "+" — chip visual coherente
+   ========================================================================== */
+
+.wpam-pa-add-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 30px;
+	padding: 0 10px;
+	border-radius: 6px;
+	border: 1.5px dashed var(--wpam-gray-300);
+	background: transparent;
+	color: var(--wpam-gray-400);
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+	white-space: nowrap;
+	transition: border-color var(--wpam-transition), color var(--wpam-transition),
+	            background var(--wpam-transition);
+	flex-shrink: 0;
 }
 
 .wpam-pa-add-btn:hover {
@@ -276,20 +381,34 @@
 	background: var(--wpam-primary-light);
 }
 
-/* ── Editor inline ────────────────────────────────────────────── */
+.wpam-pa-add-btn-icon {
+	font-size: 16px;
+	line-height: 1;
+	font-weight: 400;
+}
+
+.wpam-pa-add-btn-label {
+	font-size: 11px;
+	letter-spacing: 0.02em;
+}
+
+/* ==========================================================================
+   Editor inline
+   ========================================================================== */
 
 .wpam-pa-editor {
-	grid-area: editor;
+	width: 100%;
+	flex-basis: 100%;
 	border-top: 1px solid var(--wpam-gray-200);
 	background: var(--wpam-gray-100);
 }
 
 .wpam-pa-edit-form {
-	/* Hereda .wpam-edit-form de admin.css */
 	border: none;
 	border-radius: 0;
 	box-shadow: none;
 	background: transparent;
+	padding: 16px 18px 14px;
 }
 
 .wpam-pa-editor-header {
@@ -297,12 +416,16 @@
 	align-items: center;
 	justify-content: space-between;
 	margin-bottom: 14px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid var(--wpam-gray-200);
 }
 
 .wpam-pa-editor-title {
-	font-size: 13px;
+	font-size: 12px;
 	font-weight: 700;
 	color: var(--wpam-gray-700);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
 }
 
 .wpam-pa-editor-close {
@@ -311,7 +434,7 @@
 	cursor: pointer;
 	font-size: 14px;
 	color: var(--wpam-gray-400);
-	padding: 4px;
+	padding: 4px 6px;
 	line-height: 1;
 	border-radius: var(--wpam-radius-sm);
 	transition: color var(--wpam-transition), background var(--wpam-transition);
@@ -322,19 +445,19 @@
 	background: var(--wpam-danger-light);
 }
 
-/* Lista de links en el editor */
+/* Lista de links */
 .wpam-pa-link-list {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
-	margin-bottom: 12px;
+	margin-bottom: 14px;
 }
 
 .wpam-pa-link-empty {
 	font-size: 12px;
 	color: var(--wpam-gray-400);
 	font-style: italic;
-	margin: 0;
+	margin: 0 0 4px;
 }
 
 /* Ítem de link */
@@ -345,19 +468,24 @@
 	padding: 12px;
 }
 
-/* Grid de campos del link item — más compacto que el grid de affiliates */
+.wpam-pa-link-item--new {
+	border-color: var(--wpam-primary-light);
+	animation: wpam-pa-item-appear 0.18s ease;
+}
+
+@keyframes wpam-pa-item-appear {
+	from { opacity: 0; transform: translateY(-4px); }
+	to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Grid compacto de campos del link */
 .wpam-pa-link-grid {
-	grid-template-columns: 1fr 1.5fr 1fr auto !important;
+	grid-template-columns: 1fr 1.4fr 1fr auto !important;
 	align-items: end;
 	gap: 10px !important;
+	margin-bottom: 0 !important;
 }
 
-/* Campo URL: un poco más ancho */
-.wpam-edit-field--url {
-	min-width: 0;
-}
-
-/* Botón eliminar item */
 .wpam-pa-item-remove-wrap {
 	min-width: 36px;
 }
@@ -374,25 +502,24 @@
 	background: var(--wpam-danger-light) !important;
 }
 
-/* Formulario "nuevo link" */
-.wpam-pa-new-link-wrap {
-	margin-top: 8px;
-}
-
 /* ==========================================================================
    Estado vacío
    ========================================================================== */
 
 .wpam-pa-empty {
 	text-align: center;
-	padding: 60px 20px;
+	padding: 64px 20px;
 	color: var(--wpam-gray-400);
+	background: #fff;
+	border: 1px solid var(--wpam-gray-200);
+	border-radius: var(--wpam-radius);
 }
 
 .wpam-pa-empty-icon {
 	font-size: 36px;
 	display: block;
 	margin-bottom: 10px;
+	opacity: 0.6;
 }
 
 .wpam-pa-empty p {
@@ -406,34 +533,63 @@
 
 .wpam-pa-load-more-wrap {
 	text-align: center;
-	padding: 20px 0 8px;
+	padding: 24px 0 8px;
 }
 
 .wpam-pa-load-more-btn {
-	min-width: 160px;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	height: 40px;
+	padding: 0 28px;
+	border: 1.5px solid var(--wpam-primary);
+	border-radius: 20px;
+	background: transparent;
+	color: var(--wpam-primary);
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background var(--wpam-transition), color var(--wpam-transition),
+	            box-shadow var(--wpam-transition);
+}
+
+.wpam-pa-load-more-btn:hover {
+	background: var(--wpam-primary);
+	color: #fff;
+	box-shadow: 0 4px 14px rgba(108,71,255,0.22);
+}
+
+.wpam-pa-load-more-btn:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.wpam-pa-load-more-arrow {
+	font-size: 14px;
+	transition: transform var(--wpam-transition);
+}
+
+.wpam-pa-load-more-btn:hover .wpam-pa-load-more-arrow {
+	transform: translateY(2px);
 }
 
 /* ==========================================================================
    Responsive
    ========================================================================== */
 
-@media ( max-width: 782px ) {
-	.wpam-pa-row {
-		grid-template-columns: 80px 1fr;
-		grid-template-areas:
-			"thumb info"
-			"links links"
-			"editor editor";
+@media ( max-width: 900px ) {
+	.wpam-pa-thumb {
+		width: 80px;
 	}
 
-	.wpam-pa-thumb { width: 80px; }
+	.wpam-pa-info {
+		max-width: none;
+	}
 
 	.wpam-pa-links-area {
-		grid-area: links;
-		justify-content: flex-start;
+		flex-basis: 100%;
 		border-top: 1px solid var(--wpam-gray-200);
 		padding: 10px 14px;
-		max-width: 100%;
 	}
 
 	.wpam-pa-link-grid {
@@ -443,9 +599,20 @@
 	.wpam-pa-item-remove-wrap {
 		grid-column: span 2;
 	}
+}
 
+@media ( max-width: 600px ) {
 	.wpam-pa-toolbar {
 		flex-direction: column;
 		align-items: stretch;
+		gap: 8px;
+	}
+
+	.wpam-pa-status-filter {
+		flex-wrap: wrap;
+	}
+
+	.wpam-pa-filter-select {
+		min-width: 100%;
 	}
 }

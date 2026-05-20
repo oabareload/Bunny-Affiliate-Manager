@@ -210,6 +210,36 @@ Yes. Set the **Brand Color** field in each affiliate's settings. The CSS variabl
 
 ## Changelog
 
+### 0.1.2 — Post Affiliates State Fixes & Visual Polish
+
+- Fix: Remove + Cancel ya no elimina afiliados visualmente de forma permanente. El botón X ahora solo afecta el estado temporal del editor abierto; Cancel restaura el estado original desde un snapshot HTML serializado inmutable capturado en `open()`, garantizando que los nodos eliminados en sesión reaparezcen exactamente como estaban.
+- Fix: El snapshot anterior guardaba referencias jQuery vivas (`$item: $( this )`) al DOM; cuando el nodo era eliminado por `.remove()`, la referencia quedaba huérfana y Cancel no podía restaurarlo. El snapshot ahora es `{ listHtml: string, emptyVisible: bool }` — una cadena de texto serializada con `$list.html()` que `.remove()` no puede mutar.
+- Fix: `cancel()` reconstruye la lista completa con `$list.html( snap.listHtml )` en lugar de iterar nodos vivos con índices desincronizados. Esto garantiza restauración exacta aunque se hayan eliminado, reordenado o añadido filas temporales durante la sesión.
+- Fix: El snapshot se elimina con `delete Editor._snapshots[ postId ]` tanto en `cancel()` como en `save()`, evitando snapshots huérfanos que podrían contaminar aperturas posteriores del editor.
+- Fix: Layout horizontal del board corregido de `display: grid` con `grid-template-areas` a `display: flex; flex-wrap: wrap`. El título del post usa `flex: 1 1 200px; max-width: 340px` y la área de chips usa `flex: 1 1 180px` sin `max-width` fijo, eliminando el gran hueco vacío a la derecha.
+- Fix: El editor inline usa `width: 100%; flex-basis: 100%` para ocupar fila completa dentro del contenedor flex, reemplazando el `grid-area: editor` que ya no aplica.
+- Mejora visual: Chips de afiliados cambian de pill ultra-redondeada (`border-radius: 20px`) a mini-card compacta (`border-radius: 6px`) con borde sutil `rgba(0,0,0,0.07)`, eliminando el aspecto de badge/tag genérico.
+- Mejora visual: Logo/inicial dentro del chip aumenta de 16px a 18px y cambia de `border-radius: 50%` (círculo) a `border-radius: 3px` (cuadrado suave), más legible y consistente con el estilo card.
+- Mejora visual: Hover de chips simplificado a `filter: brightness(0.94)` + `box-shadow` suave, eliminando `transform: translateY(-1px)` innecesario.
+- Mejora visual: Botón "+" adopta `border-radius: 6px` coherente con los chips, altura 30px, sin animación de elevar en hover.
+- Version bumped to `0.1.2`.
+
+### 0.1.1 — Post Affiliates UX/UI Fixes
+
+- Fix: "Add Link" ahora siempre inyecta una fila nueva clonada dinámicamente desde JS. Eliminado el contenedor reutilizable `#wpam-pa-new-wrap-{id}` — cada clic crea un nódo `<div>` único con ID basado en `Date.now()`. Resuelve el problema donde clics adicionales no producían nueva fila.
+- Fix: Cancel y Save ahora destruyen el estado temporal completamente. Save reemplaza el row completo con HTML fresco del servidor (editor colapsado). Cancel elimina todas las filas marcadas como `.wpam-pa-link-item--new` y restaura los valores originales de las filas existentes desde atributos `data-orig-*`.
+- Fix: El editor ya no reaparece con datos stale al reabrir después de Cancel, porque el DOM fue limpiado antes de cerrar.
+- New: Filtro de status en toolbar (segmented control: All / Published / Draft / Scheduled). La selección activa aplica `post_status` a la query AJAX `wpam_load_posts`. El PHP valida el valor contra `VALID_STATUSES` whitelist.
+- New: `query_posts()` acepta parámetro `$status` y aplica `post_status` dinámico; `ajax_load_posts()` acepta `status` POST var.
+- Mejora: Chips de afiliados rediseñados como mini-cards visuales: logo 16px circular + label + color del afiliado via `--chip-color`/`--chip-bg` CSS custom properties. PHP calcula el `rgba()` del `brand_color` con `hex_to_rgba()`. Hover con `filter: brightness + transform + box-shadow`.
+- Mejora: Botón "+" rediseñado como chip dashed con icono y label “Add”, coherente con la galía de chips.
+- Mejora: Toolbar rediseñado: todos los controles tienen la misma altura (36px), icono de lupa en el search, `background: var(--wpam-gray-100)`, `box-shadow` suave, transición al foco.
+- Mejora: Load More rediseñado como botón pill con borde `var(--wpam-primary)`, flecha animada en hover.
+- Mejora: Filas nuevas aparecen con animación `wpam-pa-item-appear` (fade + slide down 4px).
+- Mejora: Clase `wpam-pa-status--draft` ahora tiene borde `var(--wpam-gray-200)` para mejor contraste en fondo blanco.
+- `class-admin-assets.php`: añadidas strings i18n para el constructor dinámico de filas JS (`label_affiliate`, `label_url`, `label_label`, `label_optional`, `label_placeholder`, `select_placeholder`, `remove_link`).
+- Version bumped to `0.1.1`.
+
 ### 0.1.0 — Post Affiliates Board
 
 - New screen: **Post Affiliates** (`wpam-post-affiliates`) — visual board to manage affiliate links per post from a single place.
