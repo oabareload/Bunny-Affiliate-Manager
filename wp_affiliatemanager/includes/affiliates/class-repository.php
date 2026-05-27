@@ -122,6 +122,60 @@ class Repository {
 	}
 
 	/**
+	 * Busca el primer afiliado activo cuyo campo `domains` contenga el dominio dado.
+	 *
+	 * Reglas de matching (sin PSL):
+	 *   - Exacto:  "amazon.com"     matches "amazon.com"
+	 *   - Sufijo:  "shop.genki.com" matches "genki.com" (termina en ".genki.com")
+	 *   - NO:      "amazon.com.mx"  NO matches "amazon.com"
+	 *
+	 * El campo `domains` es una cadena separada por comas, ej: "amazon.com, amzn.to".
+	 * Cada entry se normaliza con wpam_normalize_domain() antes de comparar.
+	 *
+	 * @since  0.1.3
+	 * @param  string $domain Dominio ya normalizado (sin www., sin protocolo).
+	 *                        Usar wpam_extract_domain_from_url() para obtenerlo de una URL.
+	 * @return array|null Afiliado normalizado o null si no hay coincidencia.
+	 */
+	public function find_by_domain( string $domain ): ?array {
+		$domain = strtolower( trim( $domain ) );
+
+		if ( ! $domain ) {
+			return null;
+		}
+
+		$result = $this->find_all( array( 'active' => true, 'per_page' => -1 ) );
+
+		foreach ( $result['items'] as $affiliate ) {
+			$raw_domains = trim( $affiliate['domains'] ?? '' );
+
+			if ( ! $raw_domains ) {
+				continue;
+			}
+
+			foreach ( explode( ',', $raw_domains ) as $entry ) {
+				$aff_domain = wpam_normalize_domain( $entry );
+
+				if ( ! $aff_domain ) {
+					continue;
+				}
+
+				// Match exacto.
+				if ( $domain === $aff_domain ) {
+					return $affiliate;
+				}
+
+				// Match por sufijo: "shop.genki.com" termina en ".genki.com".
+				if ( str_ends_with( $domain, '.' . $aff_domain ) ) {
+					return $affiliate;
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
 	 * Crea o actualiza un afiliado.
 	 *
 	 * @since  2.0.0

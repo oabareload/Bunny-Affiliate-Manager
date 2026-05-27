@@ -1,6 +1,12 @@
 /**
  * Bunny Affiliate Manager — Post Affiliates Board
  *
+ * v0.1.3:
+ * - Estados --detected / --error en items de link.
+ * - Chip de preview de afiliado detectado (.wpam-pa-detect-chip).
+ * - Error inline animado (.wpam-pa-url-error).
+ * - Botón Save deshabilitado cuando hay errores.
+ *
  * v0.1.1:
  * - Toolbar rediseñado (search + selects + status pills en mismo nivel).
  * - Chips visuales con logo, color y label.
@@ -615,4 +621,100 @@
 	.wpam-pa-filter-select {
 		min-width: 100%;
 	}
+}
+
+/* ==========================================================================
+   v0.1.3 — Estados de detección de afiliado
+   ========================================================================== */
+
+/* Item detectado correctamente — borde verde sutil */
+.wpam-pa-link-item--detected {
+	border-color: #86efac;
+	background: #f0fdf4;
+}
+
+/* Item con error de detección — borde rojo */
+.wpam-pa-link-item--error {
+	border-color: #fca5a5;
+	background: #fff5f5;
+}
+
+/* Input URL en estado error */
+.wpam-pa-link-item--error .wpam-pa-url-input,
+.wpam-pa-link-item--error .wpam-input[type="url"] {
+	border-color: var(--wpam-danger, #dc2626);
+}
+
+/* Input URL en estado detectado */
+.wpam-pa-link-item--detected .wpam-pa-url-input,
+.wpam-pa-link-item--detected .wpam-input[type="url"] {
+	border-color: #86efac;
+}
+
+/* Contenedor del preview de detección */
+.wpam-pa-detect-preview {
+	min-height: 0;
+	margin-top: 6px;
+}
+
+/* Chip del afiliado detectado */
+.wpam-pa-detect-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 10px 4px 6px;
+	border-radius: 6px;
+	border: 1px solid var(--chip-color, var(--wpam-primary));
+	background: var(--chip-bg, #f0eeff);
+	color: var(--chip-color, var(--wpam-primary));
+	font-size: 12px;
+	font-weight: 600;
+	animation: wpam-chip-pop 200ms ease;
+}
+
+@keyframes wpam-chip-pop {
+	from { opacity: 0; transform: scale(0.90); }
+	to   { opacity: 1; transform: scale(1); }
+}
+
+.wpam-pa-detect-chip .wpam-pa-chip-logo {
+	width: 16px;
+	height: 16px;
+	object-fit: contain;
+	border-radius: 2px;
+}
+
+.wpam-pa-detect-chip-name {
+	font-weight: 600;
+}
+
+/* Error inline */
+.wpam-pa-url-error {
+	margin-top: 5px;
+	padding: 5px 10px;
+	border-radius: var(--wpam-radius-sm);
+	background: var(--wpam-danger-light, #fee2e2);
+	color: var(--wpam-danger, #dc2626);
+	font-size: 12px;
+	font-weight: 500;
+	border-left: 3px solid var(--wpam-danger, #dc2626);
+	animation: wpam-error-slidein 160ms ease;
+}
+
+@keyframes wpam-error-slidein {
+	from { opacity: 0; transform: translateY(-4px); }
+	to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Campo URL dentro del item (flex column para apilar preview + error) */
+.wpam-pa-url-field {
+	display: flex;
+	flex-direction: column;
+}
+
+/* Botón Save deshabilitado */
+.wpam-btn-primary:disabled,
+.wpam-pa-save-btn:disabled {
+	opacity: 0.45 !important;
+	cursor: not-allowed !important;
 }

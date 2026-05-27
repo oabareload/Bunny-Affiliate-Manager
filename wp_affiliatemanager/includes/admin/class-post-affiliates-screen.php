@@ -7,7 +7,7 @@
  *
  * @package WP_AffiliateManager\Admin
  * @since   0.1.0
- * @version 0.1.1
+ * @version 0.1.3
  */
 
 namespace WP_AffiliateManager\Admin;
@@ -142,13 +142,25 @@ class Post_Affiliates_Screen {
 		);
 		$status_label = $status_map[ $post['status'] ] ?? esc_html( $post['status'] );
 
-		// Pasar afiliados como JSON al editor para que JS pueda clonar filas.
-		$affiliates_json = wp_json_encode( array_map( fn( $a ) => array(
-			'id'          => $a['id'],
-			'title'       => $a['title'],
-			'logo_url'    => $a['logo_url'],
-			'brand_color' => $a['brand_color'],
-		), $affiliates ) );
+		// v0.1.3: pre-normalizar dominios de cada afiliado como array para matching JS sin AJAX.
+		$affiliates_json = wp_json_encode( array_map( function( $a ) {
+			$domains_list = array();
+			if ( $a['domains'] ) {
+				foreach ( explode( ',', $a['domains'] ) as $entry ) {
+					$normalized = wpam_normalize_domain( $entry );
+					if ( $normalized ) {
+						$domains_list[] = $normalized;
+					}
+				}
+			}
+			return array(
+				'id'          => $a['id'],
+				'title'       => $a['title'],
+				'logo_url'    => $a['logo_url'],
+				'brand_color' => $a['brand_color'],
+				'domains'     => $domains_list,
+			);
+		}, $affiliates ) );
 		?>
 		<div
 			class="wpam-pa-row"
@@ -271,6 +283,7 @@ class Post_Affiliates_Screen {
 	 *
 	 * @since  0.1.0
 	 * @since  0.1.1 Eliminado el "new-wrap" fijo — JS clona plantilla.
+	 * @since  0.1.3 render_link_item ya no incluye select de proveedor.
 	 */
 	private function render_inline_editor( int $post_id, array $links, array $affiliates ): void {
 		?>
@@ -327,7 +340,12 @@ class Post_Affiliates_Screen {
 	/**
 	 * Renderiza un ítem de link.
 	 *
+	 * v0.1.3: Eliminado el select de afiliado. El usuario solo pega la URL;
+	 * la detección ocurre en JS (debounce 500ms) y se valida en PHP.
+	 * El afiliado detectado se muestra como chip preview bajo el input.
+	 *
 	 * @since  0.1.0
+	 * @since  0.1.3 Sin select de proveedor. URL + preview de detección + Label.
 	 * @param  int        $post_id    ID del post.
 	 * @param  int|string $index      Índice numérico o string para nuevos.
 	 * @param  array      $link       Datos del link.
@@ -338,26 +356,36 @@ class Post_Affiliates_Screen {
 		$original_url = esc_url( $link['original_url'] ?? '' );
 		$custom_label = esc_attr( $link['custom_label'] ?? '' );
 		$item_id      = 'wpam-pa-item-' . $post_id . '-' . $index;
+
+		// Buscar el afiliado actual para renderizar el chip de preview inicial.
+		$detected_aff = null;
+		if ( $provider_id ) {
+			foreach ( $affiliates as $aff ) {
+				if ( (int) $aff['id'] === $provider_id ) {
+					$detected_aff = $aff;
+					break;
+				}
+			}
+		}
 		?>
-		<div class="wpam-pa-link-item" id="<?php echo esc_attr( $item_id ); ?>">
+		<div
+			class="wpam-pa-link-item<?php echo $detected_aff ? ' wpam-pa-link-item--detected' : ''; ?>"
+			id="<?php echo esc_attr( $item_id ); ?>"
+		>
 			<div class="wpam-edit-grid wpam-pa-link-grid">
 
-				<div class="wpam-edit-field">
-					<label><?php esc_html_e( 'Affiliate', 'wp-affiliatemanager' ); ?></label>
-					<select class="wpam-select wpam-pa-provider-select">
-						<option value=""><?php esc_html_e( '— Select —', 'wp-affiliatemanager' ); ?></option>
-						<?php foreach ( $affiliates as $aff ) : ?>
-							<option
-								value="<?php echo esc_attr( (string) $aff['id'] ); ?>"
-								<?php selected( $provider_id, $aff['id'] ); ?>
-							><?php echo esc_html( $aff['title'] ); ?></option>
-						<?php endforeach; ?>
-					</select>
-				</div>
-
-				<div class="wpam-edit-field wpam-edit-field--url">
+				<!-- URL — la detección de afiliado ocurre en este campo -->
+				<div class="wpam-edit-field wpam-edit-field--url wpam-pa-url-field">
 					<label><?php esc_html_e( 'URL', 'wp-affiliatemanager' ); ?></label>
 					<input type="url" class="wpam-input wpam-pa-url-input" value="<?php echo $original_url; ?>" placeholder="https://…" />
+					<!-- Preview del afiliado detectado (JS lo actualiza; PHP lo renderiza en items existentes) -->
+					<div class="wpam-pa-detect-preview">
+						<?php if ( $detected_aff ) : ?>
+							<?php $this->render_detect_chip( $detected_aff ); ?>
+						<?php endif; ?>
+					</div>
+					<!-- Error inline (JS lo muestra/oculta) -->
+					<div class="wpam-pa-url-error" style="display:none;"></div>
 				</div>
 
 				<div class="wpam-edit-field">
@@ -367,10 +395,32 @@ class Post_Affiliates_Screen {
 
 				<div class="wpam-edit-field wpam-pa-item-remove-wrap">
 					<label>&nbsp;</label>
-					<button type="button" class="button wpam-pa-remove-item-btn" title="<?php esc_attr_e( 'Remove this link', 'wp-affiliatemanager' ); ?>">✕</button>
+					<button type="button" class="button wpam-pa-remove-item-btn" title="<?php esc_attr_e( 'Remove this link', 'wp-affiliatemanager' ); ?>">&#x2715;</button>
 				</div>
 
 			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Renderiza el chip de preview del afiliado detectado.
+	 *
+	 * @since  0.1.3
+	 * @param  array $aff Afiliado normalizado.
+	 */
+	private function render_detect_chip( array $aff ): void {
+		$color    = $aff['brand_color'] ?: '#6c47ff';
+		$bg_color = $this->hex_to_rgba( $color, 0.10 );
+		$style    = sprintf( '--chip-color:%s;--chip-bg:%s;', esc_attr( $color ), esc_attr( $bg_color ) );
+		?>
+		<div class="wpam-pa-detect-chip" style="<?php echo esc_attr( $style ); ?>">
+			<?php if ( $aff['logo_url'] ) : ?>
+				<img class="wpam-pa-chip-logo" src="<?php echo esc_url( $aff['logo_url'] ); ?>" alt="" />
+			<?php else : ?>
+				<span class="wpam-pa-chip-initial"><?php echo esc_html( strtoupper( substr( $aff['title'], 0, 1 ) ) ); ?></span>
+			<?php endif; ?>
+			<span class="wpam-pa-detect-chip-name"><?php echo esc_html( $aff['title'] ); ?></span>
 		</div>
 		<?php
 	}
@@ -466,21 +516,42 @@ class Post_Affiliates_Screen {
 	// AJAX — guardar links del post
 	// =========================================================================
 
+	/**
+	 * Guarda los links del post enviados desde el editor inline.
+	 *
+	 * v0.1.3:
+	 * - Ya no se recibe provider_id desde el cliente.
+	 * - El affiliate se detecta automáticamente por dominio de la URL.
+	 * - Si ningún afiliado activo coincide: wp_send_json_error().
+	 * - Duplicados de URL (mismo post, misma URL normalizada): wp_send_json_error().
+	 *
+	 * @since 0.1.0
+	 * @since 0.1.3 Auto-detección de afiliado. Validación de duplicados.
+	 */
 	public function ajax_save_post_links(): void {
 		check_ajax_referer( self::NONCE_ACTION, 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'Permission denied.', 'wp-affiliatemanager' ) );
+			wp_send_json_error( array(
+				'code'    => 'permission_denied',
+				'message' => __( 'Permission denied.', 'wp-affiliatemanager' ),
+			) );
 		}
 
 		$post_id = absint( $_POST['post_id'] ?? 0 );
 		if ( ! $post_id ) {
-			wp_send_json_error( __( 'Invalid post ID.', 'wp-affiliatemanager' ) );
+			wp_send_json_error( array(
+				'code'    => 'invalid_post',
+				'message' => __( 'Invalid post ID.', 'wp-affiliatemanager' ),
+			) );
 		}
 
 		$post = get_post( $post_id );
 		if ( ! $post instanceof \WP_Post || 'post' !== $post->post_type ) {
-			wp_send_json_error( __( 'Post not found.', 'wp-affiliatemanager' ) );
+			wp_send_json_error( array(
+				'code'    => 'invalid_post',
+				'message' => __( 'Post not found.', 'wp-affiliatemanager' ),
+			) );
 		}
 
 		$raw_json  = wp_unslash( $_POST['links'] ?? '[]' );
@@ -490,28 +561,64 @@ class Post_Affiliates_Screen {
 			$raw_links = array();
 		}
 
-		$valid_links = array();
+		$valid_links     = array();
+		$normalized_urls = array(); // para detección de duplicados
+
 		foreach ( $raw_links as $raw ) {
 			if ( ! is_array( $raw ) ) { continue; }
 
-			$provider_id  = absint( $raw['provider_id']  ?? 0 );
 			$raw_url      = trim( (string) ( $raw['original_url'] ?? '' ) );
 			$custom_label = sanitize_text_field( $raw['custom_label'] ?? '' );
 
-			if ( ! $provider_id || ! $raw_url ) { continue; }
-			if ( false === filter_var( $raw_url, FILTER_VALIDATE_URL ) ) { continue; }
+			if ( ! $raw_url ) { continue; }
+
+			if ( false === filter_var( $raw_url, FILTER_VALIDATE_URL ) ) {
+				wp_send_json_error( array(
+					'code'    => 'invalid_url',
+					'message' => sprintf( __( 'Invalid URL: %s', 'wp-affiliatemanager' ), $raw_url ),
+				) );
+				return;
+			}
 
 			$scheme = strtolower( (string) wp_parse_url( $raw_url, PHP_URL_SCHEME ) );
-			if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) { continue; }
+			if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+				wp_send_json_error( array(
+					'code'    => 'invalid_url',
+					'message' => sprintf( __( 'Only http/https URLs are allowed: %s', 'wp-affiliatemanager' ), $raw_url ),
+				) );
+				return;
+			}
 
 			$original_url = esc_url_raw( $raw_url );
 			if ( ! $original_url ) { continue; }
 
-			$provider_post = get_post( $provider_id );
-			if ( ! $provider_post instanceof \WP_Post || 'wpam_affiliate' !== $provider_post->post_type ) { continue; }
+			// v0.1.3: Auto-detección de afiliado por dominio.
+			$domain    = wpam_extract_domain_from_url( $original_url );
+			$affiliate = $domain ? $this->repository->find_by_domain( $domain ) : null;
+
+			if ( null === $affiliate ) {
+				wp_send_json_error( array(
+					'code'    => 'no_affiliate_for_url',
+					'message' => sprintf( __( 'No active affiliate found for URL: %s', 'wp-affiliatemanager' ), $original_url ),
+				) );
+				return;
+			}
+
+			// v0.1.3: Validación de duplicados (URL normalizada).
+			$normalized_url = $this->normalize_url_for_comparison( $original_url );
+
+			if ( in_array( $normalized_url, $normalized_urls, true ) ) {
+				wp_send_json_error( array(
+					'code'    => 'duplicate_url',
+					'message' => sprintf( __( 'Duplicate URL: %s', 'wp-affiliatemanager' ), $original_url ),
+				) );
+				return;
+			}
+
+			$normalized_urls[] = $normalized_url;
 
 			$valid_links[] = array(
-				'provider_id'  => $provider_id,
+				'provider_id'  => $affiliate['id'],
 				'original_url' => $original_url,
 				'custom_label' => $custom_label,
 			);
@@ -615,7 +722,7 @@ class Post_Affiliates_Screen {
 	}
 
 	// =========================================================================
-	// Helpers
+	// Helpers privados
 	// =========================================================================
 
 	private function get_active_affiliates(): array {
@@ -629,6 +736,27 @@ class Post_Affiliates_Screen {
 		$post = get_post( $provider_id );
 		$cache[ $provider_id ] = $post instanceof \WP_Post ? $post->post_title : '#' . $provider_id;
 		return $cache[ $provider_id ];
+	}
+
+	/**
+	 * Normaliza una URL para comparación de duplicados.
+	 *
+	 * Reglas: lowercase del host + path sin trailing slash + query preservada.
+	 * Estas dos URLs se consideran iguales:
+	 *   https://site.com/a
+	 *   https://site.com/a/
+	 *
+	 * @since  0.1.3
+	 * @param  string $url URL ya validada y sanitizada.
+	 * @return string URL normalizada.
+	 */
+	private function normalize_url_for_comparison( string $url ): string {
+		$parsed = wp_parse_url( $url );
+		$scheme = $parsed['scheme'] ?? 'https';
+		$host   = strtolower( $parsed['host'] ?? '' );
+		$path   = rtrim( $parsed['path'] ?? '', '/' );
+		$query  = isset( $parsed['query'] ) ? '?' . $parsed['query'] : '';
+		return $scheme . '://' . $host . $path . $query;
 	}
 
 	/**

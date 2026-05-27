@@ -228,3 +228,78 @@ function wpam_log( mixed $message, string $prefix = 'WPAM' ): void {
 		error_log( '[' . $prefix . '] ' . (string) $message );
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Helpers de dominio — v0.1.3
+// ---------------------------------------------------------------------------
+
+/**
+ * Normaliza un dominio o URL a su forma canónica:
+ * lowercase, sin protocolo, sin www., sin trailing slash.
+ *
+ * Usa wp_parse_url() cuando el input parece una URL completa.
+ * Si el input ya es un dominio simple, lo limpia directamente.
+ *
+ * Ejemplos:
+ *   'https://www.amazon.com.mx/'  → 'amazon.com.mx'
+ *   'www.hobby-genki.com'         → 'hobby-genki.com'
+ *   'Amazon.com'                  → 'amazon.com'
+ *
+ * @since  0.1.3
+ * @param  string $domain Dominio o URL a normalizar.
+ * @return string Dominio normalizado. Cadena vacía si el input es inválido.
+ */
+function wpam_normalize_domain( string $domain ): string {
+	$domain = trim( strtolower( $domain ) );
+	$domain = rtrim( $domain, '/,"\'.' );
+	$domain = trim( $domain );
+
+	if ( ! $domain ) {
+		return '';
+	}
+
+	// Si parece una URL con protocolo, extraer solo el host.
+	if ( str_contains( $domain, '://' ) ) {
+		$parsed = wp_parse_url( $domain );
+		$domain = strtolower( $parsed['host'] ?? '' );
+	}
+
+	// Eliminar www. al inicio.
+	if ( str_starts_with( $domain, 'www.' ) ) {
+		$domain = substr( $domain, 4 );
+	}
+
+	return rtrim( $domain, '/.' );
+}
+
+/**
+ * Extrae y normaliza el dominio de una URL completa.
+ *
+ * Delega en wp_parse_url() y aplica wpam_normalize_domain() al host.
+ * No usa regex.
+ *
+ * Ejemplos:
+ *   'https://www.amazon.com.mx/product?tag=bunny'  → 'amazon.com.mx'
+ *   'https://shop.hobby-genki.com/item'            → 'shop.hobby-genki.com'
+ *   'no-valid'                                     → ''
+ *
+ * @since  0.1.3
+ * @param  string $url URL completa (con protocolo).
+ * @return string Dominio normalizado o cadena vacía si la URL es inválida.
+ */
+function wpam_extract_domain_from_url( string $url ): string {
+	$url = trim( $url );
+
+	if ( ! $url ) {
+		return '';
+	}
+
+	$parsed = wp_parse_url( $url );
+	$host   = $parsed['host'] ?? '';
+
+	if ( ! $host ) {
+		return '';
+	}
+
+	return wpam_normalize_domain( $host );
+}

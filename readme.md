@@ -18,7 +18,12 @@ A modular and scalable affiliate link management plugin for WordPress that allow
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v0.1.0)
+## Current scope (v0.1.3)
+
+- **Automatic affiliate detection:** pasting a URL in the Post Affiliates editor
+  auto-detects the affiliate by domain. No manual provider selection required.
+  Inline error if no active affiliate matches. Duplicate URL detection per post.
+  Save is blocked until all URLs resolve to a valid affiliate.
 
 - **Post Affiliates board:** new admin screen to manage affiliate links per post — visual rows with thumbnail, status, date, and affiliate chips. Inline editor (expand/collapse, no modal). Incremental loading (20 initial, +10 Load More). Search by title, filter by category and tag.
 - Affiliate logo picker via WordPress Media Library (inline CRUD).
@@ -176,7 +181,8 @@ wpam_get_rendered_links( int $post_id = 0, string $style = '' ): string
 2. Activate **Bunny Affiliate Manager** from the WordPress Plugins screen.
 3. Open **Bunny Affiliates -> Affiliates** to register your first affiliates.
 4. Edit any post to find the **Affiliate Links** meta box.
-5. Add one or more links by selecting a provider, entering the original URL, and optionally a custom label.
+5. Add one or more links by pasting the affiliate URL. The system detects
+   the affiliate automatically by domain. Optionally add a custom label.
 6. The real-time preview shows the final affiliate URL before saving.
 7. Save the post; links are validated, sanitized, and stored with correct order.
 8. Visit the post on the frontend — affiliate links appear automatically (based on **Settings -> Modo de renderizado**).
@@ -209,6 +215,54 @@ Yes. Set the **Brand Color** field in each affiliate's settings. The CSS variabl
 - All user-facing strings use the `wp_affiliatemanager` text domain.
 
 ## Changelog
+
+### 0.1.3 — Auto-detección de afiliado por dominio
+
+**Nuevas funciones en `helpers.php`:**
+- `wpam_normalize_domain( string $domain ): string`
+  Normaliza cualquier dominio o URL a su forma canónica (lowercase, sin www., sin
+  protocolo, sin trailing slash). Usa `wp_parse_url()` internamente.
+- `wpam_extract_domain_from_url( string $url ): string`
+  Extrae y normaliza el dominio del host de una URL completa.
+
+**`class-repository.php`:**
+- Nuevo método `find_by_domain( string $domain ): ?array`
+  Recorre todos los afiliados activos y compara sus `domains` (campo separado por
+  comas) con el dominio dado. Soporta matching exacto y por sufijo. Case-insensitive.
+
+**`class-post-affiliates-screen.php`:**
+- Eliminado el `<select>` de afiliado/proveedor del editor inline.
+- Nuevo método `render_detect_chip()` para el chip de preview en items existentes.
+- `render_link_item()` ahora muestra solo: URL + preview de detección + Label opcional.
+- `render_post_row()` pre-normaliza los dominios de cada afiliado como array JSON en
+  `data-affiliates`, listo para matching JS sin AJAX.
+- `ajax_save_post_links()`: valida la detección en PHP de forma independiente al JS.
+  Detecta el afiliado por dominio, guarda `provider_id` automáticamente, rechaza URLs
+  sin coincidencia y URLs duplicadas.
+- Nuevo método privado `normalize_url_for_comparison()`.
+
+**`post-affiliates.js`:**
+- Nuevo módulo `DomainDetector` con `normalizeDomain()`, `extractDomain()` y
+  `findByDomain()`. Espejo de las funciones PHP para consistencia cliente/servidor.
+- `Editor.detectAffiliate()`: detección con debounce 500ms al escribir en el campo URL.
+- `Editor.setDetectSuccess()`: renderiza el chip visual del afiliado detectado.
+- `Editor.setDetectError()`: muestra error inline sin `alert()`.
+- `Editor.clearDetectState()`: limpia el estado durante la espera del debounce.
+- `Editor.refreshSaveBtn()`: habilita/deshabilita Save según estado de todos los items.
+- `Save.readItem()`: ya no lee `provider_id` del DOM; solo envía `original_url` + `custom_label`.
+- `normalizeUrlForComparison()`: normaliza URLs para detección de duplicados en cliente.
+
+**`post-affiliates.css`:**
+- `.wpam-pa-detect-preview` / `.wpam-pa-detect-chip`: chip visual del afiliado detectado.
+- `.wpam-pa-link-item--detected`: borde verde cuando el afiliado es detectado.
+- `.wpam-pa-link-item--error`: borde rojo cuando no hay coincidencia.
+- `.wpam-pa-url-error`: mensaje de error inline animado.
+- `.wpam-pa-save-btn:disabled`: botón Save bloqueado con opacidad reducida.
+
+**Compatibilidad:**
+- Los links existentes en DB no se modifican.
+- El campo `provider_id` se sigue guardando en meta; ahora lo asigna el backend.
+- Afiliados con `domains` vacío no participan en la detección automática.
 
 ### 0.1.2 — Post Affiliates State Fixes & Visual Polish
 
