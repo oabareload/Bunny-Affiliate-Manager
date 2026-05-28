@@ -4,12 +4,13 @@
  *
  * @package WP_AffiliateManager\Admin
  * @since   1.0.0
- * @version 0.0.3
+ * @version 0.1.4
  */
 
 namespace WP_AffiliateManager\Admin;
 
 use WP_AffiliateManager\Affiliates\CPT;
+use WP_AffiliateManager\Affiliates\Repository;
 use WP_AffiliateManager\Posts\Post_Links;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -113,11 +114,20 @@ class Admin_Assets {
 			}
 
 			// Post Affiliates screen (v0.1.0).
+			// v0.1.4: domain-detector.js como dependencia compartida con post-links.js.
 			if ( 'bunny-affiliates_page_wpam-post-affiliates' === $hook_suffix ) {
+				wp_enqueue_script(
+					'wpam-domain-detector',
+					WPAM_PLUGIN_URL . 'assets/js/domain-detector.js',
+					array(),
+					$this->version,
+					true
+				);
+
 				wp_enqueue_script(
 					'wpam-post-affiliates-scripts',
 					WPAM_PLUGIN_URL . 'assets/js/post-affiliates.js',
-					array( 'jquery' ),
+					array( 'jquery', 'wpam-domain-detector' ),
 					$this->version,
 					true
 				);
@@ -126,33 +136,45 @@ class Admin_Assets {
 					'wpam-post-affiliates-scripts',
 					'wpamPAData',
 					array(
-						'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
-						'moreLimit'  => 10,
-						'i18n'       => array(
-						'saving'             => __( 'Saving…', 'wp-affiliatemanager' ),
-						'saved'              => __( 'Saved!', 'wp-affiliatemanager' ),
-						'error'              => __( 'Error. Please try again.', 'wp-affiliatemanager' ),
-						'loading'            => __( 'Loading…', 'wp-affiliatemanager' ),
-						'no_more'            => __( 'No more posts.', 'wp-affiliatemanager' ),
-						'confirm_del'        => __( 'Remove this link?', 'wp-affiliatemanager' ),
-						 'remove_link'        => __( 'Remove this link', 'wp-affiliatemanager' ),
-						'select_placeholder' => __( '— Select —', 'wp-affiliatemanager' ),
-						'label_affiliate'    => __( 'Affiliate', 'wp-affiliatemanager' ),
-						'label_url'          => __( 'URL', 'wp-affiliatemanager' ),
-						'label_label'        => __( 'Label', 'wp-affiliatemanager' ),
-						'label_optional'     => __( 'opt.', 'wp-affiliatemanager' ),
-						'label_placeholder'  => __( 'e.g. Buy on Amazon', 'wp-affiliatemanager' ),
-					),
+						'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
+						'moreLimit' => 10,
+						'i18n'      => array(
+							'saving'             => __( 'Saving...', 'wp-affiliatemanager' ),
+							'saved'              => __( 'Saved!', 'wp-affiliatemanager' ),
+							'error'              => __( 'Error. Please try again.', 'wp-affiliatemanager' ),
+							'loading'            => __( 'Loading...', 'wp-affiliatemanager' ),
+							'no_more'            => __( 'No more posts.', 'wp-affiliatemanager' ),
+							'confirm_del'        => __( 'Remove this link?', 'wp-affiliatemanager' ),
+							'remove_link'        => __( 'Remove this link', 'wp-affiliatemanager' ),
+							'label_url'          => __( 'URL', 'wp-affiliatemanager' ),
+							'label_label'        => __( 'Label', 'wp-affiliatemanager' ),
+							'label_optional'     => __( 'opt.', 'wp-affiliatemanager' ),
+							'label_placeholder'  => __( 'e.g. Buy on Amazon', 'wp-affiliatemanager' ),
+							'url_invalid'        => __( 'Enter a valid URL (https://...).', 'wp-affiliatemanager' ),
+							'no_affiliate_found' => __( 'No active affiliate found for this URL.', 'wp-affiliatemanager' ),
+							'save_blocked'       => __( 'Fix errors before saving.', 'wp-affiliatemanager' ),
+							'duplicate_url'      => __( 'Duplicate URL detected. Remove the duplicate before saving.', 'wp-affiliatemanager' ),
+						),
 					)
 				);
 			}
 		}
 
+		// Post editor (post.php / post-new.php).
+		// v0.1.4: domain-detector.js como dependencia compartida.
 		if ( $this->is_supported_post_screen( $hook_suffix ) ) {
+			wp_enqueue_script(
+				'wpam-domain-detector',
+				WPAM_PLUGIN_URL . 'assets/js/domain-detector.js',
+				array(),
+				$this->version,
+				true
+			);
+
 			wp_enqueue_script(
 				'wpam-post-links-scripts',
 				WPAM_PLUGIN_URL . 'assets/js/post-links.js',
-				array( 'jquery' ),
+				array( 'jquery', 'wpam-domain-detector' ),
 				$this->version,
 				true
 			);
@@ -164,20 +186,22 @@ class Admin_Assets {
 				'wpam-post-links-scripts',
 				'wpamPostLinksData',
 				array(
-					'nextIndex' => $next_index,
-					'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
-					'nonce'     => wp_create_nonce( 'wpam_post_links_nonce' ),
-					'i18n'      => array(
-						'no_links'            => __( 'No affiliate links added yet. Click "Add Link" to start.', 'wp-affiliatemanager' ),
-						'no_links_count'      => __( '0 links', 'wp-affiliatemanager' ),
-						'one_link'            => __( '1 link', 'wp-affiliatemanager' ),
+					'nextIndex'  => $next_index,
+					'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
+					'nonce'      => wp_create_nonce( 'wpam_post_links_nonce' ),
+					// v0.1.4: afiliados activos con dominios pre-normalizados para DomainDetector.
+					'affiliates' => $this->get_affiliates_for_js(),
+					'i18n'       => array(
+						'no_links'           => __( 'No affiliate links added yet. Click "Add Link" to start.', 'wp-affiliatemanager' ),
+						'no_links_count'     => __( '0 links', 'wp-affiliatemanager' ),
+						'one_link'           => __( '1 link', 'wp-affiliatemanager' ),
 						/* translators: %d: número de links */
-						'n_links'             => __( '%d links', 'wp-affiliatemanager' ),
-						'preview_placeholder' => __( 'Select an affiliate and enter a URL to see the generated link.', 'wp-affiliatemanager' ),
-						// 0.0.3: nuevo string para URL inválida.
-						'invalid_url'         => __( 'Please enter a valid URL (https://...).', 'wp-affiliatemanager' ),
-						'final_url'           => __( 'Final URL:', 'wp-affiliatemanager' ),
-						'open_tab'            => __( 'Open in new tab', 'wp-affiliatemanager' ),
+						'n_links'            => __( '%d links', 'wp-affiliatemanager' ),
+						'preview_placeholder'=> __( 'Paste an affiliate URL to detect the affiliate automatically.', 'wp-affiliatemanager' ),
+						'url_invalid'        => __( 'Enter a valid URL (https://...).', 'wp-affiliatemanager' ),
+						'no_affiliate_found' => __( 'No active affiliate found for this URL.', 'wp-affiliatemanager' ),
+						'final_url'          => __( 'Final URL:', 'wp-affiliatemanager' ),
+						'open_tab'           => __( 'Open in new tab', 'wp-affiliatemanager' ),
 					),
 				)
 			);
@@ -242,5 +266,40 @@ class Admin_Assets {
 		}
 
 		return max( 100, count( $links ) + 50 );
+	}
+
+	/**
+	 * Retorna los afiliados activos con dominios pre-normalizados para JS.
+	 *
+	 * Mismo formato que usa Post_Affiliates_Screen::render_post_row() en data-affiliates,
+	 * más los campos param/value necesarios para generar la URL final client-side.
+	 *
+	 * @since  0.1.4
+	 * @return array[]
+	 */
+	private function get_affiliates_for_js(): array {
+		$repo   = new Repository();
+		$result = $repo->find_all( array( 'active' => true, 'orderby' => 'title', 'order' => 'ASC' ) );
+
+		return array_map( function( $a ) {
+			$domains_list = array();
+			if ( $a['domains'] ) {
+				foreach ( explode( ',', $a['domains'] ) as $entry ) {
+					$normalized = wpam_normalize_domain( $entry );
+					if ( $normalized ) {
+						$domains_list[] = $normalized;
+					}
+				}
+			}
+			return array(
+				'id'          => $a['id'],
+				'title'       => $a['title'],
+				'logo_url'    => $a['logo_url'],
+				'brand_color' => $a['brand_color'],
+				'param'       => $a['param'],
+				'value'       => $a['value'],
+				'domains'     => $domains_list,
+			);
+		}, $result['items'] );
 	}
 }

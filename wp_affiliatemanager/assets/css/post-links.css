@@ -5,7 +5,13 @@
  *
  * @package WP_AffiliateManager
  * @since   3.0.0
- * @version 0.0.3
+ * @version 0.1.4
+ *
+ * v0.1.4:
+ * - Estilos de detección automática por dominio.
+ * - Chip preview de afiliado detectado.
+ * - Estados --detected / --error en filas.
+ * - Error inline de detección.
  */
 
 /* ==========================================================================
@@ -407,4 +413,121 @@
 @media screen and (max-width: 900px) {
 	.wpam-link-row-top { grid-template-columns: 1fr; }
 	.wpam-link-row     { flex-wrap: wrap; }
+}
+
+/* ==========================================================================
+   v0.1.4 — Detección automática de afiliado
+   ========================================================================== */
+
+/* Fila detectada correctamente */
+.wpam-link-row--detected {
+	border-color: #86efac;
+	background: #f0fdf4;
+}
+
+.wpam-link-row--detected:hover {
+	border-color: #4ade80;
+	box-shadow: 0 2px 8px rgba(22, 163, 74, 0.10);
+}
+
+/* Fila con error de detección */
+.wpam-link-row--error {
+	border-color: #fca5a5;
+	background: #fff5f5;
+}
+
+.wpam-link-row--error:hover {
+	border-color: var(--wpam-danger);
+	box-shadow: 0 2px 8px rgba(224, 55, 90, 0.10);
+}
+
+/* Input URL en estado error */
+.wpam-link-row--error .wpam-url-input {
+	border-color: var(--wpam-danger);
+}
+
+.wpam-link-row--error .wpam-url-input:focus {
+	box-shadow: 0 0 0 2px var(--wpam-danger-light);
+}
+
+/* Input URL en estado detectado */
+.wpam-link-row--detected .wpam-url-input {
+	border-color: #86efac;
+}
+
+/* Campo URL: flex column para apilar detect-preview y detect-error */
+.wpam-link-field--url {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+}
+
+/* Contenedor del chip detectado */
+.wpam-detect-preview {
+	margin-top: 6px;
+	min-height: 0;
+}
+
+/* Chip del afiliado detectado */
+.wpam-detect-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 10px 4px 6px;
+	border-radius: 999px;
+	border: 1px solid var(--chip-color, var(--wpam-primary));
+	background: var(--chip-bg, var(--wpam-primary-light));
+	color: var(--chip-color, var(--wpam-primary));
+	font-size: 12px;
+	font-weight: 600;
+	animation: wpam-chip-pop 200ms ease;
+}
+
+@keyframes wpam-chip-pop {
+	from { opacity: 0; transform: scale(0.88); }
+	to   { opacity: 1; transform: scale(1);    }
+}
+
+.wpam-detect-chip-logo {
+	width: 16px;
+	height: 16px;
+	object-fit: contain;
+	border-radius: 2px;
+	flex-shrink: 0;
+}
+
+.wpam-detect-chip-initial {
+	width: 16px;
+	height: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 10px;
+	font-weight: 700;
+	border-radius: 50%;
+	background: currentColor;
+	color: #fff;
+	flex-shrink: 0;
+}
+
+.wpam-detect-chip-name {
+	font-weight: 600;
+}
+
+/* Error inline de detección */
+.wpam-detect-error {
+	margin-top: 5px;
+	padding: 5px 10px;
+	border-radius: var(--wpam-radius-sm);
+	background: var(--wpam-danger-light);
+	color: var(--wpam-danger);
+	font-size: 12px;
+	font-weight: 500;
+	border-left: 3px solid var(--wpam-danger);
+	animation: wpam-error-slidein 160ms ease;
+}
+
+@keyframes wpam-error-slidein {
+	from { opacity: 0; transform: translateY(-4px); }
+	to   { opacity: 1; transform: translateY(0);    }
 }

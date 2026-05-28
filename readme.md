@@ -216,6 +216,57 @@ Yes. Set the **Brand Color** field in each affiliate's settings. The CSS variabl
 
 ## Changelog
 
+### 0.1.4 — Auto-detección de afiliado en el editor de posts
+
+**Nuevo archivo `assets/js/domain-detector.js`:**
+- Módulo compartido `window.WPAMDomainDetector` con `normalizeDomain()`,
+  `extractDomain()` y `findByDomain()`.
+- Elimina la duplicación de lógica de detección entre el board Post Affiliates
+  y el editor de posts. Un solo archivo, dos consumidores.
+
+**`assets/js/post-links.js`:**
+- Eliminado el select manual de afiliado del formulario.
+- Auto-detección por dominio con debounce 500ms usando `WPAMDomainDetector`.
+- Chip preview visual al detectar afiliado (logo + nombre + color).
+- Preview de URL final generada client-side con param/value del afiliado detectado.
+- Error inline si no hay afiliado para el dominio.
+- Detección inicial en filas ya cargadas al abrir el editor.
+
+**`assets/js/post-affiliates.js`:**
+- `DomainDetector` local reemplazado por alias de `window.WPAMDomainDetector`.
+- Sin cambios funcionales; comportamiento idéntico a v0.1.3.
+
+**`includes/posts/class-post-links.php`:**
+- Eliminado el `<select>` de afiliado del formulario del meta box.
+- `render_link_item()`: ahora muestra URL + `.wpam-detect-preview` + `.wpam-detect-error` + Label.
+- Nuevo método `render_detect_chip()` para el chip inicial en items existentes.
+- `save()`: ya no recibe `provider_id` del formulario. Detecta el afiliado
+  automáticamente por dominio usando `Repository::find_by_domain()` +
+  `wpam_extract_domain_from_url()`, exactamente igual que `ajax_save_post_links()`.
+  Links sin afiliado coincidente se descartan silenciosamente.
+- `render_meta_box()`: añade `data-affiliates` con dominios pre-normalizados
+  para matching JS sin AJAX.
+
+**`includes/admin/class-admin-assets.php`:**
+- Encola `domain-detector.js` como dependencia de `post-links.js` en el editor de posts.
+- Encola `domain-detector.js` como dependencia de `post-affiliates.js` en el board.
+- Añade campo `affiliates` a `wpamPostLinksData` (afiliados activos con dominios
+  pre-normalizados, param y value).
+- Nuevo método privado `get_affiliates_for_js()`.
+- Actualizado string `preview_placeholder` en i18n.
+
+**`assets/css/post-links.css`:**
+- `.wpam-link-row--detected`: borde verde cuando el afiliado es detectado.
+- `.wpam-link-row--error`: borde rojo cuando no hay coincidencia.
+- `.wpam-detect-preview` / `.wpam-detect-chip`: chip visual del afiliado detectado.
+- `.wpam-detect-error`: mensaje de error inline animado.
+
+**Compatibilidad:**
+- Links existentes en DB siguen funcionando sin migración.
+- `provider_id` se sigue guardando en meta; ahora lo asigna el backend por dominio.
+- Compatible con editor clásico y Gutenberg (meta box estándar de WordPress).
+- No interfiere con el flujo de publicación nativo de WordPress.
+
 ### 0.1.3 — Auto-detección de afiliado por dominio
 
 **Nuevas funciones en `helpers.php`:**

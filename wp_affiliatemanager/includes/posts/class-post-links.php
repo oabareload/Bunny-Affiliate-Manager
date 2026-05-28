@@ -8,14 +8,14 @@
  *     'provider_id'   => 42,
  *     'original_url'  => 'https://...',
  *     'custom_label'  => 'Buy now',
- *     'order'         => 0,   // Siempre incremental correcto desde 0.
+ *     'order'         => 0,
  *   ],
  *   ...
  * ]
  *
  * @package WP_AffiliateManager\Posts
  * @since   3.0.0
- * @version 0.0.3
+ * @version 0.1.4
  */
 
 namespace WP_AffiliateManager\Posts;
@@ -89,7 +89,11 @@ class Post_Links {
 	/**
 	 * Renderiza el meta box completo.
 	 *
+	 * v0.1.4: El wrap ahora incluye data-affiliates con dominios pre-normalizados
+	 * para que el JS (domain-detector.js) pueda detectar el afiliado sin AJAX.
+	 *
 	 * @since  3.0.0
+	 * @since  0.1.4 Añade data-affiliates al wrap. Elimina select de afiliado.
 	 * @param  \WP_Post $post Post actual.
 	 * @return void
 	 */
@@ -98,16 +102,36 @@ class Post_Links {
 
 		$links = $this->get_links( $post->ID );
 
-		// Afiliados activos para el select (incluimos también los del post aunque estén inactivos).
 		$repo       = new Repository();
 		$result     = $repo->find_all( array( 'active' => true, 'orderby' => 'title', 'order' => 'ASC' ) );
 		$affiliates = $result['items'];
+
+		// v0.1.4: Pre-normalizar dominios para matching en JS (igual que en Post_Affiliates_Screen).
+		$affiliates_json = wp_json_encode( array_map( function( $a ) {
+			$domains_list = array();
+			if ( $a['domains'] ) {
+				foreach ( explode( ',', $a['domains'] ) as $entry ) {
+					$normalized = wpam_normalize_domain( $entry );
+					if ( $normalized ) {
+						$domains_list[] = $normalized;
+					}
+				}
+			}
+			return array(
+				'id'          => $a['id'],
+				'title'       => $a['title'],
+				'logo_url'    => $a['logo_url'],
+				'brand_color' => $a['brand_color'],
+				'param'       => $a['param'],
+				'value'       => $a['value'],
+				'domains'     => $domains_list,
+			);
+		}, $affiliates ) );
 		?>
-		<div class="wpam-post-links" id="wpam-post-links-wrap">
+		<div class="wpam-post-links" id="wpam-post-links-wrap" data-affiliates="<?php echo esc_attr( $affiliates_json ); ?>">
 
 			<?php if ( empty( $affiliates ) && empty( $links ) ) : ?>
 
-				<!-- Sin afiliados activos y sin links guardados -->
 				<div class="wpam-post-links-empty-providers">
 					<p>
 						<?php
@@ -125,12 +149,11 @@ class Post_Links {
 
 			<?php else : ?>
 
-				<!-- Lista de links -->
 				<div class="wpam-links-list" id="wpam-links-list">
 					<?php if ( empty( $links ) ) : ?>
 						<div class="wpam-links-placeholder" id="wpam-links-placeholder">
 							<span class="wpam-placeholder-icon">🔗</span>
-							<span><?php esc_html_e( 'No affiliate links added yet. Click "Add Link" to start.', 'wp-affiliatemanager' ); ?></span>
+							<span><?php esc_html_e( 'Paste an affiliate URL to start.', 'wp-affiliatemanager' ); ?></span>
 						</div>
 					<?php else : ?>
 						<?php foreach ( $links as $index => $link ) : ?>
@@ -139,7 +162,6 @@ class Post_Links {
 					<?php endif; ?>
 				</div>
 
-				<!-- Footer: botón + contador -->
 				<div class="wpam-links-footer">
 					<button
 						type="button"
@@ -175,7 +197,7 @@ class Post_Links {
 
 		</div>
 
-		<!-- Template HTML para nuevas filas (clonado por JS, nunca renderizado visualmente) -->
+		<!-- Template HTML para nuevas filas (clonado por JS) -->
 		<?php if ( ! empty( $affiliates ) ) : ?>
 			<script type="text/html" id="wpam-link-row-template">
 				<?php $this->render_link_row( '{{INDEX}}', array(), $affiliates ); ?>
@@ -187,12 +209,17 @@ class Post_Links {
 	/**
 	 * Renderiza una fila de link individual.
 	 *
+	 * v0.1.4: Eliminado el select de afiliado. El usuario pega la URL y JS detecta
+	 * el afiliado automáticamente usando window.WPAMDomainDetector.
+	 * El chip de detección y el error inline los gestiona post-links.js.
+	 *
 	 * @since  3.0.0
-	 * @since  0.0.3 Añade indicador visual de provider huérfano.
+	 * @since  0.0.3 Indicador visual de provider huérfano.
+	 * @since  0.1.4 Sin select de afiliado. Añade .wpam-detect-preview y .wpam-detect-error.
 	 *
 	 * @param  int|string $index      Índice (int para existentes, '{{INDEX}}' para template JS).
-	 * @param  array      $link       Datos del link. Puede incluir '_orphan' => true si el provider no existe.
-	 * @param  array      $affiliates Lista de afiliados activos normalizados.
+	 * @param  array      $link       Datos del link.
+	 * @param  array      $affiliates Lista de afiliados activos normalizados (no usado en render v0.1.4).
 	 * @return void
 	 */
 	public function render_link_row( int|string $index, array $link, array $affiliates ): void {
@@ -203,18 +230,29 @@ class Post_Links {
 		$is_orphan    = ! empty( $link['_orphan'] );
 		$orphan_name  = isset( $link['_orphan_title'] ) ? esc_html( $link['_orphan_title'] ) : '';
 
-		// Preview solo si hay datos válidos y el provider existe.
+		// Buscar el afiliado actual para el chip de preview inicial (items existentes).
+		$detected_aff = null;
+		if ( $provider_id && ! $is_orphan ) {
+			foreach ( $affiliates as $aff ) {
+				if ( (int) $aff['id'] === $provider_id ) {
+					$detected_aff = $aff;
+					break;
+				}
+			}
+		}
+
 		$preview_url = '';
-		if ( $provider_id && $original_url && ! $is_orphan ) {
+		if ( $detected_aff && $original_url ) {
 			$preview_url = wpam_generate_affiliate_url( $provider_id, $original_url );
 		} elseif ( $original_url && $is_orphan ) {
-			// Provider eliminado: mostrar URL original sin parámetro.
 			$preview_url = $original_url;
 		}
 
 		$row_classes = 'wpam-link-row';
 		if ( $is_orphan ) {
 			$row_classes .= ' wpam-link-row--orphan';
+		} elseif ( $detected_aff ) {
+			$row_classes .= ' wpam-link-row--detected';
 		}
 		?>
 		<div
@@ -229,7 +267,6 @@ class Post_Links {
 			<div class="wpam-link-row-fields">
 
 				<?php if ( $is_orphan ) : ?>
-					<!-- Aviso de provider huérfano -->
 					<div class="wpam-orphan-notice">
 						<span class="wpam-orphan-icon">⚠️</span>
 						<span class="wpam-orphan-text">
@@ -237,57 +274,39 @@ class Post_Links {
 							if ( $orphan_name ) {
 								printf(
 									/* translators: %s: nombre del afiliado eliminado */
-									esc_html__( 'Affiliate "%s" no longer exists or is inactive. Please select a replacement or remove this link.', 'wp-affiliatemanager' ),
+									esc_html__( 'Affiliate "%s" no longer exists or is inactive. Edit the URL or remove this link.', 'wp-affiliatemanager' ),
 									esc_html( $orphan_name )
 								);
 							} else {
-								esc_html_e( 'The affiliate for this link no longer exists or is inactive. Please select a replacement or remove this link.', 'wp-affiliatemanager' );
+								esc_html_e( 'The affiliate for this link no longer exists or is inactive. Edit the URL or remove this link.', 'wp-affiliatemanager' );
 							}
 							?>
 						</span>
 					</div>
 				<?php endif; ?>
 
-				<!-- Fila superior: provider + URL -->
+				<!-- Fila superior: URL + chip de detección -->
 				<div class="wpam-link-row-top">
 
-					<!-- Provider select -->
-					<div class="wpam-link-field wpam-link-field--provider">
-						<label><?php esc_html_e( 'Affiliate', 'wp-affiliatemanager' ); ?></label>
-						<select
-							name="wpam_links[<?php echo esc_attr( (string) $index ); ?>][provider_id]"
-							class="wpam-select wpam-provider-select <?php echo $is_orphan ? 'wpam-select--orphan' : ''; ?>"
-							data-index="<?php echo esc_attr( (string) $index ); ?>"
-						>
-							<option value=""><?php esc_html_e( '— Select affiliate —', 'wp-affiliatemanager' ); ?></option>
-							<?php foreach ( $affiliates as $affiliate ) : ?>
-								<option
-									value="<?php echo esc_attr( (string) $affiliate['id'] ); ?>"
-									data-param="<?php echo esc_attr( $affiliate['param'] ); ?>"
-									data-value="<?php echo esc_attr( $affiliate['value'] ); ?>"
-									data-color="<?php echo esc_attr( $affiliate['brand_color'] ); ?>"
-									<?php selected( $provider_id, $affiliate['id'] ); ?>
-								>
-									<?php echo esc_html( $affiliate['title'] ); ?>
-									<?php if ( $affiliate['param'] ) : ?>
-										(<?php echo esc_html( $affiliate['param'] . '=' . $affiliate['value'] ); ?>)
-									<?php endif; ?>
-								</option>
-							<?php endforeach; ?>
-						</select>
-					</div>
-
-					<!-- URL input -->
+					<!-- URL input — único campo de entrada; la detección ocurre aquí -->
 					<div class="wpam-link-field wpam-link-field--url">
-						<label><?php esc_html_e( 'Original URL', 'wp-affiliatemanager' ); ?></label>
+						<label><?php esc_html_e( 'Affiliate URL', 'wp-affiliatemanager' ); ?></label>
 						<input
 							type="url"
 							name="wpam_links[<?php echo esc_attr( (string) $index ); ?>][original_url]"
 							value="<?php echo $original_url; // Already escaped via esc_url() above. ?>"
-							placeholder="https://example.com/product"
+							placeholder="https://..."
 							class="wpam-input wpam-url-input"
 							data-index="<?php echo esc_attr( (string) $index ); ?>"
 						/>
+						<!-- Preview del afiliado detectado (JS lo actualiza en tiempo real) -->
+						<div class="wpam-detect-preview">
+							<?php if ( $detected_aff ) : ?>
+								<?php $this->render_detect_chip( $detected_aff ); ?>
+							<?php endif; ?>
+						</div>
+						<!-- Error inline de detección (JS lo muestra/oculta) -->
+						<div class="wpam-detect-error" style="display:none;"></div>
 					</div>
 
 				</div>
@@ -308,25 +327,15 @@ class Post_Links {
 						/>
 					</div>
 
-					<!--
-						Campo order oculto.
-						IMPORTANTE: el valor es el índice real de la fila en el DOM.
-						JS actualiza este campo en dos momentos:
-						  1. Al agregar una fila nueva (via reindexAll).
-						  2. Al reordenar mediante drag & drop (FASE 4).
-						El PHP re-asigna order = posición final al guardar,
-						por lo que este valor solo sirve para preservar el orden durante el envío.
-					-->
 					<input
 						type="hidden"
 						name="wpam_links[<?php echo esc_attr( (string) $index ); ?>][order]"
 						value="<?php echo esc_attr( (string) $order ); ?>"
 						class="wpam-order-input"
 					/>
-
 				</div>
 
-				<!-- Preview de URL final -->
+				<!-- Preview de URL final (JS lo actualiza al detectar; PHP lo pre-renderiza en items existentes) -->
 				<div class="wpam-link-preview" data-index="<?php echo esc_attr( (string) $index ); ?>">
 					<?php if ( $preview_url && ! $is_orphan ) : ?>
 						<span class="wpam-preview-label"><?php esc_html_e( 'Final URL:', 'wp-affiliatemanager' ); ?></span>
@@ -342,7 +351,7 @@ class Post_Links {
 						<span class="wpam-preview-label wpam-preview-label--warning"><?php esc_html_e( 'Original URL (no affiliate applied):', 'wp-affiliatemanager' ); ?></span>
 						<code class="wpam-preview-url wpam-preview-url--warning"><?php echo esc_html( $preview_url ); ?></code>
 					<?php else : ?>
-						<span class="wpam-preview-placeholder"><?php esc_html_e( 'Select an affiliate and enter a URL to see the generated link.', 'wp-affiliatemanager' ); ?></span>
+						<span class="wpam-preview-placeholder"><?php esc_html_e( 'Paste an affiliate URL to detect the affiliate automatically.', 'wp-affiliatemanager' ); ?></span>
 					<?php endif; ?>
 				</div>
 
@@ -360,6 +369,28 @@ class Post_Links {
 		<?php
 	}
 
+	/**
+	 * Renderiza el chip de preview del afiliado detectado para items existentes.
+	 *
+	 * @since  0.1.4
+	 * @param  array $aff Afiliado normalizado.
+	 */
+	private function render_detect_chip( array $aff ): void {
+		$color    = $aff['brand_color'] ?: '#6c47ff';
+		$bg_color = $this->hex_to_rgba( $color, 0.10 );
+		$style    = sprintf( '--chip-color:%s;--chip-bg:%s;', esc_attr( $color ), esc_attr( $bg_color ) );
+		?>
+		<div class="wpam-detect-chip" style="<?php echo esc_attr( $style ); ?>">
+			<?php if ( $aff['logo_url'] ) : ?>
+				<img class="wpam-detect-chip-logo" src="<?php echo esc_url( $aff['logo_url'] ); ?>" alt="" />
+			<?php else : ?>
+				<span class="wpam-detect-chip-initial"><?php echo esc_html( strtoupper( substr( $aff['title'], 0, 1 ) ) ); ?></span>
+			<?php endif; ?>
+			<span class="wpam-detect-chip-name"><?php echo esc_html( $aff['title'] ); ?></span>
+		</div>
+		<?php
+	}
+
 	// -------------------------------------------------------------------------
 	// Guardado
 	// -------------------------------------------------------------------------
@@ -368,8 +399,14 @@ class Post_Links {
 	 * Guarda los links del post.
 	 * Hook: save_post
 	 *
+	 * v0.1.4: Ya no se recibe provider_id del formulario.
+	 * El afiliado se detecta automáticamente por dominio usando
+	 * Repository::find_by_domain() + wpam_extract_domain_from_url().
+	 * Los links sin afiliado coincidente se descartan silenciosamente.
+	 *
 	 * @since  3.0.0
-	 * @since  0.0.3 Order correcto incremental; validación de URL con filter_var.
+	 * @since  0.0.3 Order correcto incremental.
+	 * @since  0.1.4 Auto-detección de afiliado por dominio. Sin provider_id manual.
 	 *
 	 * @param  int $post_id ID del post.
 	 * @return void
@@ -408,7 +445,7 @@ class Post_Links {
 			return;
 		}
 
-		// --- Sanitizar y validar cada fila ---
+		$repo        = new Repository();
 		$valid_links = array();
 
 		foreach ( $raw_links as $raw_link ) {
@@ -416,44 +453,43 @@ class Post_Links {
 				continue;
 			}
 
-			$provider_id  = absint( $raw_link['provider_id'] ?? 0 );
 			$raw_url      = trim( (string) ( $raw_link['original_url'] ?? '' ) );
 			$custom_label = sanitize_text_field( $raw_link['custom_label'] ?? '' );
 
-			// Descartar si falta provider o URL.
-			if ( ! $provider_id || ! $raw_url ) {
+			if ( ! $raw_url ) {
 				continue;
 			}
 
-			// Validar URL con filter_var ANTES de sanitizar para detectar URLs malformadas.
-			// filter_var con FILTER_VALIDATE_URL rechaza URLs sin esquema, con espacios, etc.
 			if ( false === filter_var( $raw_url, FILTER_VALIDATE_URL ) ) {
 				continue;
 			}
 
-			// Solo permitir esquemas seguros.
 			$scheme = strtolower( (string) wp_parse_url( $raw_url, PHP_URL_SCHEME ) );
 			if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
 				continue;
 			}
 
-			// Sanitizar URL después de validarla.
 			$original_url = esc_url_raw( $raw_url );
 			if ( ! $original_url ) {
 				continue;
 			}
 
-			// Verificar que el provider existe y es wpam_affiliate.
-			$provider_post = get_post( $provider_id );
-			if ( ! $provider_post instanceof \WP_Post || CPT::POST_TYPE !== $provider_post->post_type ) {
+			// v0.1.4: Auto-detección de afiliado por dominio.
+			// Reutiliza wpam_extract_domain_from_url() y Repository::find_by_domain()
+			// exactamente igual que ajax_save_post_links() en Post_Affiliates_Screen.
+			$domain    = wpam_extract_domain_from_url( $original_url );
+			$affiliate = $domain ? $repo->find_by_domain( $domain ) : null;
+
+			if ( null === $affiliate ) {
+				// Sin afiliado coincidente: descartar silenciosamente.
+				// (El error ya se mostró en el cliente vía JS).
 				continue;
 			}
 
 			$valid_links[] = array(
-				'provider_id'  => $provider_id,
+				'provider_id'  => $affiliate['id'],
 				'original_url' => $original_url,
 				'custom_label' => $custom_label,
-				// 'order' se re-asigna a continuación: no confiamos en el valor del cliente.
 			);
 		}
 
@@ -462,9 +498,7 @@ class Post_Links {
 			return;
 		}
 
-		// --- Re-asignar order SIEMPRE como índice incremental desde 0 ---
-		// No se usa el order enviado por el cliente para evitar el bug de order=0 múltiple.
-		// En FASE 4 (drag & drop) se añadirá lógica de reordenación aquí.
+		// Re-asignar order siempre como índice incremental desde 0.
 		foreach ( $valid_links as $i => &$link ) {
 			$link['order'] = $i;
 		}
@@ -481,19 +515,10 @@ class Post_Links {
 	 * Retorna los links guardados de un post, normalizados y seguros.
 	 *
 	 * @since  3.0.0
-	 * @since  0.0.3 Maneja providers huérfanos sin warnings; re-asigna order correcto.
+	 * @since  0.0.3 Maneja providers huérfanos; re-asigna order correcto.
 	 *
 	 * @param  int $post_id ID del post.
-	 * @return array[] Lista de links normalizados.
-	 *
-	 * Cada item del array incluye:
-	 *   'provider_id'   int     ID del afiliado.
-	 *   'original_url'  string  URL base.
-	 *   'custom_label'  string  Etiqueta personalizada (puede ser '').
-	 *   'order'         int     Posición (siempre incremental desde 0).
-	 *   'final_url'     string  URL con parámetro afiliado (vacía si provider inactivo/eliminado).
-	 *   '_orphan'       bool    true si el provider no existe o está inactivo.
-	 *   '_orphan_title' string  Nombre del provider huérfano (vacío si fue eliminado de la DB).
+	 * @return array[]
 	 */
 	public function get_links( int $post_id ): array {
 		$raw = get_post_meta( $post_id, self::META_KEY, true );
@@ -504,7 +529,7 @@ class Post_Links {
 
 		$repo  = new Repository();
 		$links = array();
-		$order = 0; // Siempre re-asignamos order incremental al leer.
+		$order = 0;
 
 		foreach ( $raw as $item ) {
 			if ( ! is_array( $item ) ) {
@@ -515,32 +540,25 @@ class Post_Links {
 			$original_url = esc_url_raw( (string) ( $item['original_url'] ?? '' ) );
 			$custom_label = sanitize_text_field( (string) ( $item['custom_label'] ?? '' ) );
 
-			// Descartar items sin datos mínimos (no deberían existir tras 0.0.3).
 			if ( ! $provider_id || ! $original_url ) {
 				continue;
 			}
 
-			// Verificar existencia y estado del provider.
-			$affiliate   = $repo->find( $provider_id );
-			$is_orphan   = false;
+			$affiliate    = $repo->find( $provider_id );
+			$is_orphan    = false;
 			$orphan_title = '';
-			$final_url   = '';
+			$final_url    = '';
 
 			if ( null === $affiliate ) {
-				// Provider eliminado de la DB.
-				$is_orphan = true;
-
-				// Intentar recuperar al menos el título del post (puede estar en trash).
+				$is_orphan     = true;
 				$provider_post = get_post( $provider_id );
 				if ( $provider_post instanceof \WP_Post ) {
 					$orphan_title = $provider_post->post_title;
 				}
 			} elseif ( ! $affiliate['active'] ) {
-				// Provider existe pero está desactivado.
 				$is_orphan    = true;
 				$orphan_title = $affiliate['title'];
 			} else {
-				// Provider válido y activo: generar URL final.
 				$final_url = wpam_generate_affiliate_url( $provider_id, $original_url );
 			}
 
@@ -561,25 +579,41 @@ class Post_Links {
 	}
 
 	// -------------------------------------------------------------------------
-	// Helpers internos
+	// Helpers privados
 	// -------------------------------------------------------------------------
 
 	/**
 	 * Formatea el contador de links para el footer del meta box.
 	 *
 	 * @since  0.0.3
-	 * @param  int $count Número de links.
-	 * @return string
 	 */
 	private function format_link_count( int $count ): string {
 		if ( 0 === $count ) {
 			return __( '0 links', 'wp-affiliatemanager' );
 		}
-
 		return sprintf(
 			/* translators: %d: número de affiliate links */
 			_n( '%d link', '%d links', $count, 'wp-affiliatemanager' ),
 			$count
 		);
+	}
+
+	/**
+	 * Convierte hex a rgba() para el chip de preview.
+	 *
+	 * @since  0.1.4
+	 */
+	private function hex_to_rgba( string $hex, float $alpha ): string {
+		$hex = ltrim( $hex, '#' );
+		if ( 3 === strlen( $hex ) ) {
+			$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+		}
+		if ( 6 !== strlen( $hex ) ) {
+			return 'rgba(108,71,255,0.10)';
+		}
+		$r = hexdec( substr( $hex, 0, 2 ) );
+		$g = hexdec( substr( $hex, 2, 2 ) );
+		$b = hexdec( substr( $hex, 4, 2 ) );
+		return "rgba({$r},{$g},{$b},{$alpha})";
 	}
 }
