@@ -48,6 +48,9 @@ class Activator {
 		$redirect = new Redirect\Redirect_Manager();
 		$redirect->register_rewrite();
 
+		// v0.2.1: crear tabla SQL de clicks.
+		Redirect\Clicks_Table::create_table();
+
 		// Limpiar rewrite rules.
 		flush_rewrite_rules();
 	}

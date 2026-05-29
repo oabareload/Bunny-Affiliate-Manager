@@ -216,6 +216,35 @@ Yes. Set the **Brand Color** field in each affiliate's settings. The CSS variabl
 
 ## Changelog
 
+### 0.2.1 — Tracking SQL + migración de clicks legacy
+
+**Nuevo archivo `includes/redirect/class-clicks-table.php`:**
+- `create_table()`: crea `{prefix}wpam_clicks` con dbDelta(). Columnas:
+  id, ts (DATETIME DEFAULT CURRENT_TIMESTAMP), post_id, affiliate_id,
+  destination_url (TEXT), referer (TEXT), ip_hash (CHAR 64), user_agent (TEXT).
+  Índices en affiliate_id, post_id, ts.
+- `maybe_migrate_legacy_clicks()`: idempotente via option `wpam_clicks_migrated`.
+  Sale inmediatamente si ya existe. Itera afiliados, inserta clicks legacy en SQL,
+  borra el meta _wpam_clicks solo si todos los inserts fueron exitosos.
+- `has_legacy_meta()`: query ligera para detectar si hay datos legacy sin iterar posts.
+- `migrate_affiliate_clicks()`: migra un afiliado específico. Normaliza timestamps
+  del formato legacy (Unix int) a DATETIME para SQL.
+
+**`includes/redirect/class-click-tracker.php`:**
+- `record()`: inserta en SQL. IP nunca guardada en texto plano;
+  se usa `hash_hmac('sha256', $ip, wp_salt())`. Registra también referer
+  (via `wp_get_raw_referer()`) y user_agent sanitizado.
+- `get_clicks()`: SELECT con ORDER BY ts DESC.
+- `count()`: SELECT COUNT(*).
+
+**`includes/class-activator.php`:**
+- `activate()` llama `Clicks_Table::create_table()` y
+  `Clicks_Table::maybe_migrate_legacy_clicks()` tras registrar la rewrite rule
+  y antes del flush_rewrite_rules().
+
+**`includes/class-plugin.php`:**
+- `require_once` de `class-clicks-table.php` añadido antes de `class-click-tracker.php`.
+
 ### 0.2.0-alpha3.2 — Texto del botón interstitial configurable
 
 **`includes/settings/class-settings.php`:**

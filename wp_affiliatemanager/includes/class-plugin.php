@@ -41,6 +41,7 @@ require_once WPAM_PLUGIN_PATH . 'includes/posts/helpers-post-links.php';
 require_once WPAM_PLUGIN_PATH . 'includes/admin/class-post-affiliates-screen.php';
 
 // --- v0.2.0-alpha1: Redirect system ---
+require_once WPAM_PLUGIN_PATH . 'includes/redirect/class-clicks-table.php';
 require_once WPAM_PLUGIN_PATH . 'includes/redirect/class-click-tracker.php';
 require_once WPAM_PLUGIN_PATH . 'includes/redirect/class-redirect-manager.php';
 require_once WPAM_PLUGIN_PATH . 'includes/redirect/class-interstitial-renderer.php';
