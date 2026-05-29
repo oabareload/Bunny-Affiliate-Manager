@@ -53,6 +53,15 @@ class Admin_Assets {
 			);
 		}
 
+		if ( 'bunny-affiliates_page_wpam-settings' === $hook_suffix ) {
+			wp_enqueue_style(
+				'wpam-settings-styles',
+				WPAM_PLUGIN_URL . 'assets/css/settings.css',
+				array( 'wpam-admin-styles' ),
+				$this->version
+			);
+		}
+
 		if ( $this->is_supported_post_screen( $hook_suffix ) ) {
 			wp_enqueue_style(
 				'wpam-post-links-styles',

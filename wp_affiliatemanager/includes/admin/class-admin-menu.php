@@ -163,7 +163,7 @@ class Admin_Menu {
 
 		$this->render_admin_header( __( 'Settings', 'wp-affiliatemanager' ) );
 		?>
-		<div class="bunny-page-content">
+		<div class="bunny-page-content wpam-settings-page">
 			<form method="post" action="options.php">
 				<?php
 				settings_fields( 'wpam_settings_group' );

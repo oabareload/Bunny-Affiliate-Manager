@@ -1,0 +1,186 @@
+/**
+ * Bunny Affiliate Manager — Interstitial Page Styles
+ *
+ * Card centrada, responsive, sin dependencias externas.
+ * Color de marca inyectado como var(--wpam-brand) por el renderer.
+ *
+ * @package WP_AffiliateManager
+ * @since   0.2.0-alpha2
+ */
+
+/* ==========================================================================
+   Reset mínimo
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+/* ==========================================================================
+   Body / layout
+   ========================================================================== */
+
+.wpam-interstitial-body {
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: #f4f4f8;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	color: #1a1a2e;
+	padding: 24px 16px;
+}
+
+/* ==========================================================================
+   Card
+   ========================================================================== */
+
+.wpam-interstitial-card {
+	background: #ffffff;
+	border-radius: 16px;
+	box-shadow: 0 8px 40px rgba(0, 0, 0, 0.10);
+	padding: 48px 40px 40px;
+	max-width: 460px;
+	width: 100%;
+	text-align: center;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 24px;
+}
+
+/* ==========================================================================
+   "You're leaving…"
+   ========================================================================== */
+
+.wpam-interstitial-leaving {
+	font-size: 14px;
+	color: #64748b;
+	letter-spacing: 0.02em;
+}
+
+.wpam-interstitial-leaving strong {
+	color: #1a1a2e;
+}
+
+/* ==========================================================================
+   Afiliado — logo + nombre
+   ========================================================================== */
+
+.wpam-interstitial-affiliate {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+}
+
+.wpam-interstitial-logo {
+	width: auto;
+	height: 56px;
+	max-width: 180px;
+	object-fit: contain;
+}
+
+.wpam-interstitial-aff-name {
+	font-size: 22px;
+	font-weight: 700;
+	color: #1a1a2e;
+	line-height: 1.2;
+}
+
+/* ==========================================================================
+   Countdown
+   ========================================================================== */
+
+.wpam-interstitial-countdown-wrap {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	color: #64748b;
+	font-size: 14px;
+}
+
+.wpam-interstitial-countdown-text {
+	font-size: 18px;
+	font-weight: 700;
+	color: var(--wpam-brand, #6c47ff);
+	line-height: 1.4;
+	transition: color 0.3s ease;
+}
+
+/* ==========================================================================
+   Botón continuar
+   ========================================================================== */
+
+.wpam-interstitial-btn {
+	display: inline-block;
+	background: var(--wpam-brand, #6c47ff);
+	color: #ffffff;
+	font-size: 15px;
+	font-weight: 700;
+	padding: 14px 32px;
+	border-radius: 10px;
+	text-decoration: none;
+	letter-spacing: 0.02em;
+	transition: opacity 0.15s ease, transform 0.15s ease;
+	width: 100%;
+	text-align: center;
+}
+
+.wpam-interstitial-btn:hover,
+.wpam-interstitial-btn:focus {
+	opacity: 0.88;
+	transform: translateY(-1px);
+	color: #ffffff;
+	text-decoration: none;
+}
+
+.wpam-interstitial-btn:active {
+	transform: translateY(0);
+	opacity: 1;
+}
+
+/* ==========================================================================
+   Disclaimer
+   ========================================================================== */
+
+.wpam-interstitial-disclaimer {
+	font-size: 12px;
+	color: #94a3b8;
+	line-height: 1.6;
+	max-width: 360px;
+}
+
+.wpam-interstitial-disclaimer a {
+	color: inherit;
+	text-decoration: underline;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media ( max-width: 500px ) {
+	.wpam-interstitial-card {
+		padding: 36px 24px 32px;
+		gap: 20px;
+	}
+
+	.wpam-interstitial-aff-name {
+		font-size: 18px;
+	}
+
+	.wpam-interstitial-countdown {
+		font-size: 28px;
+	}
+
+	.wpam-interstitial-btn {
+		font-size: 14px;
+		padding: 13px 24px;
+	}
+}

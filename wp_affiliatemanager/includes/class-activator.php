@@ -44,6 +44,10 @@ class Activator {
 		// incluyan el post type desde el primer momento.
 		self::register_cpt_for_flush();
 
+		// v0.2.0-alpha1: registrar la rewrite rule del redirect antes del flush.
+		$redirect = new Redirect\Redirect_Manager();
+		$redirect->register_rewrite();
+
 		// Limpiar rewrite rules.
 		flush_rewrite_rules();
 	}

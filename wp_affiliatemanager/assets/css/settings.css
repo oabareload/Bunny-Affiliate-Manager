@@ -1,0 +1,309 @@
+/**
+ * Bunny Affiliate Manager — Settings Page Modern UI
+ *
+ * Moderniza visualmente la pantalla de Settings de WordPress
+ * sin cambiar la lógica ni la estructura de los formularios.
+ *
+ * @package WP_AffiliateManager
+ * @since   0.2.0-alpha3
+ */
+
+/* ==========================================================================
+   Variables
+   ========================================================================== */
+
+:root {
+	--wpam-s-accent:       #6c47ff;
+	--wpam-s-accent-light: rgba(108, 71, 255, 0.08);
+	--wpam-s-accent-mid:   rgba(108, 71, 255, 0.18);
+	--wpam-s-border:       #e2e8f0;
+	--wpam-s-bg:           #f8fafc;
+	--wpam-s-card:         #ffffff;
+	--wpam-s-text:         #1e293b;
+	--wpam-s-muted:        #64748b;
+	--wpam-s-radius:       10px;
+	--wpam-s-shadow:       0 1px 4px rgba(0,0,0,.07);
+	--wpam-s-shadow-md:    0 4px 18px rgba(0,0,0,.09);
+}
+
+/* ==========================================================================
+   Layout de página
+   ========================================================================== */
+
+.wpam-settings-page .wrap {
+	max-width: 860px;
+}
+
+/* ==========================================================================
+   Header de la página
+   ========================================================================== */
+
+.wpam-settings-page h1.wp-heading-inline {
+	font-size: 22px;
+	font-weight: 700;
+	color: var(--wpam-s-text);
+	margin-bottom: 24px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.wpam-settings-page h1.wp-heading-inline::before {
+	content: '🐰';
+	font-size: 20px;
+}
+
+/* ==========================================================================
+   Secciones como cards
+   ========================================================================== */
+
+/* Título de sección (h2 que WP genera) */
+.wpam-settings-page h2 {
+	font-size: 13px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--wpam-s-accent);
+	background: var(--wpam-s-accent-light);
+	border: 1px solid var(--wpam-s-accent-mid);
+	border-radius: var(--wpam-s-radius) var(--wpam-s-radius) 0 0;
+	padding: 12px 20px;
+	margin: 28px 0 0;
+}
+
+/* Tabla de settings de cada sección */
+.wpam-settings-page .form-table {
+	background: var(--wpam-s-card);
+	border: 1px solid var(--wpam-s-border);
+	border-top: none;
+	border-radius: 0 0 var(--wpam-s-radius) var(--wpam-s-radius);
+	box-shadow: var(--wpam-s-shadow);
+	margin-bottom: 8px;
+	border-collapse: separate;
+	border-spacing: 0;
+	overflow: hidden;
+}
+
+/* Descripción de sección (párrafo que va entre h2 y la tabla) */
+.wpam-settings-page .form-table + p,
+.wpam-settings-page p.description:first-of-type {
+	display: none; /* WP la genera fuera de la tabla; la manejamos via callback */
+}
+
+/* Filas */
+.wpam-settings-page .form-table tr {
+	border-bottom: 1px solid var(--wpam-s-border);
+}
+
+.wpam-settings-page .form-table tr:last-child {
+	border-bottom: none;
+}
+
+/* Labels (th) */
+.wpam-settings-page .form-table th {
+	width: 220px;
+	padding: 18px 20px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--wpam-s-text);
+	vertical-align: top;
+	background: #fafbfc;
+	border-right: 1px solid var(--wpam-s-border);
+}
+
+/* Contenido (td) */
+.wpam-settings-page .form-table td {
+	padding: 16px 20px;
+	vertical-align: top;
+}
+
+/* ==========================================================================
+   Inputs modernos
+   ========================================================================== */
+
+.wpam-settings-page input[type="text"],
+.wpam-settings-page input[type="number"],
+.wpam-settings-page input[type="url"],
+.wpam-settings-page input[type="email"],
+.wpam-settings-page textarea,
+.wpam-settings-page select {
+	border: 1px solid var(--wpam-s-border);
+	border-radius: 6px;
+	padding: 8px 12px;
+	font-size: 13px;
+	color: var(--wpam-s-text);
+	background: #fff;
+	box-shadow: 0 1px 2px rgba(0,0,0,.04);
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+	width: 100%;
+	max-width: 460px;
+}
+
+.wpam-settings-page input[type="number"] {
+	max-width: 80px;
+}
+
+.wpam-settings-page input[type="text"]:focus,
+.wpam-settings-page input[type="number"]:focus,
+.wpam-settings-page textarea:focus,
+.wpam-settings-page select:focus {
+	outline: none;
+	border-color: var(--wpam-s-accent);
+	box-shadow: 0 0 0 3px var(--wpam-s-accent-light);
+}
+
+.wpam-settings-page textarea {
+	min-height: 80px;
+	resize: vertical;
+	line-height: 1.6;
+}
+
+/* ==========================================================================
+   Toggle (checkbox moderno)
+   ========================================================================== */
+
+/* Ocultar el checkbox nativo de WP completamente — el toggle CSS lo reemplaza.
+   clip + overflow son necesarios para que algunos browsers no muestren el
+   elemento nativo aunque appearance:none esté seteado. */
+.wpam-settings-page input[type="checkbox"] {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 40px;
+	height: 22px;
+	min-width: 40px;
+	background: #cbd5e1;
+	border-radius: 999px;
+	cursor: pointer;
+	position: relative;
+	transition: background 0.2s ease;
+	flex-shrink: 0;
+	vertical-align: middle;
+	margin-right: 8px;
+	/* Eliminar cualquier borde, sombra o checkmark nativo */
+	border: none;
+	box-shadow: none;
+	color: transparent;
+	outline-offset: 3px;
+	overflow: hidden; /* recorta cualquier pseudo-elemento nativo */
+}
+
+/* Thumb del toggle */
+.wpam-settings-page input[type="checkbox"]::before {
+	display: none; /* anular ::before si algún browser lo usa */
+}
+
+.wpam-settings-page input[type="checkbox"]::after {
+	content: '';
+	position: absolute;
+	width: 16px;
+	height: 16px;
+	background: #fff;
+	border-radius: 50%;
+	top: 3px;
+	left: 3px;
+	transition: left 0.2s ease;
+	box-shadow: 0 1px 3px rgba(0,0,0,.20);
+}
+
+.wpam-settings-page input[type="checkbox"]:checked {
+	background: var(--wpam-s-accent);
+}
+
+.wpam-settings-page input[type="checkbox"]:checked::after {
+	left: 21px;
+}
+
+.wpam-settings-page input[type="checkbox"]:focus {
+	outline: 2px solid var(--wpam-s-accent);
+	box-shadow: none;
+}
+
+/* Label junto al toggle */
+.wpam-settings-page label {
+	display: flex;
+	align-items: center;
+	font-size: 13px;
+	color: var(--wpam-s-text);
+	cursor: pointer;
+	gap: 4px;
+}
+
+/* ==========================================================================
+   Descriptions
+   ========================================================================== */
+
+.wpam-settings-page .description,
+.wpam-settings-page p.description {
+	font-size: 12px;
+	color: var(--wpam-s-muted);
+	margin-top: 6px;
+	line-height: 1.5;
+	max-width: 460px;
+}
+
+.wpam-settings-page span.description {
+	margin-left: 8px;
+}
+
+/* ==========================================================================
+   Botón guardar
+   ========================================================================== */
+
+.wpam-settings-page .submit {
+	padding: 24px 0 8px;
+	display: block !important;
+	visibility: visible !important;
+}
+
+.wpam-settings-page p.submit {
+	display: block !important;
+	visibility: visible !important;
+}
+
+.wpam-settings-page .submit input[type="submit"],
+.wpam-settings-page .submit .button-primary {
+	background: var(--wpam-s-accent) !important;
+	border-color: var(--wpam-s-accent) !important;
+	border-width: 1px !important;
+	color: #fff !important;
+	font-size: 14px !important;
+	font-weight: 600 !important;
+	padding: 10px 28px !important;
+	height: auto !important;
+	line-height: 1.4 !important;
+	border-radius: 8px !important;
+	box-shadow: 0 2px 8px rgba(108,71,255,0.25) !important;
+	transition: opacity 0.15s ease !important;
+	cursor: pointer !important;
+	display: inline-block !important;
+}
+
+.wpam-settings-page .submit input[type="submit"]:hover,
+.wpam-settings-page .submit .button-primary:hover {
+	opacity: 0.88 !important;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media ( max-width: 768px ) {
+	.wpam-settings-page .form-table th {
+		width: auto;
+		display: block;
+		border-right: none;
+		border-bottom: 1px solid var(--wpam-s-border);
+		padding: 14px 16px 8px;
+	}
+
+	.wpam-settings-page .form-table td {
+		display: block;
+		padding: 10px 16px 16px;
+	}
+
+	.wpam-settings-page input[type="text"],
+	.wpam-settings-page textarea,
+	.wpam-settings-page select {
+		max-width: 100%;
+	}
+}

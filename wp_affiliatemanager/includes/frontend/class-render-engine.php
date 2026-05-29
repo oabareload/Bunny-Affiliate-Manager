@@ -288,6 +288,12 @@ class Render_Engine {
 				continue;
 			}
 
+			// v0.2.0-alpha1: usar URL interna /go/{token} en lugar de la URL de afiliado directa.
+			$go_url = wpam_go_url( $post_id, (int) $link['order'] );
+			if ( '' === $go_url ) {
+				continue;
+			}
+
 			$label = '' !== $link['custom_label']
 				? $link['custom_label']
 				: $this->get_affiliate_name( $link['provider_id'] );
@@ -295,7 +301,7 @@ class Render_Engine {
 			$item_html = $template_engine->render(
 				'link-item',
 				array(
-					'final_url'       => $link['final_url'],
+					'final_url'       => $go_url,
 					'label'           => $label,
 					'link_target'     => $link_target,
 					'rel'             => $rel,

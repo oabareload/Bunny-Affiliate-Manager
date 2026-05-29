@@ -40,6 +40,12 @@ require_once WPAM_PLUGIN_PATH . 'includes/posts/helpers-post-links.php';
 // --- v0.1.0: Post Affiliates board ---
 require_once WPAM_PLUGIN_PATH . 'includes/admin/class-post-affiliates-screen.php';
 
+// --- v0.2.0-alpha1: Redirect system ---
+require_once WPAM_PLUGIN_PATH . 'includes/redirect/class-click-tracker.php';
+require_once WPAM_PLUGIN_PATH . 'includes/redirect/class-redirect-manager.php';
+require_once WPAM_PLUGIN_PATH . 'includes/redirect/class-interstitial-renderer.php';
+require_once WPAM_PLUGIN_PATH . 'includes/redirect/helpers-redirect.php';
+
 // --- FASE 4: Render Engine ---
 require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-render-engine.php';
 require_once WPAM_PLUGIN_PATH . 'includes/frontend/helpers-render.php';
@@ -91,6 +97,12 @@ final class Plugin {
 	private function define_global_hooks(): void {
 		$cpt = new Affiliates\CPT();
 		$this->loader->add_action( 'init', $cpt, 'register' );
+
+		// v0.2.0-alpha1: Redirect system.
+		$redirect = new Redirect\Redirect_Manager();
+		$this->loader->add_action( 'init',             $redirect, 'register_rewrite' );
+		$this->loader->add_filter( 'query_vars',       $redirect, 'add_query_var' );
+		$this->loader->add_action( 'template_redirect', $redirect, 'handle' );
 	}
 
 	/**
@@ -141,6 +153,10 @@ final class Plugin {
 		$post_links = new Posts\Post_Links();
 		$this->loader->add_action( 'add_meta_boxes', $post_links, 'register_meta_box' );
 		$this->loader->add_action( 'save_post',      $post_links, 'save' );
+
+		// v0.2.0-alpha1: Reconstruir mapa de tokens al guardar links.
+		$redirect = new Redirect\Redirect_Manager();
+		$this->loader->add_action( 'save_post', $redirect, 'rebuild_token_map' );
 	}
 
 	/**

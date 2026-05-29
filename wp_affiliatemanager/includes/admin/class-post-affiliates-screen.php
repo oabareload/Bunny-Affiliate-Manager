@@ -635,6 +635,12 @@ class Post_Affiliates_Screen {
 			update_post_meta( $post_id, Post_Links::META_KEY, $valid_links );
 		}
 
+		// v0.2.0-alpha1: regenerar tokens de redirect tras guardar desde Post Affiliates.
+		// El hook save_post no se dispara en contexto AJAX, por lo que hay que
+		// llamarlo explícitamente aquí para mantener el token map sincronizado.
+		$redirect_manager = new \WP_AffiliateManager\Redirect\Redirect_Manager();
+		$redirect_manager->rebuild_token_map( $post_id );
+
 		$affiliates = $this->get_active_affiliates();
 		$post_data  = $this->normalize_post( $post );
 

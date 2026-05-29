@@ -216,6 +216,42 @@ Yes. Set the **Brand Color** field in each affiliate's settings. The CSS variabl
 
 ## Changelog
 
+### 0.2.0-alpha3.2 — Texto del botón interstitial configurable
+
+**`includes/settings/class-settings.php`:**
+- Nuevo campo `interstitial_button_text` en la sección "Redirect / Interstitial".
+- Sanitización con `sanitize_text_field()`. Fallback automático a "Continuar"
+  si el campo queda vacío.
+- Default añadido en `get_defaults()`.
+
+**`includes/redirect/class-interstitial-renderer.php`:**
+- El botón principal del interstitial ya no tiene texto hardcoded.
+- Lee `interstitial_button_text` de las settings del plugin.
+- Fallback a "Continuar" si el setting no existe.
+
+### 0.2.0-alpha3.1 — Settings UI fixes
+
+**`assets/css/settings.css`:**
+- Fix del toggle/switch: el checkmark nativo de WordPress ya no aparece encima
+  del toggle custom. Se añadieron `border:none`, `box-shadow:none`,
+  `color:transparent`, `overflow:hidden` y `::before{display:none}` para
+  suprimir cualquier pseudo-elemento o decoración nativa del browser.
+- Foco del toggle ahora usa `outline` en lugar de `box-shadow` para mantener
+  accesibilidad por teclado sin interferir con el thumb del switch.
+- Botón Save restaurado y visible: selectores ampliados a
+  `input[type="submit"]` además de `.button-primary`. Añadidos
+  `display:block !important` y `visibility:visible !important` al contenedor
+  `.submit` y `p.submit` para evitar herencia del admin de WordPress.
+
+**`includes/settings/class-settings.php`:**
+- Campo `redirect_delay` cambiado de `<input type="number">` a `<select>`
+  con opciones fijas: 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 segundos.
+- Máximo permitido actualizado de 30s a 60s.
+- Sanitización actualizada: valida contra la lista de valores permitidos.
+  Valores fuera de lista hacen fallback a 5s. Clamp absoluto a 60s para
+  valores enviados manualmente fuera del select.
+- La opción 0s muestra "0s — Redirect instantáneo" para dejar claro el comportamiento.
+
 ### 0.1.4 — Auto-detección de afiliado en el editor de posts
 
 **Nuevo archivo `assets/js/domain-detector.js`:**

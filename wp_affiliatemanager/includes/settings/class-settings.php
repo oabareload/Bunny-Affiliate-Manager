@@ -111,6 +111,64 @@ class Settings {
 		);
 
 		// ---------------------------------------------------------------------------
+		// Sección: Redirect / Interstitial — v0.2.0-alpha2
+		// ---------------------------------------------------------------------------
+		add_settings_section(
+			'wpam_section_redirect',
+			__( 'Redirect / Interstitial', 'wp-affiliatemanager' ),
+			array( $this, 'render_section_redirect' ),
+			self::PAGE_SLUG
+		);
+
+		add_settings_field(
+			'wpam_field_enable_interstitial',
+			__( 'Habilitar página interstitial', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_enable_interstitial' ),
+			self::PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		add_settings_field(
+			'wpam_field_redirect_delay',
+			__( 'Delay de redirect (segundos)', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_redirect_delay' ),
+			self::PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		add_settings_field(
+			'wpam_field_disclaimer_text',
+			__( 'Texto de disclaimer', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_disclaimer_text' ),
+			self::PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		add_settings_field(
+			'wpam_field_interstitial_title',
+			__( 'Título del interstitial', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_interstitial_title' ),
+			self::PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		add_settings_field(
+			'wpam_field_interstitial_countdown_text',
+			__( 'Texto del countdown', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_interstitial_countdown_text' ),
+			self::PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		add_settings_field(
+			'wpam_field_interstitial_button_text',
+			__( 'Texto del botón continuar', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_interstitial_button_text' ),
+			self::PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		// ---------------------------------------------------------------------------
 		// Sección: Apariencia
 		// ---------------------------------------------------------------------------
 		add_settings_section(
@@ -181,6 +239,161 @@ class Settings {
 	 */
 	public function render_section_general(): void {
 		echo '<p>' . esc_html__( 'Ajusta el comportamiento global de los enlaces de afiliados en tu sitio.', 'wp-affiliatemanager' ) . '</p>';
+	}
+
+	/**
+	 * Renderiza la descripción de la sección Redirect.
+	 *
+	 * @since  0.2.0-alpha2
+	 * @return void
+	 */
+	public function render_section_redirect(): void {
+		echo '<p>' . esc_html__( 'Configura la página interstitial que aparece antes de redirigir al sitio externo.', 'wp-affiliatemanager' ) . '</p>';
+	}
+
+	/**
+	 * Renderiza el campo enable_interstitial.
+	 *
+	 * @since  0.2.0-alpha2
+	 * @return void
+	 */
+	public function render_field_enable_interstitial(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['redirect']['enable_interstitial'] ?? true;
+		?>
+		<label>
+			<input
+				type="checkbox"
+				name="<?php echo esc_attr( self::OPTION_NAME . '[redirect][enable_interstitial]' ); ?>"
+				value="1"
+				<?php checked( (bool) $value ); ?>
+			/>
+			<?php esc_html_e( 'Mostrar página interstitial antes de redirigir', 'wp-affiliatemanager' ); ?>
+		</label>
+		<p class="description"><?php esc_html_e( 'Si está desactivado, el redirect ocurre instantáneamente sin mostrar ninguna página.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo redirect_delay como select con opciones fijas.
+	 *
+	 * Opciones: 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 segundos.
+	 * Máximo: 60 s. Valor 0 = bypass instantáneo del interstitial.
+	 *
+	 * @since  0.2.0-alpha2
+	 * @since  0.2.0-alpha3.1 Cambiado de number input a select con opciones fijas.
+	 * @return void
+	 */
+	public function render_field_redirect_delay(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = absint( $options['redirect']['redirect_delay'] ?? 3 );
+
+		$allowed = array( 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 );
+
+		// Si el valor guardado no está en la lista, usar el más cercano.
+		if ( ! in_array( $value, $allowed, true ) ) {
+			$value = 5; // fallback
+		}
+		?>
+		<select name="<?php echo esc_attr( self::OPTION_NAME . '[redirect][redirect_delay]' ); ?>">
+			<?php foreach ( $allowed as $seconds ) : ?>
+				<option value="<?php echo esc_attr( (string) $seconds ); ?>" <?php selected( $value, $seconds ); ?>>
+					<?php
+					if ( 0 === $seconds ) {
+						esc_html_e( '0s — Redirect instantáneo', 'wp-affiliatemanager' );
+					} else {
+						/* translators: %d: número de segundos */
+						printf( esc_html__( '%ds', 'wp-affiliatemanager' ), $seconds );
+					}
+					?>
+				</option>
+			<?php endforeach; ?>
+		</select>
+		<p class="description"><?php esc_html_e( 'Tiempo antes de redirigir. 0s = sin countdown, redirect instantáneo aunque el interstitial esté activado.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo disclaimer_text.
+	 *
+	 * @since  0.2.0-alpha2
+	 * @return void
+	 */
+	public function render_field_disclaimer_text(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$default = __( 'Los precios, disponibilidad y contenido son responsabilidad del sitio externo.', 'wp-affiliatemanager' );
+		$value   = $options['redirect']['disclaimer_text'] ?? $default;
+		?>
+		<textarea
+			name="<?php echo esc_attr( self::OPTION_NAME . '[redirect][disclaimer_text]' ); ?>"
+			rows="3"
+			class="large-text"
+		><?php echo esc_textarea( $value ); ?></textarea>
+		<p class="description"><?php esc_html_e( 'Texto visible bajo el botón de continuar. Acepta HTML básico.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo interstitial_title.
+	 *
+	 * @since  0.2.0-alpha3
+	 * @return void
+	 */
+	public function render_field_interstitial_title(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['redirect']['interstitial_title'] ?? __( 'Estás saliendo de BunnyChase', 'wp-affiliatemanager' );
+		?>
+		<input
+			type="text"
+			name="<?php echo esc_attr( self::OPTION_NAME . '[redirect][interstitial_title]' ); ?>"
+			value="<?php echo esc_attr( $value ); ?>"
+			class="large-text"
+			placeholder="<?php esc_attr_e( 'Estás saliendo de BunnyChase', 'wp-affiliatemanager' ); ?>"
+		/>
+		<p class="description"><?php esc_html_e( 'Título principal que aparece en la página de salida.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo interstitial_countdown_text.
+	 *
+	 * @since  0.2.0-alpha3
+	 * @return void
+	 */
+	public function render_field_interstitial_countdown_text(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['redirect']['interstitial_countdown_text'] ?? __( 'Redirigiendo en {seconds}s', 'wp-affiliatemanager' );
+		?>
+		<input
+			type="text"
+			name="<?php echo esc_attr( self::OPTION_NAME . '[redirect][interstitial_countdown_text]' ); ?>"
+			value="<?php echo esc_attr( $value ); ?>"
+			class="large-text"
+			placeholder="<?php esc_attr_e( 'Redirigiendo en {seconds}s', 'wp-affiliatemanager' ); ?>"
+		/>
+		<p class="description"><?php esc_html_e( 'Usa {seconds} como placeholder dinámico. Ejemplo: "Redirigiendo en {seconds}s"', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo interstitial_button_text.
+	 *
+	 * @since  0.2.0-alpha3.2
+	 * @return void
+	 */
+	public function render_field_interstitial_button_text(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['redirect']['interstitial_button_text'] ?? __( 'Continuar', 'wp-affiliatemanager' );
+		?>
+		<input
+			type="text"
+			name="<?php echo esc_attr( self::OPTION_NAME . '[redirect][interstitial_button_text]' ); ?>"
+			value="<?php echo esc_attr( $value ); ?>"
+			class="regular-text"
+			placeholder="<?php esc_attr_e( 'Continuar', 'wp-affiliatemanager' ); ?>"
+		/>
+		<p class="description"><?php esc_html_e( 'Texto del botón principal de la página interstitial.', 'wp-affiliatemanager' ); ?></p>
+		<?php
 	}
 
 	/**
@@ -495,6 +708,37 @@ class Settings {
 
 		$sanitized['general']['nofollow'] = ! empty( $input['general']['nofollow'] );
 
+		// Redirect / Interstitial — v0.2.0-alpha2.
+		$sanitized['redirect']['enable_interstitial'] = ! empty( $input['redirect']['enable_interstitial'] );
+
+		// v0.2.0-alpha3.1: delay limitado a valores permitidos del select (0..60, múltiplos de 5).
+		$allowed_delays = array( 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 );
+		$delay          = absint( $input['redirect']['redirect_delay'] ?? 5 );
+		$delay          = min( $delay, 60 ); // clamp absoluto
+		$sanitized['redirect']['redirect_delay'] = in_array( $delay, $allowed_delays, true ) ? $delay : 5;
+
+		$disclaimer = wp_kses_post( $input['redirect']['disclaimer_text'] ?? '' );
+		$sanitized['redirect']['disclaimer_text'] = '' !== trim( $disclaimer )
+			? $disclaimer
+			: __( 'Los precios, disponibilidad y contenido son responsabilidad del sitio externo.', 'wp-affiliatemanager' );
+
+		// v0.2.0-alpha3: textos configurables del interstitial.
+		$title = sanitize_text_field( $input['redirect']['interstitial_title'] ?? '' );
+		$sanitized['redirect']['interstitial_title'] = '' !== $title
+			? $title
+			: __( 'Estás saliendo de BunnyChase', 'wp-affiliatemanager' );
+
+		$countdown_text = sanitize_text_field( $input['redirect']['interstitial_countdown_text'] ?? '' );
+		$sanitized['redirect']['interstitial_countdown_text'] = '' !== $countdown_text
+			? $countdown_text
+			: __( 'Redirigiendo en {seconds}s', 'wp-affiliatemanager' );
+
+		// v0.2.0-alpha3.2: texto del botón continuar.
+		$button_text = sanitize_text_field( $input['redirect']['interstitial_button_text'] ?? '' );
+		$sanitized['redirect']['interstitial_button_text'] = '' !== $button_text
+			? $button_text
+			: __( 'Continuar', 'wp-affiliatemanager' );
+
 		// Appearance.
 		if ( isset( $input['appearance']['link_style'] ) ) {
 			$sanitized['appearance']['link_style'] = in_array(
@@ -554,6 +798,14 @@ class Settings {
 				'link_target'  => '_blank',
 				'nofollow'     => true,
 				'track_clicks' => false,
+			),
+			'redirect' => array(
+				'enable_interstitial'          => true,
+				'redirect_delay'               => 3,
+				'disclaimer_text'              => 'Los precios, disponibilidad y contenido son responsabilidad del sitio externo.',
+				'interstitial_title'           => 'Estás saliendo de BunnyChase',
+				'interstitial_countdown_text'  => 'Redirigiendo en {seconds}s',
+				'interstitial_button_text'     => 'Continuar',
 			),
 			'appearance' => array(
 				'link_style'      => 'vertical',
