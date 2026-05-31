@@ -216,6 +216,32 @@ Yes. Set the **Brand Color** field in each affiliate's settings. The CSS variabl
 
 ## Changelog
 
+### 0.2.3 — Dashboard Analytics MVP
+
+* Nuevo dashboard de analytics integrado directamente en la pantalla principal del plugin.
+* Visualización de métricas reales obtenidas desde la tabla SQL `wpam_clicks`.
+
+**`includes/admin/class-admin-menu.php`:**
+
+* 4 stat cards nuevas en el dashboard: Clicks Today, Last 7 Days, Last 30 Days y Total Clicks.
+* Queries SQL directas sobre `wpam_clicks`.
+* Top Affiliates: top 10 por clicks con logo, nombre, barra de progreso y porcentaje respecto al total.
+* Top Posts: top 10 por clicks con thumbnail, título y acceso rápido al editor.
+* Recent Clicks: tabla compacta con los últimos 20 clicks registrados.
+* Muestra fecha/hora (timezone local), afiliado, post y dominio destino.
+* No muestra IP, user agent ni referer.
+* Layout reorganizado con métricas superiores, columnas para rankings y sección de actividad reciente.
+* Todas las queries limitadas (Top 10 / Recent 20) para mantener rendimiento óptimo.
+
+**`assets/css/admin.css`:**
+
+* Nuevas clases para analytics dashboard.
+* Grid responsive para métricas y rankings.
+* Barras de progreso visuales para Top Affiliates.
+* Tabla moderna para actividad reciente.
+* Chips visuales para dominios de destino.
+* Responsive automático a una columna en pantallas menores a 900px.
+
 ### 0.2.1 — Tracking SQL + migración de clicks legacy
 
 **Nuevo archivo `includes/redirect/class-clicks-table.php`:**
