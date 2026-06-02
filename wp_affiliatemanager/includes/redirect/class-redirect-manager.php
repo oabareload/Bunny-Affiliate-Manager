@@ -103,8 +103,11 @@ class Redirect_Manager {
 			return; // No es nuestra petición.
 		}
 
-		// A partir de aquí toda la lógica está dentro de un try/catch para
-		// garantizar que ningún error inesperado rompa el sitio.
+		// Leer opciones y la flag de exclusión antes de cualquier uso.
+		$options        = get_option( WPAM_OPTION_KEY, array() );
+		$exclude_admins = ! empty( $options['general']['exclude_admins_from_analytics'] );
+
+		// Resolver el token en todos los casos (el redirect siempre debe ocurrir).
 		try {
 			$destination = $this->resolve( $token );
 		} catch ( \Throwable $e ) {
@@ -117,19 +120,21 @@ class Redirect_Manager {
 		}
 
 		// Registrar el click (fallo no bloquea el redirect).
-		try {
-			$tracker = new Click_Tracker();
-			$tracker->record(
-				$destination['post_id'],
-				$destination['affiliate_id'],
-				$destination['url']
-			);
-		} catch ( \Throwable $e ) {
-			// Silenciar: el tracking no puede impedir el redirect.
+		// Si exclude_admins está activo y el usuario tiene manage_options, se omite el tracking.
+		if ( ! ( $exclude_admins && current_user_can( 'manage_options' ) ) ) {
+			try {
+				$tracker = new Click_Tracker();
+				$tracker->record(
+					$destination['post_id'],
+					$destination['affiliate_id'],
+					$destination['url']
+				);
+			} catch ( \Throwable $e ) {
+				// Silenciar: el tracking no puede impedir el redirect.
+			}
 		}
-
+		
 		// v0.2.0-alpha2: bifurcar según settings de interstitial.
-		$options             = get_option( WPAM_OPTION_KEY, array() );
 		$enable_interstitial = ! empty( $options['redirect']['enable_interstitial'] ?? true );
 		$delay               = absint( $options['redirect']['redirect_delay'] ?? 3 );
 

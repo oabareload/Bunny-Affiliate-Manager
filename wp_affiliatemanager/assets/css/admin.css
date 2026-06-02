@@ -432,6 +432,14 @@
 .wpam-edit-field--name   { grid-column: span 2; }
 .wpam-edit-field--domains { grid-column: span 2; }
 .wpam-edit-field--checks  { display: flex; align-items: flex-end; gap: 16px; padding-bottom: 2px; }
+.wpam-edit-field--custom-disclaimer { grid-column: span 2; }
+.wpam-edit-field--related-post { grid-column: span 2; }
+.wpam-edit-field--disclaimer-check { display: flex; align-items: flex-end; padding-bottom: 2px; }
+
+.wpam-edit-field textarea.wpam-input {
+	min-height: 82px;
+	resize: vertical;
+}
 
 .wpam-inline-check {
 	display: flex; align-items: center; gap: 6px;
@@ -632,6 +640,43 @@
 
 .wpam-analytics-card--full {
 	margin-top: 20px;
+}
+
+.wpam-maintenance-card {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.wpam-maintenance-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 20px;
+	padding-top: 16px;
+	border-top: 1px solid var(--wpam-gray-200);
+}
+
+.wpam-maintenance-row:first-of-type {
+	padding-top: 0;
+	border-top: none;
+}
+
+.wpam-maintenance-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.wpam-maintenance-info strong {
+	display: block;
+	font-size: 13px;
+	color: var(--wpam-gray-900);
+	margin-bottom: 4px;
+}
+
+.wpam-maintenance-info .description {
+	margin: 0;
+	color: var(--wpam-gray-400);
 }
 
 .wpam-analytics-card-title {

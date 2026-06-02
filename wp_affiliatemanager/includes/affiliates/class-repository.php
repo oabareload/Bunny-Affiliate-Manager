@@ -227,6 +227,14 @@ class Repository {
 		update_post_meta( $post_id, Meta::KEY_ACTIVE,      ! empty( $data['active'] ) ? '1' : '0' );
 		update_post_meta( $post_id, Meta::KEY_DOMAINS,     sanitize_textarea_field( $data['domains'] ?? '' ) );
 		update_post_meta( $post_id, Meta::KEY_VISIBLE,     ! empty( $data['visible'] ) ? '1' : '0' );
+		update_post_meta( $post_id, Meta::KEY_USE_GLOBAL_DISCLAIMER, ! empty( $data['use_global_disclaimer'] ) ? '1' : '0' );
+		update_post_meta( $post_id, Meta::KEY_CUSTOM_DISCLAIMER,     wp_kses_post( $data['custom_disclaimer'] ?? '' ) );
+
+		$related_post_id = absint( $data['related_post_id'] ?? 0 );
+		if ( $related_post_id > 0 && 'post' !== get_post_type( $related_post_id ) ) {
+			$related_post_id = 0;
+		}
+		update_post_meta( $post_id, Meta::KEY_RELATED_POST_ID, $related_post_id );
 
 		return $post_id;
 	}
@@ -275,6 +283,7 @@ class Repository {
 	 */
 	public function normalize( \WP_Post $post ): array {
 		$is_active = get_post_meta( $post->ID, Meta::KEY_ACTIVE, true );
+		$use_global_disclaimer = get_post_meta( $post->ID, Meta::KEY_USE_GLOBAL_DISCLAIMER, true );
 
 		return array(
 			'id'          => $post->ID,
@@ -287,6 +296,9 @@ class Repository {
 			'active'      => '' === $is_active ? true : '1' === $is_active,
 			'domains'     => get_post_meta( $post->ID, Meta::KEY_DOMAINS,     true ) ?: '',
 			'visible'     => '' === get_post_meta( $post->ID, Meta::KEY_VISIBLE, true ) ? true : '1' === get_post_meta( $post->ID, Meta::KEY_VISIBLE, true ),
+			'use_global_disclaimer' => '' === $use_global_disclaimer ? true : '1' === $use_global_disclaimer,
+			'custom_disclaimer'     => get_post_meta( $post->ID, Meta::KEY_CUSTOM_DISCLAIMER, true ) ?: '',
+			'related_post_id'       => absint( get_post_meta( $post->ID, Meta::KEY_RELATED_POST_ID, true ) ),
 			'edit_url'    => get_edit_post_link( $post->ID, 'raw' ),
 			'created_at'  => $post->post_date,
 		);

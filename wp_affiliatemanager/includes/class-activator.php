@@ -80,6 +80,16 @@ class Activator {
 				'link_target'  => '_blank',
 				'nofollow'     => true,
 				'track_clicks' => false,
+				'exclude_admins_from_analytics' => true,
+			),
+			'redirect' => array(
+				'enable_interstitial'          => true,
+				'redirect_delay'               => 3,
+				'disclaimer_text'              => 'Los precios, disponibilidad y contenido son responsabilidad del sitio externo.',
+				'interstitial_title'           => 'Estas saliendo de BunnyChase',
+				'interstitial_countdown_text'  => 'Redirigiendo en {seconds}s',
+				'interstitial_button_text'     => 'Continuar',
+				'show_related_post_excerpt'    => false,
 			),
 			'appearance' => array(
 				'template'     => 'default',

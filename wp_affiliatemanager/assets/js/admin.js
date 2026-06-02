@@ -122,6 +122,9 @@
 					domains:     $form.find( '.wpam-ef-domains' ).val().trim(),
 					active:      $form.find( '.wpam-ef-active' ).is( ':checked' ) ? '1' : '',
 					visible:     $form.find( '.wpam-ef-visible' ).is( ':checked' ) ? '1' : '',
+					use_global_disclaimer: $form.find( '.wpam-ef-use-global-disclaimer' ).is( ':checked' ) ? '1' : '',
+					custom_disclaimer:     $form.find( '.wpam-ef-custom-disclaimer' ).val().trim(),
+					related_post_id:       $form.find( '.wpam-ef-related-post' ).val(),
 				};
 
 				// UI de carga.

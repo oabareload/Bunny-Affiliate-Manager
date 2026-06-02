@@ -158,6 +158,11 @@ final class Plugin {
 		// v0.2.0-alpha1: Reconstruir mapa de tokens al guardar links.
 		$redirect = new Redirect\Redirect_Manager();
 		$this->loader->add_action( 'save_post', $redirect, 'rebuild_token_map' );
+
+		// v0.2.4: Maintenance action — rebuild token map completo.
+		$admin_menu_maint = new Admin\Admin_Menu();
+		$this->loader->add_action( 'admin_post_wpam_rebuild_token_map', $admin_menu_maint, 'handle_rebuild_token_map' );
+		$this->loader->add_action( 'admin_post_wpam_clear_analytics',    $admin_menu_maint, 'handle_clear_analytics' );
 	}
 
 	/**

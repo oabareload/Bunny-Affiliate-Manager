@@ -64,7 +64,6 @@ class Settings {
 			self::OPTION_NAME,
 			array(
 				'sanitize_callback' => array( $this, 'sanitize_options' ),
-				'default'           => $this->get_defaults(),
 			)
 		);
 
@@ -106,6 +105,14 @@ class Settings {
 			'wpam_field_nofollow',
 			__( 'Atributo nofollow', 'wp-affiliatemanager' ),
 			array( $this, 'render_field_nofollow' ),
+			self::PAGE_SLUG,
+			'wpam_section_general'
+		);
+
+		add_settings_field(
+			'wpam_field_exclude_admins_from_analytics',
+			__( 'Exclude Administrators From Analytics', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_exclude_admins_from_analytics' ),
 			self::PAGE_SLUG,
 			'wpam_section_general'
 		);
@@ -164,6 +171,14 @@ class Settings {
 			'wpam_field_interstitial_button_text',
 			__( 'Texto del botón continuar', 'wp-affiliatemanager' ),
 			array( $this, 'render_field_interstitial_button_text' ),
+			self::PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		add_settings_field(
+			'wpam_field_show_related_post_excerpt',
+			__( 'Show Related Post Excerpt', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_show_related_post_excerpt' ),
 			self::PAGE_SLUG,
 			'wpam_section_redirect'
 		);
@@ -402,6 +417,29 @@ class Settings {
 	 * @since  1.0.0
 	 * @return void
 	 */
+	/**
+	 * Renderiza el campo show_related_post_excerpt.
+	 *
+	 * @since  0.2.5
+	 * @return void
+	 */
+	public function render_field_show_related_post_excerpt(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['redirect']['show_related_post_excerpt'] ?? false;
+		?>
+		<label>
+			<input
+				type="checkbox"
+				name="<?php echo esc_attr( self::OPTION_NAME . '[redirect][show_related_post_excerpt]' ); ?>"
+				value="1"
+				<?php checked( (bool) $value ); ?>
+			/>
+			<?php esc_html_e( 'Show the manual excerpt from the related post.', 'wp-affiliatemanager' ); ?>
+		</label>
+		<p class="description"><?php esc_html_e( 'Only post_excerpt is used. Automatic excerpts and post content are never used.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
 	public function render_section_appearance(): void {
 		echo '<p>' . esc_html__( 'Personaliza la apariencia de los bloques de afiliados en el frontend.', 'wp-affiliatemanager' ) . '</p>';
 	}
@@ -507,6 +545,29 @@ class Settings {
 			<?php esc_html_e( 'Añadir rel="nofollow" a todos los enlaces de afiliados', 'wp-affiliatemanager' ); ?>
 		</label>
 		<p class="description"><?php esc_html_e( 'Recomendado para cumplir con las guías de Google para enlaces de afiliados.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'exclude_admins_from_analytics'.
+	 *
+	 * @since  0.2.5
+	 * @return void
+	 */
+	public function render_field_exclude_admins_from_analytics(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['general']['exclude_admins_from_analytics'] ?? true;
+		?>
+		<label>
+			<input
+				type="checkbox"
+				name="<?php echo esc_attr( self::OPTION_NAME . '[general][exclude_admins_from_analytics]' ); ?>"
+				value="1"
+				<?php checked( (bool) $value ); ?>
+			/>
+			<?php esc_html_e( 'Do not record analytics clicks for administrators.', 'wp-affiliatemanager' ); ?>
+		</label>
+		<p class="description"><?php esc_html_e( 'Skips click tracking when the current user can manage options.', 'wp-affiliatemanager' ); ?></p>
 		<?php
 	}
 
@@ -707,9 +768,11 @@ class Settings {
 		}
 
 		$sanitized['general']['nofollow'] = ! empty( $input['general']['nofollow'] );
+		$sanitized['general']['exclude_admins_from_analytics'] = ! empty( $input['general']['exclude_admins_from_analytics'] );
 
 		// Redirect / Interstitial — v0.2.0-alpha2.
 		$sanitized['redirect']['enable_interstitial'] = ! empty( $input['redirect']['enable_interstitial'] );
+		$sanitized['redirect']['show_related_post_excerpt'] = ! empty( $input['redirect']['show_related_post_excerpt'] );
 
 		// v0.2.0-alpha3.1: delay limitado a valores permitidos del select (0..60, múltiplos de 5).
 		$allowed_delays = array( 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 );
@@ -798,14 +861,16 @@ class Settings {
 				'link_target'  => '_blank',
 				'nofollow'     => true,
 				'track_clicks' => false,
+				'exclude_admins_from_analytics' => true,
 			),
 			'redirect' => array(
 				'enable_interstitial'          => true,
-				'redirect_delay'               => 3,
+				'redirect_delay'               => 5,
 				'disclaimer_text'              => 'Los precios, disponibilidad y contenido son responsabilidad del sitio externo.',
 				'interstitial_title'           => 'Estás saliendo de BunnyChase',
 				'interstitial_countdown_text'  => 'Redirigiendo en {seconds}s',
 				'interstitial_button_text'     => 'Continuar',
+				'show_related_post_excerpt'    => false,
 			),
 			'appearance' => array(
 				'link_style'      => 'vertical',

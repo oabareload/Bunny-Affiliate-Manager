@@ -147,6 +147,9 @@ class Admin_Menu {
 		<!-- Recent clicks full width -->
 		<?php $this->render_recent_clicks_section( $recent_clicks ); ?>
 
+		<!-- Maintenance card -->
+		<?php $this->render_maintenance_card(); ?>
+
 		</div><!-- .bunny-page-content -->
 		<?php
 		$this->render_admin_footer();
@@ -212,7 +215,6 @@ class Admin_Menu {
 
 	private function render_admin_header( string $page_title ): void {
 		?>
-		<div class="wrap bunny-wrap wpam-admin-wrap">
 			<div class="bunny-header">
 				<div class="bunny-header-inner">
 					<span class="bunny-logo">🐰</span>
@@ -252,6 +254,187 @@ class Admin_Menu {
 
 	private function render_admin_footer(): void {
 		echo '</div><!-- .wpam-admin-wrap -->';
+	}
+
+	// -------------------------------------------------------------------------
+	// v0.2.4 — Maintenance
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Renderiza la card de mantenimiento en el dashboard.
+	 *
+	 * @since 0.2.4
+	 */
+	private function render_maintenance_card(): void {
+		// Mostrar notice si venimos de una reconstrucción exitosa.
+		// phpcs:disable WordPress.Security.NonceVerification
+		if ( isset( $_GET['wpam_rebuilt'] ) && '1' === $_GET['wpam_rebuilt'] ) {
+			$posts  = absint( $_GET['wpam_posts']  ?? 0 );
+			$tokens = absint( $_GET['wpam_tokens'] ?? 0 );
+			?>
+			<div class="notice notice-success is-dismissible" style="margin:16px 0 0;">
+				<p>
+					<?php
+					printf(
+						/* translators: 1: posts processed, 2: tokens generated */
+						esc_html__( 'Token map rebuilt successfully. %1$d post(s) processed, %2$d token(s) generated.', 'wp-affiliatemanager' ),
+						$posts,
+						$tokens
+					);
+					?>
+				</p>
+			</div>
+			<?php
+		}
+
+		if ( isset( $_GET['wpam_cleared'] ) && '1' === $_GET['wpam_cleared'] ) {
+			$deleted = absint( $_GET['wpam_deleted'] ?? 0 );
+			?>
+			<div class="notice notice-success is-dismissible" style="margin:16px 0 0;">
+				<p>
+					<?php
+					printf(
+						/* translators: %d: deleted analytics rows */
+						esc_html__( 'Analytics cleared successfully. %d record(s) deleted.', 'wp-affiliatemanager' ),
+						$deleted
+					);
+					?>
+				</p>
+			</div>
+			<?php
+		}
+		// phpcs:enable
+		?>
+		<div class="wpam-analytics-card wpam-analytics-card--full wpam-maintenance-card">
+			<h3 class="wpam-analytics-card-title">
+				<span>🛠️</span> <?php esc_html_e( 'Maintenance', 'wp-affiliatemanager' ); ?>
+			</h3>
+			<div class="wpam-maintenance-row">
+				<div class="wpam-maintenance-info">
+					<strong><?php esc_html_e( 'Rebuild Redirect Token Map', 'wp-affiliatemanager' ); ?></strong>
+					<p class="description"><?php esc_html_e( 'Scans all posts with affiliate links and regenerates the complete token map. Use this after migrating, importing posts, or if /go/ links redirect to the homepage.', 'wp-affiliatemanager' ); ?></p>
+				</div>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<input type="hidden" name="action" value="wpam_rebuild_token_map" />
+					<?php wp_nonce_field( 'wpam_rebuild_token_map', 'wpam_nonce' ); ?>
+					<button type="submit" class="button button-secondary">
+						<?php esc_html_e( 'Rebuild Token Map', 'wp-affiliatemanager' ); ?>
+					</button>
+				</form>
+			</div>
+
+			<div class="wpam-maintenance-row">
+				<div class="wpam-maintenance-info">
+					<strong><?php esc_html_e( 'Clear Analytics', 'wp-affiliatemanager' ); ?></strong>
+					<p class="description"><?php esc_html_e( 'Deletes all recorded click analytics. The clicks table remains intact and redirects continue working normally.', 'wp-affiliatemanager' ); ?></p>
+				</div>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return window.confirm('<?php echo esc_js( __( 'Delete all analytics records? This cannot be undone.', 'wp-affiliatemanager' ) ); ?>');">
+					<input type="hidden" name="action" value="wpam_clear_analytics" />
+					<?php wp_nonce_field( 'wpam_clear_analytics', 'wpam_nonce' ); ?>
+					<button type="submit" class="button button-secondary">
+						<?php esc_html_e( 'Clear Analytics', 'wp-affiliatemanager' ); ?>
+					</button>
+				</form>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Handler del action admin-post para reconstruir el mapa de tokens.
+	 *
+	 * Flujo:
+	 *  1. Verificar nonce + capability.
+	 *  2. Vaciar completamente wpam_redirect_tokens.
+	 *  3. Buscar todos los posts con _wpam_links.
+	 *  4. Llamar rebuild_token_map() para cada uno.
+	 *  5. Redirigir al dashboard con resultados en query args.
+	 *
+	 * @since 0.2.4
+	 */
+	public function handle_rebuild_token_map(): void {
+		// Seguridad.
+		if (
+			! isset( $_POST['wpam_nonce'] ) ||
+			! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wpam_nonce'] ) ), 'wpam_rebuild_token_map' )
+		) {
+			wp_die( esc_html__( 'Security check failed.', 'wp-affiliatemanager' ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'wp-affiliatemanager' ) );
+		}
+
+		// 1. Vaciar el mapa completamente antes de reconstruir.
+		update_option( \WP_AffiliateManager\Redirect\Redirect_Manager::TOKEN_MAP_OPTION, array(), false );
+
+		// 2. Buscar todos los posts que tengan _wpam_links.
+		global $wpdb;
+		$post_ids = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT DISTINCT post_id FROM {$wpdb->postmeta} WHERE meta_key = %s AND meta_value != '' AND meta_value != 'a:0:{}'" ,
+				\WP_AffiliateManager\Posts\Post_Links::META_KEY
+			)
+		);
+
+		// 3. Reconstruir token por token reutilizando la lógica existente.
+		$redirect_manager = new \WP_AffiliateManager\Redirect\Redirect_Manager();
+		$processed        = 0;
+
+		foreach ( $post_ids as $post_id ) {
+			$redirect_manager->rebuild_token_map( (int) $post_id );
+			$processed++;
+		}
+
+		// 4. Contar tokens generados.
+		$map        = get_option( \WP_AffiliateManager\Redirect\Redirect_Manager::TOKEN_MAP_OPTION, array() );
+		$token_count = is_array( $map ) ? count( $map ) : 0;
+
+		// 5. Redirigir al dashboard con resultados.
+		wp_safe_redirect( add_query_arg(
+			array(
+				'page'          => 'wpam-dashboard',
+				'wpam_rebuilt'  => '1',
+				'wpam_posts'    => $processed,
+				'wpam_tokens'   => $token_count,
+			),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	/**
+	 * Handler del action admin-post para borrar registros de analytics.
+	 *
+	 * @since 0.2.5
+	 */
+	public function handle_clear_analytics(): void {
+		if (
+			! isset( $_POST['wpam_nonce'] ) ||
+			! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wpam_nonce'] ) ), 'wpam_clear_analytics' )
+		) {
+			wp_die( esc_html__( 'Security check failed.', 'wp-affiliatemanager' ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'wp-affiliatemanager' ) );
+		}
+
+		global $wpdb;
+		$table   = \WP_AffiliateManager\Redirect\Clicks_Table::table_name();
+		$deleted = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
+		wp_safe_redirect( add_query_arg(
+			array(
+				'page'          => 'wpam-dashboard',
+				'wpam_cleared'  => '1',
+				'wpam_deleted'  => $deleted,
+			),
+			admin_url( 'admin.php' )
+		) );
+		exit;
 	}
 
 	private function render_stat_card( string $label, string $value, string $icon ): void {

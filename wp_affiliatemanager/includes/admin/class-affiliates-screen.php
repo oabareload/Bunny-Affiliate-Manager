@@ -124,6 +124,9 @@ class Affiliates_Screen {
 			'active'      => ! empty( $_POST['active'] ),
 			'visible'     => ! empty( $_POST['visible'] ),
 			'domains'     => sanitize_textarea_field( wp_unslash( $_POST['domains'] ?? '' ) ),
+			'use_global_disclaimer' => ! empty( $_POST['use_global_disclaimer'] ),
+			'custom_disclaimer'     => wp_kses_post( wp_unslash( $_POST['custom_disclaimer'] ?? '' ) ),
+			'related_post_id'       => absint( $_POST['related_post_id'] ?? 0 ),
 		);
 
 		$result = $this->repository->save( $data );
@@ -387,6 +390,10 @@ class Affiliates_Screen {
 		$active      = $affiliate ? (bool) $affiliate['active']   : true;
 		$visible     = $affiliate ? (bool) $affiliate['visible']  : true;
 		$domains     = $affiliate ? esc_textarea( $affiliate['domains'] ) : '';
+		$use_global_disclaimer = $affiliate ? (bool) $affiliate['use_global_disclaimer'] : true;
+		$custom_disclaimer     = $affiliate ? esc_textarea( $affiliate['custom_disclaimer'] ) : '';
+		$related_post_id       = $affiliate ? absint( $affiliate['related_post_id'] ) : 0;
+		$related_posts         = $this->get_related_post_options();
 		$is_new      = ( 0 === $id );
 		$row_id      = $is_new ? 'wpam-new-row' : 'wpam-row-' . $id;
 		?>
@@ -482,6 +489,30 @@ class Affiliates_Screen {
 							</label>
 						</div>
 
+						<div class="wpam-edit-field wpam-edit-field--disclaimer-check">
+							<label class="wpam-inline-check">
+								<input type="checkbox" class="wpam-ef-use-global-disclaimer" <?php checked( $use_global_disclaimer ); ?> />
+								<?php esc_html_e( 'Use Global Disclaimer', 'wp-affiliatemanager' ); ?>
+							</label>
+						</div>
+
+						<div class="wpam-edit-field wpam-edit-field--custom-disclaimer">
+							<label><?php esc_html_e( 'Custom Disclaimer', 'wp-affiliatemanager' ); ?></label>
+							<textarea class="wpam-input wpam-ef-custom-disclaimer" rows="3"><?php echo $custom_disclaimer; ?></textarea>
+						</div>
+
+						<div class="wpam-edit-field wpam-edit-field--related-post">
+							<label><?php esc_html_e( 'Related Post', 'wp-affiliatemanager' ); ?></label>
+							<select class="wpam-input wpam-ef-related-post">
+								<option value="0"><?php esc_html_e( 'None', 'wp-affiliatemanager' ); ?></option>
+								<?php foreach ( $related_posts as $related_post ) : ?>
+									<option value="<?php echo esc_attr( (string) $related_post->ID ); ?>" <?php selected( $related_post_id, $related_post->ID ); ?>>
+										<?php echo esc_html( $related_post->post_title ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+						</div>
+
 					</div><!-- .wpam-edit-grid -->
 
 					<div class="wpam-edit-actions">
@@ -531,5 +562,21 @@ class Affiliates_Screen {
 			<p><?php echo esc_html( $messages[ $message ] ); ?></p>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Posts disponibles para seleccionar como related post del afiliado.
+	 *
+	 * @since 0.2.5
+	 * @return \WP_Post[]
+	 */
+	private function get_related_post_options(): array {
+		return get_posts( array(
+			'post_type'      => 'post',
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'orderby'        => 'title',
+			'order'          => 'ASC',
+		) );
 	}
 }

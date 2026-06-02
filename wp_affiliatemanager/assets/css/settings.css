@@ -34,6 +34,20 @@
 	max-width: 860px;
 }
 
+/*
+ * En la pantalla Settings, el footer nativo de WordPress (#wpfooter) tiene
+ * position:absolute dentro de #wpwrap (height:100%; overflow:hidden), lo que
+ * lo ancla al borde inferior visible de la ventana en lugar de al final real
+ * del contenido. El header sticky de Bunny agrava el cálculo JS de WordPress.
+ *
+ * Solución: sacar #wpfooter del flujo absoluto únicamente en esta pantalla,
+ * convirtiéndolo en posicionamiento relativo normal. Igual que WooCommerce.
+ */
+.wpam-settings-page ~ #wpfooter,
+body.bunny-affiliates_page_wpam-settings #wpfooter {
+	position: relative !important;
+}
+
 /* ==========================================================================
    Header de la página
    ========================================================================== */

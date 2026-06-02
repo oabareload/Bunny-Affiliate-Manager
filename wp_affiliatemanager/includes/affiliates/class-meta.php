@@ -49,6 +49,12 @@ class Meta {
 	const KEY_DOMAINS     = '_wpam_domains';
 	/** @since 0.0.6 */
 	const KEY_VISIBLE     = '_wpam_visible';
+	/** @since 0.2.5 */
+	const KEY_USE_GLOBAL_DISCLAIMER = '_wpam_use_global_disclaimer';
+	/** @since 0.2.5 */
+	const KEY_CUSTOM_DISCLAIMER     = '_wpam_custom_disclaimer';
+	/** @since 0.2.5 */
+	const KEY_RELATED_POST_ID       = '_wpam_related_post_id';
 
 	/**
 	 * Registra los meta boxes en el CPT.
@@ -71,6 +77,15 @@ class Meta {
 			'wpam_affiliate_appearance',
 			__( 'Appearance', 'wp-affiliatemanager' ),
 			array( $this, 'render_appearance_meta_box' ),
+			CPT::POST_TYPE,
+			'normal',
+			'default'
+		);
+
+		add_meta_box(
+			'wpam_affiliate_interstitial',
+			__( 'Interstitial', 'wp-affiliatemanager' ),
+			array( $this, 'render_interstitial_meta_box' ),
 			CPT::POST_TYPE,
 			'normal',
 			'default'
@@ -237,6 +252,71 @@ class Meta {
 	}
 
 	/**
+	 * Renderiza el meta box de interstitial del afiliado.
+	 *
+	 * @since  0.2.5
+	 * @param  \WP_Post $post Post actual.
+	 * @return void
+	 */
+	public function render_interstitial_meta_box( \WP_Post $post ): void {
+		$use_global = get_post_meta( $post->ID, self::KEY_USE_GLOBAL_DISCLAIMER, true );
+		if ( '' === $use_global ) {
+			$use_global = '1';
+		}
+
+		$custom_disclaimer = get_post_meta( $post->ID, self::KEY_CUSTOM_DISCLAIMER, true );
+		$related_post_id   = absint( get_post_meta( $post->ID, self::KEY_RELATED_POST_ID, true ) );
+		$posts             = get_posts( array(
+			'post_type'      => 'post',
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'orderby'        => 'title',
+			'order'          => 'ASC',
+		) );
+		?>
+		<div class="wpam-meta-box">
+			<div class="wpam-field-row">
+				<label class="wpam-toggle-label" for="wpam_use_global_disclaimer">
+					<input
+						type="checkbox"
+						id="wpam_use_global_disclaimer"
+						name="wpam_use_global_disclaimer"
+						value="1"
+						<?php checked( '1', $use_global ); ?>
+					/>
+					<span><?php esc_html_e( 'Use Global Disclaimer', 'wp-affiliatemanager' ); ?></span>
+				</label>
+				<p class="wpam-description"><?php esc_html_e( 'When enabled, the interstitial uses the global disclaimer from Settings.', 'wp-affiliatemanager' ); ?></p>
+			</div>
+
+			<div class="wpam-field-row">
+				<label for="wpam_custom_disclaimer"><?php esc_html_e( 'Custom Disclaimer', 'wp-affiliatemanager' ); ?></label>
+				<textarea
+					id="wpam_custom_disclaimer"
+					name="wpam_custom_disclaimer"
+					rows="4"
+					class="wpam-input"
+				><?php echo esc_textarea( $custom_disclaimer ); ?></textarea>
+				<p class="wpam-description"><?php esc_html_e( 'Used only when Use Global Disclaimer is disabled. Basic HTML is allowed.', 'wp-affiliatemanager' ); ?></p>
+			</div>
+
+			<div class="wpam-field-row">
+				<label for="wpam_related_post_id"><?php esc_html_e( 'Related Post', 'wp-affiliatemanager' ); ?></label>
+				<select id="wpam_related_post_id" name="wpam_related_post_id" class="wpam-input">
+					<option value="0"><?php esc_html_e( 'None', 'wp-affiliatemanager' ); ?></option>
+					<?php foreach ( $posts as $related_post ) : ?>
+						<option value="<?php echo esc_attr( (string) $related_post->ID ); ?>" <?php selected( $related_post_id, $related_post->ID ); ?>>
+							<?php echo esc_html( $related_post->post_title ); ?>
+						</option>
+					<?php endforeach; ?>
+				</select>
+				<p class="wpam-description"><?php esc_html_e( 'Optional article shown on the interstitial page for this affiliate.', 'wp-affiliatemanager' ); ?></p>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
 	 * Renderiza el meta box de estado (sidebar).
 	 *
 	 * @since  2.0.0
@@ -343,5 +423,19 @@ class Meta {
 		// Estado activo: checkbox (presente = 1, ausente = 0).
 		$is_active = isset( $_POST['wpam_active'] ) ? '1' : '0';
 		update_post_meta( $post_id, self::KEY_ACTIVE, $is_active );
+
+		$use_global_disclaimer = isset( $_POST['wpam_use_global_disclaimer'] ) ? '1' : '0';
+		update_post_meta( $post_id, self::KEY_USE_GLOBAL_DISCLAIMER, $use_global_disclaimer );
+
+		if ( isset( $_POST['wpam_custom_disclaimer'] ) ) {
+			$custom_disclaimer = wp_kses_post( wp_unslash( $_POST['wpam_custom_disclaimer'] ) );
+			update_post_meta( $post_id, self::KEY_CUSTOM_DISCLAIMER, $custom_disclaimer );
+		}
+
+		$related_post_id = absint( $_POST['wpam_related_post_id'] ?? 0 );
+		if ( $related_post_id > 0 && 'post' !== get_post_type( $related_post_id ) ) {
+			$related_post_id = 0;
+		}
+		update_post_meta( $post_id, self::KEY_RELATED_POST_ID, $related_post_id );
 	}
 }

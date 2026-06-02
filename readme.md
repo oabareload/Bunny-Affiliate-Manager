@@ -216,6 +216,52 @@ Yes. Set the **Brand Color** field in each affiliate's settings. The CSS variabl
 
 ## Changelog
 
+## 0.2.5 — Interstitial Improvements & Analytics Controls
+
+### Added
+
+* Affiliate-specific disclaimer support.
+* Affiliate-related post support.
+* Optional related post excerpt display.
+* Setting to exclude administrators from analytics (enabled by default).
+* "Clear Analytics" maintenance tool.
+* Maintenance section in Dashboard for analytics and token map utilities.
+
+### Improved
+
+* Interstitial can now display related content cards.
+* Better flexibility for affiliate-specific messaging.
+* Cleaner maintenance workflow from the Dashboard.
+
+### Fixed
+
+* Fixed administrator exclusion logic in analytics tracking.
+* Fixed redirect flow when admin analytics exclusion is enabled.
+* Fixed undefined variable warning in `Redirect_Manager`.
+* Improved interstitial stability and redirect handling.
+
+### Notes
+
+* No database migrations required.
+* No changes to redirect tokens.
+* No changes to the `wpam_clicks` table structure.
+* Fully compatible with existing 0.2.x installations.
+
+### 0.2.4 — Maintenance: Rebuild Token Map
+
+**`includes/admin/class-admin-menu.php`:**
+- Nueva card "Maintenance" al final del Dashboard.
+- Botón "Rebuild Token Map": vacía completamente `wpam_redirect_tokens`,
+  busca todos los posts con `_wpam_links` via SQL, llama
+  `Redirect_Manager::rebuild_token_map()` para cada uno (reutiliza
+  la lógica existente sin duplicarla), redirige al dashboard con un
+  notice que muestra posts procesados y tokens generados.
+- Seguridad: nonce + `manage_options` capability check.
+
+**`includes/class-plugin.php`:**
+- Registrado hook `admin_post_wpam_rebuild_token_map`.
+
+
 ### 0.2.3 — Dashboard Analytics MVP
 
 * Nuevo dashboard de analytics integrado directamente en la pantalla principal del plugin.
