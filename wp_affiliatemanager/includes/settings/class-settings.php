@@ -183,6 +183,56 @@ class Settings {
 			'wpam_section_redirect'
 		);
 
+		add_settings_field(
+			'wpam_field_interstitial_width',
+			__( 'Interstitial Width', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_interstitial_width' ),
+			self::PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		// ---------------------------------------------------------------------------
+		// Sección: Interstitial — Content Slots
+		// ---------------------------------------------------------------------------
+		add_settings_section(
+			'wpam_section_content_slots',
+			__( 'Interstitial — Content Slot', 'wp-affiliatemanager' ),
+			array( $this, 'render_section_content_slots' ),
+			self::PAGE_SLUG
+		);
+
+		add_settings_field(
+			'wpam_field_slot0_type',
+			__( 'Slot Type', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_slot0_type' ),
+			self::PAGE_SLUG,
+			'wpam_section_content_slots'
+		);
+
+		add_settings_field(
+			'wpam_field_slot0_position',
+			__( 'Slot Position', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_slot0_position' ),
+			self::PAGE_SLUG,
+			'wpam_section_content_slots'
+		);
+
+		add_settings_field(
+			'wpam_field_slot0_html',
+			__( 'Custom HTML', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_slot0_html' ),
+			self::PAGE_SLUG,
+			'wpam_section_content_slots'
+		);
+
+		add_settings_field(
+			'wpam_field_slot0_image',
+			__( 'Image + Link', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_slot0_image' ),
+			self::PAGE_SLUG,
+			'wpam_section_content_slots'
+		);
+
 		// ---------------------------------------------------------------------------
 		// Sección: Apariencia
 		// ---------------------------------------------------------------------------
@@ -437,6 +487,169 @@ class Settings {
 			<?php esc_html_e( 'Show the manual excerpt from the related post.', 'wp-affiliatemanager' ); ?>
 		</label>
 		<p class="description"><?php esc_html_e( 'Only post_excerpt is used. Automatic excerpts and post content are never used.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo interstitial_width.
+	 *
+	 * @since  0.2.6
+	 * @return void
+	 */
+	public function render_field_interstitial_width(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['redirect']['interstitial_width'] ?? '460';
+		$widths  = array(
+			'460'  => '460px',
+			'600'  => '600px',
+			'800'  => '800px',
+			'1000' => '1000px',
+			'full' => __( 'Full Width', 'wp-affiliatemanager' ),
+		);
+		?>
+		<select name="<?php echo esc_attr( self::OPTION_NAME . '[redirect][interstitial_width]' ); ?>">
+			<?php foreach ( $widths as $key => $label ) : ?>
+				<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $value, $key ); ?>>
+					<?php echo esc_html( $label ); ?>
+				</option>
+			<?php endforeach; ?>
+		</select>
+		<p class="description"><?php esc_html_e( 'Ancho máximo de la card interstitial. Full Width ocupa todo el viewport.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza la descripción de la sección Content Slots.
+	 *
+	 * @since  0.2.6
+	 * @return void
+	 */
+	public function render_section_content_slots(): void {
+		echo '<p>' . esc_html__( 'Añade un bloque de contenido personalizado dentro de la página interstitial. Ideal para publicidad, banners o promociones temporales.', 'wp-affiliatemanager' ) . '</p>';
+	}
+
+	/**
+	 * Renderiza el campo tipo de slot (slot 0).
+	 *
+	 * @since  0.2.6
+	 * @return void
+	 */
+	public function render_field_slot0_type(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['content_slots'][0]['type'] ?? 'none';
+		?>
+		<select
+			name="<?php echo esc_attr( self::OPTION_NAME . '[content_slots][0][type]' ); ?>"
+			id="wpam-slot0-type"
+		>
+			<option value="none"       <?php selected( $value, 'none' ); ?>><?php esc_html_e( 'None (disabled)', 'wp-affiliatemanager' ); ?></option>
+			<option value="custom_html" <?php selected( $value, 'custom_html' ); ?>><?php esc_html_e( 'Custom HTML', 'wp-affiliatemanager' ); ?></option>
+			<option value="image_link" <?php selected( $value, 'image_link' ); ?>><?php esc_html_e( 'Image + Link', 'wp-affiliatemanager' ); ?></option>
+		</select>
+		<p class="description"><?php esc_html_e( 'Tipo de contenido a mostrar en el slot. Selecciona None para desactivarlo.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo de posición del slot (slot 0).
+	 *
+	 * @since  0.2.6
+	 * @return void
+	 */
+	public function render_field_slot0_position(): void {
+		$options   = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value     = $options['content_slots'][0]['position'] ?? 'after_disclaimer';
+		$positions = array(
+			'before_disclaimer' => __( 'Before Disclaimer', 'wp-affiliatemanager' ),
+			'after_disclaimer'  => __( 'After Disclaimer', 'wp-affiliatemanager' ),
+			'before_related'    => __( 'Before Related Post', 'wp-affiliatemanager' ),
+			'after_related'     => __( 'After Related Post', 'wp-affiliatemanager' ),
+		);
+		?>
+		<select name="<?php echo esc_attr( self::OPTION_NAME . '[content_slots][0][position]' ); ?>">
+			<?php foreach ( $positions as $key => $label ) : ?>
+				<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $value, $key ); ?>>
+					<?php echo esc_html( $label ); ?>
+				</option>
+			<?php endforeach; ?>
+		</select>
+		<p class="description"><?php esc_html_e( 'Dónde aparece el slot dentro de la card interstitial.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo Custom HTML del slot (slot 0).
+	 *
+	 * @since  0.2.6
+	 * @return void
+	 */
+	public function render_field_slot0_html(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['content_slots'][0]['html'] ?? '';
+		?>
+		<textarea
+			name="<?php echo esc_attr( self::OPTION_NAME . '[content_slots][0][html]' ); ?>"
+			rows="6"
+			class="large-text code"
+			placeholder="&lt;!-- Adsense, banner, promoción temporal... --&gt;"
+		><?php echo esc_textarea( $value ); ?></textarea>
+		<p class="description"><?php esc_html_e( 'HTML libre. Se renderiza solo cuando el tipo de slot es Custom HTML. Acepta scripts de redes publicitarias.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza los campos Image + Link del slot (slot 0).
+	 *
+	 * @since  0.2.6
+	 * @return void
+	 */
+	public function render_field_slot0_image(): void {
+		$options   = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$slot      = $options['content_slots'][0] ?? array();
+		$image_url = $slot['image_url'] ?? '';
+		$dest_url  = $slot['dest_url']  ?? '';
+		$alt_text  = $slot['alt_text']  ?? '';
+		$field     = self::OPTION_NAME . '[content_slots][0]';
+		?>
+		<table class="form-table" style="margin:0;">
+			<tr>
+				<th style="padding-left:0;width:140px;"><?php esc_html_e( 'Image URL', 'wp-affiliatemanager' ); ?></th>
+				<td>
+					<input
+						type="url"
+						name="<?php echo esc_attr( $field . '[image_url]' ); ?>"
+						value="<?php echo esc_attr( $image_url ); ?>"
+						class="large-text"
+						placeholder="https://example.com/banner.jpg"
+					/>
+				</td>
+			</tr>
+			<tr>
+				<th style="padding-left:0;"><?php esc_html_e( 'Destination URL', 'wp-affiliatemanager' ); ?></th>
+				<td>
+					<input
+						type="url"
+						name="<?php echo esc_attr( $field . '[dest_url]' ); ?>"
+						value="<?php echo esc_attr( $dest_url ); ?>"
+						class="large-text"
+						placeholder="https://example.com/oferta"
+					/>
+				</td>
+			</tr>
+			<tr>
+				<th style="padding-left:0;"><?php esc_html_e( 'Alt Text', 'wp-affiliatemanager' ); ?></th>
+				<td>
+					<input
+						type="text"
+						name="<?php echo esc_attr( $field . '[alt_text]' ); ?>"
+						value="<?php echo esc_attr( $alt_text ); ?>"
+						class="regular-text"
+						placeholder="<?php esc_attr_e( 'Descripción de la imagen', 'wp-affiliatemanager' ); ?>"
+					/>
+				</td>
+			</tr>
+		</table>
+		<p class="description"><?php esc_html_e( 'Se renderiza solo cuando el tipo de slot es Image + Link. El bloque completo es clicable.', 'wp-affiliatemanager' ); ?></p>
 		<?php
 	}
 
@@ -802,6 +1015,38 @@ class Settings {
 			? $button_text
 			: __( 'Continuar', 'wp-affiliatemanager' );
 
+		// v0.2.6: ancho del interstitial.
+		$allowed_widths = array( '460', '600', '800', '1000', 'full' );
+		$width_val      = sanitize_text_field( $input['redirect']['interstitial_width'] ?? '460' );
+		$sanitized['redirect']['interstitial_width'] = in_array( $width_val, $allowed_widths, true ) ? $width_val : '460';
+
+		// v0.2.6: content_slots — array indexado para soporte futuro de múltiples slots.
+		$allowed_slot_types     = array( 'none', 'custom_html', 'image_link' );
+		$allowed_slot_positions = array( 'before_disclaimer', 'after_disclaimer', 'before_related', 'after_related' );
+		$raw_slots              = $input['content_slots'] ?? array();
+		$sanitized_slots        = array();
+
+		foreach ( $raw_slots as $index => $raw_slot ) {
+			$index = absint( $index );
+			if ( ! is_array( $raw_slot ) ) {
+				continue;
+			}
+
+			$slot_type     = sanitize_text_field( $raw_slot['type'] ?? 'none' );
+			$slot_position = sanitize_text_field( $raw_slot['position'] ?? 'after_disclaimer' );
+
+			$sanitized_slots[ $index ] = array(
+				'type'      => in_array( $slot_type, $allowed_slot_types, true ) ? $slot_type : 'none',
+				'position'  => in_array( $slot_position, $allowed_slot_positions, true ) ? $slot_position : 'after_disclaimer',
+				'html' 		=> current_user_can( 'unfiltered_html' ) ? ( $raw_slot['html'] ?? '' ) : wp_kses_post( $raw_slot['html'] ?? '' ),
+				'image_url' => esc_url_raw( $raw_slot['image_url'] ?? '' ),
+				'dest_url'  => esc_url_raw( $raw_slot['dest_url'] ?? '' ),
+				'alt_text'  => sanitize_text_field( $raw_slot['alt_text'] ?? '' ),
+			);
+		}
+
+		$sanitized['content_slots'] = $sanitized_slots;
+
 		// Appearance.
 		if ( isset( $input['appearance']['link_style'] ) ) {
 			$sanitized['appearance']['link_style'] = in_array(
@@ -871,6 +1116,17 @@ class Settings {
 				'interstitial_countdown_text'  => 'Redirigiendo en {seconds}s',
 				'interstitial_button_text'     => 'Continuar',
 				'show_related_post_excerpt'    => false,
+				'interstitial_width'           => '460',
+			),
+			'content_slots' => array(
+				0 => array(
+					'type'      => 'none',
+					'position'  => 'after_disclaimer',
+					'html'      => '',
+					'image_url' => '',
+					'dest_url'  => '',
+					'alt_text'  => '',
+				),
 			),
 			'appearance' => array(
 				'link_style'      => 'vertical',

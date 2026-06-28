@@ -13,13 +13,12 @@
  * El botón también redirige inmediatamente.
  *
  * Lo que NO hace todavía:
- *  - No muestra ads.
  *  - No tiene templates intercambiables.
  *  - No tiene override por afiliado.
  *
  * @package WP_AffiliateManager\Redirect
  * @since   0.2.0-alpha2
- * @version 0.2.0-alpha3.2
+ * @version 0.2.6
  */
 
 namespace WP_AffiliateManager\Redirect;
@@ -56,6 +55,11 @@ class Interstitial_Renderer {
 		$countdown_tpl = sanitize_text_field( $options['redirect']['interstitial_countdown_text'] ?? __( 'Redirigiendo en {seconds}s', 'wp-affiliatemanager' ) );
 		$button_text   = sanitize_text_field( $options['redirect']['interstitial_button_text'] ?? __( 'Continuar', 'wp-affiliatemanager' ) );
 		$show_related_excerpt = ! empty( $options['redirect']['show_related_post_excerpt'] ?? false );
+		$width_key     = sanitize_text_field( $options['redirect']['interstitial_width'] ?? '460' );
+		$allowed_widths = array( '460', '600', '800', '1000', 'full' );
+		$width_key     = in_array( $width_key, $allowed_widths, true ) ? $width_key : '460';
+		$width_class   = 'full' === $width_key ? 'wpam-card--full' : 'wpam-card--w' . $width_key;
+		$content_slots = $options['content_slots'] ?? array();
 		$site_name     = get_bloginfo( 'name' );
 		$dest_url      = esc_url( $destination['url'] );
 
@@ -73,7 +77,10 @@ class Interstitial_Renderer {
 		$related_image   = $related_post ? get_the_post_thumbnail( $related_post, 'medium', array( 'class' => 'wpam-interstitial-related-img' ) ) : '';
 		$related_excerpt = ( $related_post && $show_related_excerpt ) ? trim( (string) $related_post->post_excerpt ) : '';
 
-		$css_url = WPAM_PLUGIN_URL . 'assets/css/interstitial.css?v=' . WPAM_VERSION;
+		$css_url  = WPAM_PLUGIN_URL . 'assets/css/interstitial.css?v=' . WPAM_VERSION;
+		$token    = sanitize_text_field( $destination['token'] ?? '' );
+		$ajax_url = admin_url( 'admin-ajax.php' );
+		$nonce    = wp_create_nonce( 'wpam_report_nonce' );
 
 		// Enviar headers antes de cualquier output.
 		if ( ! headers_sent() ) {
@@ -97,10 +104,11 @@ class Interstitial_Renderer {
 ?></title>
 <link rel="stylesheet" href="<?php echo esc_url( $css_url ); ?>">
 <style>:root{--wpam-brand:<?php echo esc_attr( $brand_hex ); ?>;}</style>
+<?php wp_head(); ?>
 </head>
 <body class="wpam-interstitial-body">
 
-<div class="wpam-interstitial-card">
+<div class="wpam-interstitial-card <?php echo esc_attr( $width_class ); ?>">
 
 	<p class="wpam-interstitial-leaving">
 		<?php echo esc_html( $title ); ?>
@@ -132,11 +140,17 @@ class Interstitial_Renderer {
 		<?php echo esc_html( $button_text ); ?> &rarr;
 	</a>
 
+	<?php echo $this->render_content_slots( 'before_disclaimer', $content_slots ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+
 	<?php if ( $disclaimer ) : ?>
 		<p class="wpam-interstitial-disclaimer">
 			<?php echo $disclaimer; // Already sanitized via wp_kses_post above. ?>
 		</p>
 	<?php endif; ?>
+
+	<?php echo $this->render_content_slots( 'after_disclaimer', $content_slots ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+
+	<?php echo $this->render_content_slots( 'before_related', $content_slots ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 
 	<?php if ( $related_post && $related_url ) : ?>
 		<div class="wpam-interstitial-related-card">
@@ -164,11 +178,57 @@ class Interstitial_Renderer {
 		</div>
 	<?php endif; ?>
 
+	<?php echo $this->render_content_slots( 'after_related', $content_slots ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+
+	<div class="wpam-interstitial-report-wrap">
+		<button
+			type="button"
+			class="wpam-interstitial-report-btn"
+			id="wpam-report-btn"
+			data-token="<?php echo esc_attr( $token ); ?>"
+			data-post="<?php echo esc_attr( (string) ( $destination['post_id'] ?? 0 ) ); ?>"
+			data-ajax="<?php echo esc_url( $ajax_url ); ?>"
+			data-nonce="<?php echo esc_attr( $nonce ); ?>"
+		>
+			<?php esc_html_e( 'Report broken link', 'wp-affiliatemanager' ); ?>
+		</button>
+	</div>
+
 </div>
 
 <script>
 ( function () {
 	'use strict';
+
+	// Broken link report handler.
+	var reportBtn = document.getElementById( 'wpam-report-btn' );
+	if ( reportBtn ) {
+		reportBtn.addEventListener( 'click', function () {
+			var btn     = this;
+			var token   = btn.getAttribute( 'data-token' );
+			var postId  = btn.getAttribute( 'data-post' );
+			var ajaxUrl = btn.getAttribute( 'data-ajax' );
+			var nonce   = btn.getAttribute( 'data-nonce' );
+
+			btn.disabled    = true;
+			btn.textContent = btn.textContent.replace( /.*/, '<?php echo esc_js( __( 'Sending…', 'wp-affiliatemanager' ) ); ?>' );
+
+			var body = 'action=wpam_report_broken_link&token=' + encodeURIComponent( token ) + '&post_id=' + encodeURIComponent( postId ) + '&nonce=' + encodeURIComponent( nonce );
+
+			var xhr = new XMLHttpRequest();
+			xhr.open( 'POST', ajaxUrl, true );
+			xhr.setRequestHeader( 'Content-Type', 'application/x-www-form-urlencoded' );
+			xhr.onreadystatechange = function () {
+				if ( 4 !== xhr.readyState ) { return; }
+				btn.textContent = ( 200 === xhr.status )
+					? '<?php echo esc_js( __( 'Report sent. Thank you!', 'wp-affiliatemanager' ) ); ?>'
+					: '<?php echo esc_js( __( 'Error — please try again.', 'wp-affiliatemanager' ) ); ?>';
+			};
+			xhr.send( body );
+		} );
+	}
+
+	// Countdown + redirect.
 	var remaining    = <?php echo (int) $delay; ?>;
 	var dest         = <?php echo wp_json_encode( $destination['url'] ); ?>;
 	var countdownTpl = <?php echo wp_json_encode( $countdown_tpl ); ?>;
@@ -190,6 +250,7 @@ class Interstitial_Renderer {
 } )();
 </script>
 
+<?php wp_footer(); ?>
 </body>
 </html><?php
 		exit;
@@ -255,6 +316,62 @@ class Interstitial_Renderer {
 		}
 
 		return $post;
+	}
+
+	/**
+	 * Renderiza los content slots activos para una posición dada.
+	 *
+	 * Itera sobre todos los slots configurados y devuelve el HTML
+	 * de los que coincidan con la posición solicitada y no sean de tipo 'none'.
+	 * Preparado para múltiples slots futuros: el bucle ya los soporta.
+	 *
+	 * @since  0.2.6
+	 * @param  string $position      Posición a renderizar ('before_disclaimer', etc.).
+	 * @param  array  $slots         Array indexado de slots desde las opciones.
+	 * @return string HTML listo para imprimir (ya sanitizado en cada rama).
+	 */
+	private function render_content_slots( string $position, array $slots ): string {
+		if ( empty( $slots ) ) {
+			return '';
+		}
+
+		$output = '';
+
+		foreach ( $slots as $slot ) {
+			if ( ! is_array( $slot ) ) {
+				continue;
+			}
+
+			$type     = $slot['type']     ?? 'none';
+			$slot_pos = $slot['position'] ?? 'after_disclaimer';
+
+			if ( 'none' === $type || $slot_pos !== $position ) {
+				continue;
+			}
+
+			if ( 'custom_html' === $type ) {
+				$html = trim( $slot['html'] ?? '' );
+				if ( '' !== $html ) {
+					// wp_kses_post ya aplicado en sanitize_options; re-escapar sería doble.
+					$output .= '<div class="wpam-interstitial-slot wpam-slot--html">' . $html . '</div>';
+				}
+			} elseif ( 'image_link' === $type ) {
+				$image_url = esc_url( $slot['image_url'] ?? '' );
+				$dest_url  = esc_url( $slot['dest_url']  ?? '' );
+				$alt_text  = esc_attr( $slot['alt_text']  ?? '' );
+
+				if ( $image_url && $dest_url ) {
+					$output .= sprintf(
+						'<div class="wpam-interstitial-slot wpam-slot--image-link"><a href="%s" rel="nofollow noopener sponsored" target="_blank"><img src="%s" alt="%s" class="wpam-slot-image" /></a></div>',
+						$dest_url,
+						$image_url,
+						$alt_text
+					);
+				}
+			}
+		}
+
+		return $output;
 	}
 
 	/**

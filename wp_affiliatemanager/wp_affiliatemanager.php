@@ -3,7 +3,7 @@
  * Plugin Name:       Bunny Affiliate Manager
  * Plugin URI:        https://bunnychase.net/bunny-affiliate-manager
  * Description:       Sistema modular y escalable para administrar enlaces de afiliados por entrada/post dentro de WordPress.
- * Version:           0.2.5
+ * Version:           1.0.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            BunnyChase
@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ---------------------------------------------------------------------------
 
 /** Versión actual del plugin. */
-define( 'WPAM_VERSION', '0.2.5' );
+define( 'WPAM_VERSION', '1.0.0' );
 
 /** Ruta absoluta al archivo principal del plugin. */
 define( 'WPAM_PLUGIN_FILE', __FILE__ );

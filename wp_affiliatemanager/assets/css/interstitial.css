@@ -44,13 +44,33 @@
 	border-radius: 16px;
 	box-shadow: 0 8px 40px rgba(0, 0, 0, 0.10);
 	padding: 48px 40px 40px;
-	max-width: 460px;
+	max-width: 460px; /* default — overridden by width modifier classes below */
 	width: 100%;
 	text-align: center;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	gap: 24px;
+}
+
+/* Width modifiers — applied via PHP from interstitial_width setting */
+
+.wpam-card--w460  { max-width: 460px;  }
+.wpam-card--w600  { max-width: 600px;  }
+.wpam-card--w800  { max-width: 800px;  }
+.wpam-card--w1000 { max-width: 1000px; }
+
+.wpam-card--full {
+	max-width: none;
+	border-radius: 0;
+	box-shadow: none;
+	min-height: 100vh;
+	justify-content: center;
+}
+
+/* When full-width, the body doesn't need its own padding */
+.wpam-interstitial-body:has( .wpam-card--full ) {
+	padding: 0;
 }
 
 /* ==========================================================================
@@ -237,6 +257,56 @@
 .wpam-interstitial-related-link:focus {
 	border-color: var(--wpam-brand, #6c47ff);
 	text-decoration: none;
+}
+
+/* ==========================================================================
+   Content Slots
+   ========================================================================== */
+
+/*
+ * Contenedor genérico para cualquier tipo de slot.
+ * El padding horizontal coincide con el de la card para alinear visualmente
+ * cualquier contenido que el usuario inyecte (ads, banners, etc.).
+ */
+.wpam-interstitial-slot {
+	width: 100%;
+	overflow: hidden;
+}
+
+/* Slot: Custom HTML
+ * Sin opinionated styles — el contenido es libre.
+ * Sólo centramos texto por defecto.
+ */
+.wpam-slot--html {
+	text-align: center;
+}
+
+/* Slot: Image + Link
+ * Bloque clicable — la imagen ocupa todo el ancho disponible.
+ */
+.wpam-slot--image-link {
+	border-radius: 10px;
+	overflow: hidden;
+}
+
+.wpam-slot--image-link a {
+	display: block;
+	line-height: 0; /* elimina el hueco bajo la imagen */
+	border-radius: 10px;
+	overflow: hidden;
+	transition: opacity 0.15s ease;
+}
+
+.wpam-slot--image-link a:hover,
+.wpam-slot--image-link a:focus {
+	opacity: 0.88;
+}
+
+.wpam-slot-image {
+	display: block;
+	width: 100%;
+	height: auto;
+	border-radius: 10px;
 }
 
 /* ==========================================================================

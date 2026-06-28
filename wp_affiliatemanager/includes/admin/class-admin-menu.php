@@ -17,8 +17,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Admin_Menu {
 
-	const PARENT_SLUG = 'wpam-dashboard';
-	const CAPABILITY  = 'manage_options';
+	const PARENT_SLUG    = 'wpam-dashboard';
+	const CAPABILITY     = 'manage_options';
+	const REPORTS_OPTION = 'wpam_broken_link_reports';
 
 	public function register_menus(): void {
 		add_menu_page(
@@ -126,7 +127,7 @@ class Admin_Menu {
 		$recent_clicks  = $this->get_recent_clicks();
 		?>
 
-		<!-- Click stat cards -->
+		<!-- Click stat cards — v0.2.8: each card is a filter trigger -->
 		<div class="wpam-stats-grid wpam-stats-grid--clicks">
 			<?php $this->render_stat_card( __( 'Clicks Today', 'wp-affiliatemanager' ),   (string) $click_stats['today'],   '📈' ); ?>
 			<?php $this->render_stat_card( __( 'Last 7 Days', 'wp-affiliatemanager' ),    (string) $click_stats['week'],    '📅' ); ?>
@@ -134,12 +135,12 @@ class Admin_Menu {
 			<?php $this->render_stat_card( __( 'Total Clicks', 'wp-affiliatemanager' ),   (string) $click_stats['total'],   '🖱️' ); ?>
 		</div>
 
-		<!-- Two-column: Top Affiliates + Top Posts -->
+		<!-- Two-column: Top Affiliates + Top Posts (v0.2.8: AJAX-replaceable containers) -->
 		<div class="wpam-analytics-cols">
-			<div class="wpam-analytics-col">
+			<div class="wpam-analytics-col wpam-filter-affiliates-col">
 				<?php $this->render_top_affiliates_section( $top_affiliates, $click_stats['total'] ); ?>
 			</div>
-			<div class="wpam-analytics-col">
+			<div class="wpam-analytics-col wpam-filter-posts-col">
 				<?php $this->render_top_posts_section( $top_posts ); ?>
 			</div>
 		</div>
@@ -149,6 +150,9 @@ class Admin_Menu {
 
 		<!-- Maintenance card -->
 		<?php $this->render_maintenance_card(); ?>
+
+		<!-- Broken Link Reports -->
+		<?php $this->render_broken_reports_section(); ?>
 
 		</div><!-- .bunny-page-content -->
 		<?php
@@ -486,16 +490,24 @@ class Admin_Menu {
 	 * Top 10 afiliados por número de clicks.
 	 *
 	 * @since  0.2.3
+	 * @since  0.2.8 Acepta un rango de tiempo opcional.
+	 * @param  string $range today|week|month|total
 	 * @return array[]
 	 */
-	private function get_top_affiliates(): array {
+	private function get_top_affiliates( string $range = 'total' ): array {
 		global $wpdb;
 		$table = \WP_AffiliateManager\Redirect\Clicks_Table::table_name();
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$where = '';
+		if ( 'total' !== $range ) {
+			$since = \WP_AffiliateManager\Frontend\Top_Posts_Query::range_to_since( $range );
+			$where = $wpdb->prepare( ' WHERE ts >= %s', $since );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT affiliate_id, COUNT(*) AS click_count FROM %i GROUP BY affiliate_id ORDER BY click_count DESC LIMIT 10",
+				"SELECT affiliate_id, COUNT(*) AS click_count FROM %i{$where} GROUP BY affiliate_id ORDER BY click_count DESC LIMIT 10",
 				$table
 			),
 			ARRAY_A
@@ -522,45 +534,27 @@ class Admin_Menu {
 	}
 
 	/**
-	 * Top 10 posts por número de clicks.
+	 * Top posts por número de clicks.
 	 *
 	 * @since  0.2.3
+	 * @since  0.2.8 Acepta un rango de tiempo opcional.
+	 * @since  1.0.0 Delega la query a Frontend\Top_Posts_Query (fuente compartida con el shortcode).
+	 *              Añade thumb_url y edit_url que sólo necesita el dashboard.
+	 * @param  string $range today|week|month|total
 	 * @return array[]
 	 */
-	private function get_top_posts(): array {
-		global $wpdb;
-		$table = \WP_AffiliateManager\Redirect\Clicks_Table::table_name();
+	private function get_top_posts( string $range = 'total' ): array {
+		$rows = \WP_AffiliateManager\Frontend\Top_Posts_Query::get( $range, 10 );
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT post_id, COUNT(*) AS click_count FROM %i GROUP BY post_id ORDER BY click_count DESC LIMIT 10",
-				$table
-			),
-			ARRAY_A
-		);
-
-		if ( ! is_array( $rows ) ) { return array(); }
-
-		$result = array();
-		foreach ( $rows as $row ) {
-			$post_id = (int) $row['post_id'];
-			$post    = get_post( $post_id );
-			if ( ! $post instanceof \WP_Post ) { continue; }
-
-			$thumb_id  = get_post_thumbnail_id( $post_id );
-			$thumb_url = $thumb_id ? wp_get_attachment_image_url( $thumb_id, 'thumbnail' ) : '';
-
-			$result[] = array(
-				'id'          => $post_id,
-				'title'       => $post->post_title ?: __( '(no title)', 'wp-affiliatemanager' ),
-				'click_count' => (int) $row['click_count'],
-				'thumb_url'   => $thumb_url ?: '',
-				'edit_url'    => (string) get_edit_post_link( $post_id, 'raw' ),
-			);
+		// Añadir campos extra que sólo usa el dashboard (thumb_url, edit_url).
+		foreach ( $rows as &$row ) {
+			$thumb_id        = get_post_thumbnail_id( $row['id'] );
+			$row['thumb_url'] = $thumb_id ? (string) wp_get_attachment_image_url( $thumb_id, 'thumbnail' ) : '';
+			$row['edit_url']  = (string) get_edit_post_link( $row['id'], 'raw' );
 		}
+		unset( $row );
 
-		return $result;
+		return $rows;
 	}
 
 	/**
@@ -744,5 +738,278 @@ class Admin_Menu {
 			. '</svg>';
 
 		return 'data:image/svg+xml;base64,' . base64_encode( $svg ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+	}
+
+	// -------------------------------------------------------------------------
+	// v0.2.7 — Broken Link Reports
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Renderiza la sección de reportes de enlaces rotos en el dashboard.
+	 *
+	 * @since 0.2.7
+	 */
+	private function render_broken_reports_section(): void {
+		// phpcs:disable WordPress.Security.NonceVerification
+		if ( isset( $_GET['wpam_report_cleared'] ) && '1' === $_GET['wpam_report_cleared'] ) {
+			?>
+			<div class="notice notice-success is-dismissible" style="margin:16px 0 0;">
+				<p><?php esc_html_e( 'Broken link report cleared.', 'wp-affiliatemanager' ); ?></p>
+			</div>
+			<?php
+		}
+		if ( isset( $_GET['wpam_reports_cleared_all'] ) && '1' === $_GET['wpam_reports_cleared_all'] ) {
+			?>
+			<div class="notice notice-success is-dismissible" style="margin:16px 0 0;">
+				<p><?php esc_html_e( 'All broken link reports cleared.', 'wp-affiliatemanager' ); ?></p>
+			</div>
+			<?php
+		}
+		// phpcs:enable
+
+		$reports = get_option( self::REPORTS_OPTION, array() );
+		$reports = is_array( $reports ) ? $reports : array();
+		?>
+		<div class="wpam-analytics-card wpam-analytics-card--full wpam-maintenance-card">
+			<h3 class="wpam-analytics-card-title">
+				<span>🔗</span> <?php esc_html_e( 'Broken Link Reports', 'wp-affiliatemanager' ); ?>
+				<?php if ( ! empty( $reports ) ) : ?>
+					<span class="wpam-analytics-card-sub">
+						<?php echo esc_html( sprintf( '%d token(s)', count( $reports ) ) ); ?>
+					</span>
+				<?php endif; ?>
+			</h3>
+
+			<?php if ( empty( $reports ) ) : ?>
+				<p class="wpam-analytics-empty"><?php esc_html_e( 'No broken link reports yet.', 'wp-affiliatemanager' ); ?></p>
+			<?php else : ?>
+				<div class="wpam-table-wrap">
+					<table class="wpam-table">
+						<thead><tr>
+							<th><?php esc_html_e( 'Token', 'wp-affiliatemanager' ); ?></th>
+							<th><?php esc_html_e( 'Post', 'wp-affiliatemanager' ); ?></th>
+							<th><?php esc_html_e( 'Reports', 'wp-affiliatemanager' ); ?></th>
+							<th><?php esc_html_e( 'Last Reported', 'wp-affiliatemanager' ); ?></th>
+							<th><?php esc_html_e( 'Action', 'wp-affiliatemanager' ); ?></th>
+						</tr></thead>
+						<tbody>
+						<?php foreach ( $reports as $token => $data ) :
+							$post_id   = absint( $data['post_id'] ?? 0 );
+							$src_post  = $post_id ? get_post( $post_id ) : null;
+							$post_label = $src_post instanceof \WP_Post
+								? sprintf( '<a href="%s">%s</a>', esc_url( (string) get_edit_post_link( $post_id, 'raw' ) ), esc_html( $src_post->post_title ) )
+								: esc_html( $post_id > 0 ? '#' . $post_id : '—' );
+							$last = $data['last_reported'] ?? '—';
+							$last = ( '—' !== $last ) ? esc_html( get_date_from_gmt( $last, 'd M Y · H:i' ) ) : '—';
+						?>
+							<tr>
+								<td><code><?php echo esc_html( $token ); ?></code></td>
+								<td><?php echo $post_label; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — escaped above. ?></td>
+								<td><?php echo esc_html( (string) absint( $data['count'] ?? 0 ) ); ?></td>
+								<td><?php echo $last; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — escaped above. ?></td>
+								<td>
+									<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline;">
+										<input type="hidden" name="action" value="wpam_clear_broken_report" />
+										<input type="hidden" name="wpam_token" value="<?php echo esc_attr( $token ); ?>" />
+										<?php wp_nonce_field( 'wpam_clear_broken_report', 'wpam_nonce' ); ?>
+										<button type="submit" class="button button-small button-secondary">
+											<?php esc_html_e( 'Clear report', 'wp-affiliatemanager' ); ?>
+										</button>
+									</form>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+						</tbody>
+					</table>
+				</div>
+
+				<div class="wpam-maintenance-row" style="margin-top:16px;">
+					<div class="wpam-maintenance-info">
+						<strong><?php esc_html_e( 'Clear All Reports', 'wp-affiliatemanager' ); ?></strong>
+						<p class="description"><?php esc_html_e( 'Removes all broken link report entries from storage.', 'wp-affiliatemanager' ); ?></p>
+					</div>
+					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return window.confirm('<?php echo esc_js( __( 'Delete all broken link reports? This cannot be undone.', 'wp-affiliatemanager' ) ); ?>')">
+						<input type="hidden" name="action" value="wpam_clear_all_broken_reports" />
+						<?php wp_nonce_field( 'wpam_clear_all_broken_reports', 'wpam_nonce' ); ?>
+						<button type="submit" class="button button-secondary">
+							<?php esc_html_e( 'Clear all reports', 'wp-affiliatemanager' ); ?>
+						</button>
+					</form>
+				</div>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * AJAX handler (nopriv): registra un reporte de enlace roto.
+	 *
+	 * @since 0.2.7
+	 */
+	public function handle_report_broken_link(): void {
+		// FIX 2: nonce verification (nonce generated server-side in the renderer).
+		check_ajax_referer( 'wpam_report_nonce', 'nonce' );
+
+		$token   = sanitize_text_field( wp_unslash( $_POST['token']   ?? '' ) );
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+
+		// Validate token format matches the 8-char hex pattern used by the plugin.
+		if ( ! preg_match( '/^[a-f0-9]{8}$/', $token ) ) {
+			wp_die( '', '', array( 'response' => 400 ) );
+		}
+
+		$reports = get_option( self::REPORTS_OPTION, array() );
+		$reports = is_array( $reports ) ? $reports : array();
+
+		if ( isset( $reports[ $token ] ) ) {
+			// FIX 3: throttle — skip if already reported within the last 10 minutes.
+			$last_ts = strtotime( $reports[ $token ]['last_reported'] ?? '' );
+			if ( $last_ts && ( time() - $last_ts ) < 600 ) {
+				wp_die( '', '', array( 'response' => 200 ) ); // Silently accept; don't increment.
+			}
+			$reports[ $token ]['count']         = absint( $reports[ $token ]['count'] ) + 1;
+			$reports[ $token ]['last_reported'] = gmdate( 'Y-m-d H:i:s' );
+			// FIX 4: backfill post_id if the first report stored 0.
+			if ( 0 === absint( $reports[ $token ]['post_id'] ?? 0 ) && $post_id > 0 ) {
+				$reports[ $token ]['post_id'] = $post_id;
+			}
+		} else {
+			$reports[ $token ] = array(
+				'count'         => 1,
+				'post_id'       => $post_id,
+				'last_reported' => gmdate( 'Y-m-d H:i:s' ),
+			);
+		}
+
+		update_option( self::REPORTS_OPTION, $reports, false );
+		wp_die( '', '', array( 'response' => 200 ) );
+	}
+
+	/**
+	 * Admin-post handler: limpia un reporte individual por token.
+	 *
+	 * @since 0.2.7
+	 */
+	public function handle_clear_broken_report(): void {
+		if (
+			! isset( $_POST['wpam_nonce'] ) ||
+			! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wpam_nonce'] ) ), 'wpam_clear_broken_report' )
+		) {
+			wp_die( esc_html__( 'Security check failed.', 'wp-affiliatemanager' ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'wp-affiliatemanager' ) );
+		}
+
+		$token   = sanitize_text_field( wp_unslash( $_POST['wpam_token'] ?? '' ) );
+		$reports = get_option( self::REPORTS_OPTION, array() );
+		$reports = is_array( $reports ) ? $reports : array();
+
+		unset( $reports[ $token ] );
+		update_option( self::REPORTS_OPTION, $reports, false );
+
+		wp_safe_redirect( add_query_arg(
+			array(
+				'page'                => 'wpam-dashboard',
+				'wpam_report_cleared' => '1',
+			),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	// -------------------------------------------------------------------------
+	// v0.2.8 — Dashboard analytics filter AJAX
+	// -------------------------------------------------------------------------
+
+	/**
+	 * AJAX handler: returns filtered Top Affiliates + Top Posts HTML.
+	 *
+	 * Accepted ranges: today | week | month | total.
+	 *
+	 * @since 0.2.8
+	 */
+	public function ajax_dashboard_filter(): void {
+		check_ajax_referer( 'wpam_dashboard_filter', 'nonce' );
+
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_send_json_error( array( 'message' => 'Forbidden' ), 403 );
+		}
+
+		$allowed = array( 'today', 'week', 'month', 'total' );
+		$range   = sanitize_text_field( wp_unslash( $_POST['range'] ?? 'total' ) );
+		if ( ! in_array( $range, $allowed, true ) ) {
+			$range = 'total';
+		}
+
+		$affiliates = $this->get_top_affiliates( $range );
+		$posts      = $this->get_top_posts( $range );
+
+		// Total clicks for the same range (for percentage bars).
+		global $wpdb;
+		$table       = \WP_AffiliateManager\Redirect\Clicks_Table::table_name();
+		$range_total = $this->get_range_total( $table, $range );
+
+		ob_start();
+		$this->render_top_affiliates_section( $affiliates, $range_total );
+		$affiliates_html = ob_get_clean();
+
+		ob_start();
+		$this->render_top_posts_section( $posts );
+		$posts_html = ob_get_clean();
+
+		wp_send_json_success( array(
+			'affiliates_html' => $affiliates_html,
+			'posts_html'      => $posts_html,
+		) );
+	}
+
+	/**
+	 * Returns total click count for a given range (used for percentage bars in AJAX response).
+	 *
+	 * @since  0.2.8
+	 * @param  string $table DB table name.
+	 * @param  string $range today|week|month|total
+	 * @return int
+	 */
+	private function get_range_total( string $table, string $range ): int {
+		global $wpdb;
+		if ( 'total' === $range ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $table ) );
+		}
+		$since = \WP_AffiliateManager\Frontend\Top_Posts_Query::range_to_since( $range );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE ts >= %s', $table, $since ) );
+	}
+
+	/**
+	 * Admin-post handler: limpia todos los reportes.
+	 *
+	 * @since 0.2.7
+	 */
+	public function handle_clear_all_broken_reports(): void {
+		if (
+			! isset( $_POST['wpam_nonce'] ) ||
+			! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wpam_nonce'] ) ), 'wpam_clear_all_broken_reports' )
+		) {
+			wp_die( esc_html__( 'Security check failed.', 'wp-affiliatemanager' ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'wp-affiliatemanager' ) );
+		}
+
+		update_option( self::REPORTS_OPTION, array(), false );
+
+		wp_safe_redirect( add_query_arg(
+			array(
+				'page'                      => 'wpam-dashboard',
+				'wpam_reports_cleared_all'  => '1',
+			),
+			admin_url( 'admin.php' )
+		) );
+		exit;
 	}
 }

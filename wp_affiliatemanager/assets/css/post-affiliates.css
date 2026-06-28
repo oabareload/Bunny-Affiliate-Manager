@@ -57,7 +57,7 @@
 
 .wpam-pa-search {
 	width: 100%;
-	padding: 8px 12px 8px 32px;
+	padding: 8px 12px 8px 32px !important;
 	height: 36px;
 	border: 1px solid var(--wpam-gray-200);
 	border-radius: var(--wpam-radius-sm);
@@ -717,4 +717,21 @@
 .wpam-pa-save-btn:disabled {
 	opacity: 0.45 !important;
 	cursor: not-allowed !important;
+}
+
+/* ==========================================================================
+   Footer fix — Post Affiliates
+   ========================================================================== */
+
+/*
+ * En la pantalla Post Affiliates, el footer nativo de WordPress (#wpfooter)
+ * tiene position:absolute dentro de #wpwrap (height:100%; overflow:hidden),
+ * lo que lo ancla al borde inferior visible de la ventana en lugar de al final
+ * real del contenido. El header sticky de Bunny agrava el cálculo JS de WordPress.
+ *
+ * Solución: sacar #wpfooter del flujo absoluto únicamente en esta pantalla,
+ * convirtiéndolo en posicionamiento relativo normal. Igual que WooCommerce.
+ */
+body.bunny-affiliates_page_wpam-post-affiliates #wpfooter {
+	position: relative !important;
 }

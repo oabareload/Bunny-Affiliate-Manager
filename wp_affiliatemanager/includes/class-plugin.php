@@ -51,6 +51,10 @@ require_once WPAM_PLUGIN_PATH . 'includes/redirect/helpers-redirect.php';
 require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-render-engine.php';
 require_once WPAM_PLUGIN_PATH . 'includes/frontend/helpers-render.php';
 
+// --- v1.0.0: Top Posts Query (compartida entre dashboard y shortcode) ---
+require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-top-posts-query.php';
+require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-shortcode-top-posts.php';
+
 /**
  * Class Plugin
  *
@@ -104,6 +108,15 @@ final class Plugin {
 		$this->loader->add_action( 'init',             $redirect, 'register_rewrite' );
 		$this->loader->add_filter( 'query_vars',       $redirect, 'add_query_var' );
 		$this->loader->add_action( 'template_redirect', $redirect, 'handle' );
+
+		// v0.2.7: Broken link AJAX report — fires for logged-in and logged-out users.
+		$admin_menu_report = new Admin\Admin_Menu();
+		$this->loader->add_action( 'wp_ajax_nopriv_wpam_report_broken_link', $admin_menu_report, 'handle_report_broken_link' );
+		$this->loader->add_action( 'wp_ajax_wpam_report_broken_link',        $admin_menu_report, 'handle_report_broken_link' );
+
+		// v0.2.8: Dashboard filter AJAX (admin-only).
+		$admin_menu_filter = new Admin\Admin_Menu();
+		$this->loader->add_action( 'wp_ajax_wpam_dashboard_filter', $admin_menu_filter, 'ajax_dashboard_filter' );
 	}
 
 	/**
@@ -163,6 +176,11 @@ final class Plugin {
 		$admin_menu_maint = new Admin\Admin_Menu();
 		$this->loader->add_action( 'admin_post_wpam_rebuild_token_map', $admin_menu_maint, 'handle_rebuild_token_map' );
 		$this->loader->add_action( 'admin_post_wpam_clear_analytics',    $admin_menu_maint, 'handle_clear_analytics' );
+
+		// v0.2.7: Broken link report clear actions (admin-only).
+		$admin_menu_reports = new Admin\Admin_Menu();
+		$this->loader->add_action( 'admin_post_wpam_clear_broken_report',      $admin_menu_reports, 'handle_clear_broken_report' );
+		$this->loader->add_action( 'admin_post_wpam_clear_all_broken_reports',  $admin_menu_reports, 'handle_clear_all_broken_reports' );
 	}
 
 	/**
@@ -181,6 +199,18 @@ final class Plugin {
 		$frontend_assets = new Frontend\Frontend_Assets( $this->version );
 		$this->loader->add_action( 'wp_enqueue_scripts', $frontend_assets, 'enqueue_styles' );
 		$this->loader->add_action( 'wp_enqueue_scripts', $frontend_assets, 'enqueue_scripts' );
+
+		// v1.0.0: Shortcode [wpam_top_posts].
+		// Los shortcodes se registran via add_shortcode() directamente (no via Loader).
+		Frontend\Shortcode_Top_Posts::register();
+
+		// Registrar el CSS del widget (lazy: se encola solo cuando el shortcode se usa).
+		wp_register_style(
+			'wpam-top-posts-widget',
+			WPAM_PLUGIN_URL . 'assets/css/top-posts-widget.css',
+			array(),
+			WPAM_VERSION
+		);
 	}
 
 	public function get_version(): string { return $this->version; }

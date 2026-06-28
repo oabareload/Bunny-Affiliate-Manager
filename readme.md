@@ -105,6 +105,55 @@ Bunny-Affiliate-Manager/
 - The Render Engine uses an in-memory cache per `post_id + style` to avoid duplicate renders within the same request.
 - No React or JavaScript framework dependency; the admin UI is intentionally lightweight.
 
+## Broken Link Reporting
+
+Version 0.2.7 adds a lightweight broken link reporting system that allows visitors to flag affiliate redirect links that appear to be broken, directly from the interstitial page.
+
+### How it works
+
+A small "Report broken link" button appears at the bottom of every interstitial card. When clicked:
+
+1. The browser sends an AJAX POST to `admin-ajax.php` with the redirect token, the originating post ID, and a WordPress nonce.
+2. The server validates the nonce, verifies the token matches the 8-character hex format used internally, and applies a 10-minute throttle per token to prevent duplicate submissions.
+3. The report is stored in the WordPress option `wpam_broken_link_reports` as a keyed array indexed by token.
+
+The button disables immediately on click and updates its label to confirm success or report an error. The countdown and redirect continue independently — the reporting request has zero effect on redirect performance.
+
+### Storage structure
+
+Reports are stored in a single WordPress option, no custom tables required:
+
+```php
+get_option( 'wpam_broken_link_reports' );
+// Returns:
+[
+  'a1b2c3d4' => [
+    'count'         => 3,        // total reports for this token
+    'post_id'       => 42,       // originating post ID
+    'last_reported' => '2025-08-14 17:32:01',  // UTC
+  ],
+]
+```
+
+### Dashboard
+
+The WPAM Dashboard shows a **Broken Link Reports** section below the Maintenance card. For each reported token it displays:
+
+- Token (8-char hex)
+- Post title (linked to the WordPress post editor)
+- Report count
+- Last reported date (converted to site local time)
+- A **Clear report** button to remove that individual entry
+
+A **Clear all reports** button (with confirmation dialog) removes all entries at once.
+
+### Security
+
+- The AJAX endpoint is public (no login required) but protected by a WordPress nonce generated server-side in the renderer and verified via `check_ajax_referer()` on the handler.
+- A 10-minute server-side throttle prevents the same token from incrementing more than once per 10-minute window regardless of how many times the button is clicked.
+- No IP addresses, user agents, or personal data are stored.
+- Admin clear actions are protected by nonce + `manage_options` capability check.
+
 ## Shortcode
 
 ```
@@ -215,6 +264,123 @@ Yes. Set the **Brand Color** field in each affiliate's settings. The CSS variabl
 - All user-facing strings use the `wp_affiliatemanager` text domain.
 
 ## Changelog
+
+### 1.0.0 — Top Posts Shortcode
+
+**New feature:** shortcode `[wpam_top_posts]` para mostrar los posts con más clicks en el frontend, reutilizando exactamente la misma fuente de datos que el Dashboard de Analytics.
+
+#### Atributos
+
+| Atributo | Valores | Default | Descripción |
+|---|---|---|---|
+| `title` | cualquier texto | vacío | Encabezado del widget. Si está vacío no se muestra. |
+| `period` | `today` `week` `month` `total` | `total` | Rango temporal de los clicks. |
+| `layout` | `horizontal` `vertical` | `horizontal` | Layout del widget. |
+| `thumbnail_size` | cualquier tamaño WordPress registrado | `medium` | Tamaño de la imagen. |
+| `limit` | entero 1-100 | `10` | Cantidad de posts a mostrar. |
+| `max_width` | valor CSS (`400px`, `100%`) | vacío | Ancho máximo del widget. |
+| `show_thumbnail` | `yes` `no` | `yes` | Mostrar o no la imagen del post. |
+
+#### Ejemplos
+
+```
+[wpam_top_posts]
+[wpam_top_posts period="month"]
+[wpam_top_posts period="week" layout="vertical"]
+[wpam_top_posts period="total" limit="20"]
+[wpam_top_posts title="Popular Figures" period="month" thumbnail_size="medium"]
+[wpam_top_posts layout="horizontal" max_width="800px" show_thumbnail="yes"]
+```
+
+#### Comportamiento responsive
+
+- **Desktop / Tablet — `layout=horizontal`:** fila adaptativa de cards (imagen + título debajo). Las cards hacen `flex-wrap` cuando no caben; sin overflow horizontal.
+- **Desktop / Tablet — `layout=vertical`:** lista apilada con imagen a la izquierda y título a la derecha.
+- **Móvil (≤ 640px):** ambos layouts usan tarjetas compactas con imagen a la izquierda y título a la derecha con ellipsis. Mismo patrón visual que el board Post Affiliates del plugin.
+
+#### Notas técnicas
+
+- El CSS del widget (`top-posts-widget.css`) se registra en `wp_enqueue_scripts` pero solo se encola cuando el shortcode es ejecutado en la página. Cero impacto en páginas que no usan el shortcode.
+- La query SQL se encapsula en `Frontend\Top_Posts_Query::get()`, clase compartida entre el Dashboard y el shortcode — sin duplicación de consultas.
+- `Admin_Menu::get_top_posts()` delega en `Top_Posts_Query::get()` y añade `thumb_url` + `edit_url` que solo necesita el dashboard.
+
+**Archivos nuevos:**
+- `includes/frontend/class-top-posts-query.php` — query compartida (rango + límite).
+- `includes/frontend/class-shortcode-top-posts.php` — shortcode `[wpam_top_posts]`.
+- `assets/css/top-posts-widget.css` — estilos del widget (horizontal, vertical, móvil).
+
+**Archivos modificados:**
+- `wp_affiliatemanager.php` — versión `0.2.8 → 1.0.0`, `WPAM_VERSION` actualizado.
+- `includes/class-plugin.php` — `require_once` de las dos clases nuevas; registro del shortcode vía `Shortcode_Top_Posts::register()`; `wp_register_style` del CSS del widget.
+- `includes/admin/class-admin-menu.php` — `get_top_posts()` ahora delega en `Top_Posts_Query::get()` en vez de ejecutar su propio SQL.
+
+### 0.2.8 — Dashboard Analytics Filters
+
+**New feature:** the four click-stat metric cards at the top of the analytics dashboard are now interactive time-range filters.
+
+**How it works:**
+
+Clicking any of the four cards — 📈 Clicks Today, 📅 Last 7 Days, 🗓️ Last 30 Days, 🖱️ Total Clicks — immediately updates both **Top Affiliates** and **Top Posts** to reflect that time range, without a page reload.
+
+- The active card remains fully visible; inactive cards appear grayed out.
+- Hovering an inactive card signals it is clickable.
+- The selected filter is persisted in `localStorage` and automatically restored when returning to the dashboard.
+- Percentage bars in Top Affiliates are calculated relative to the total clicks within the selected range.
+
+**Files changed:**
+
+- `wp_affiliatemanager.php`: version bumped to `0.2.8`, `WPAM_VERSION` updated.
+- `includes/admin/class-admin-menu.php`:
+  - Top Affiliates and Top Posts column wrappers now carry `wpam-filter-affiliates-col` / `wpam-filter-posts-col` CSS classes as stable AJAX targets.
+  - `get_top_affiliates()` and `get_top_posts()` accept an optional `$range` param (`today|week|month|total`); a `WHERE ts >= ?` clause is applied when range is not `total`.
+  - New `ajax_dashboard_filter()` public method — AJAX handler secured with nonce + `manage_options` capability check.
+  - New private helpers `get_range_total()` and `range_to_since()`.
+- `includes/class-plugin.php`: registered `wp_ajax_wpam_dashboard_filter` hook.
+- `includes/admin/class-admin-assets.php`: enqueues `assets/js/dashboard.js` and localizes `wpamDashboard` object only on the dashboard screen.
+- `assets/js/dashboard.js` *(new)*: card click handler, active/inactive state toggling, AJAX request, `localStorage` persistence and restore on load.
+- `assets/css/admin.css`: added scoped styles for card `--active`, `--inactive`, and `--inactive:hover` states (opacity + grayscale filter), scoped to `body.toplevel_page_wpam-dashboard`.
+
+### 0.2.7 — Security Hardening & Broken Link Reporting
+
+**`includes/settings/class-settings.php`:**
+
+* Added a new **Interstitial Width** setting with 5 predefined sizes:
+
+  * 460px (default)
+  * 600px
+  * 800px
+  * 1000px
+  * Full Width
+* Added a new **Content Slots** section for custom content inside the interstitial page.
+* Supported slot types:
+
+  * Custom HTML
+  * Image + Link
+* Available slot positions:
+
+  * Before Disclaimer
+  * After Disclaimer
+  * Before Related Post
+  * After Related Post
+* Introduced a scalable `content_slots` structure to support multiple slots in future releases.
+
+**`includes/redirect/class-interstitial-renderer.php`:**
+
+* Added dynamic Content Slot rendering based on configured position.
+* Added configurable width classes for the interstitial card.
+* Improved extensibility for future promotional content, embeds, banners, and custom layouts.
+
+**`assets/css/interstitial.css`:**
+
+* Added responsive width classes for configurable interstitial layouts.
+* Added styling for Custom HTML slots.
+* Added styling for Image + Link promotional blocks.
+* Improved support for wider layouts and future monetization features.
+
+**Admin UI Fixes:**
+
+* Fixed a WordPress admin footer overlap issue that could cover controls at the bottom of plugin settings pages.
+* Improved compatibility with custom content rendered inside the interstitial page.
 
 ## 0.2.5 — Interstitial Improvements & Analytics Controls
 

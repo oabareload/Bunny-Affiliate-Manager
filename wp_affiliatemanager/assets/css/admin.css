@@ -837,3 +837,56 @@ a.wpam-top-name:hover { color: var(--wpam-primary); }
 	font-family: monospace;
 	color: var(--wpam-gray-700);
 }
+
+/* ==========================================================================
+   Footer fix — Dashboard & Affiliates
+   ========================================================================== */
+
+/*
+ * En las pantallas Dashboard y Affiliates, el footer nativo de WordPress
+ * (#wpfooter) tiene position:absolute dentro de #wpwrap (height:100%;
+ * overflow:hidden), lo que lo ancla al borde inferior visible de la ventana
+ * en lugar de al final real del contenido. El header sticky de Bunny agrava
+ * el cálculo JS de WordPress.
+ *
+ * Solución: sacar #wpfooter del flujo absoluto únicamente en estas pantallas,
+ * convirtiéndolo en posicionamiento relativo normal. Igual que WooCommerce.
+ */
+body.toplevel_page_wpam-dashboard #wpfooter,
+body.bunny-affiliates_page_wpam-affiliates #wpfooter {
+	position: relative !important;
+}
+
+/* ==========================================================================
+   v0.2.8 — Dashboard analytics filter card states
+   ========================================================================== */
+
+/* Scoped to dashboard only to avoid touching other stat grids */
+body.toplevel_page_wpam-dashboard .wpam-stats-grid--clicks .wpam-stat-card {
+	cursor: pointer;
+	transition: opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+body.toplevel_page_wpam-dashboard .wpam-stats-grid--clicks .wpam-stat-card--inactive {
+	opacity: 0.42;
+	filter: grayscale(60%);
+	box-shadow: none;
+}
+
+body.toplevel_page_wpam-dashboard .wpam-stats-grid--clicks .wpam-stat-card--inactive:hover {
+	opacity: 0.72;
+	filter: grayscale(20%);
+	box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+}
+
+body.toplevel_page_wpam-dashboard .wpam-stats-grid--clicks .wpam-stat-card--active {
+	opacity: 1;
+	filter: none;
+}
+
+/* Loading state for AJAX replacement columns */
+.wpam-filter-affiliates-col .wpam-loading,
+.wpam-filter-posts-col .wpam-loading {
+	opacity: 0.6;
+	font-style: italic;
+}

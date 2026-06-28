@@ -4,7 +4,7 @@
  *
  * @package WP_AffiliateManager\Admin
  * @since   1.0.0
- * @version 0.1.4
+ * @version 0.2.8
  */
 
 namespace WP_AffiliateManager\Admin;
@@ -117,6 +117,30 @@ class Admin_Assets {
 				)
 			);
 
+			// v0.2.8: Dashboard analytics filter JS.
+			if ( 'toplevel_page_wpam-dashboard' === $hook_suffix ) {
+				wp_enqueue_script(
+					'wpam-dashboard',
+					WPAM_PLUGIN_URL . 'assets/js/dashboard.js',
+					array( 'jquery' ),
+					$this->version,
+					true
+				);
+
+				wp_localize_script(
+					'wpam-dashboard',
+					'wpamDashboard',
+					array(
+						'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+						'nonce'   => wp_create_nonce( 'wpam_dashboard_filter' ),
+						'i18n'    => array(
+							'loading' => __( 'Loading...', 'wp-affiliatemanager' ),
+							'error'   => __( 'Error loading data.', 'wp-affiliatemanager' ),
+						),
+					)
+				);
+			}
+
 			// Media Library: CPT edit screen + pantalla inline de affiliates (v0.0.6).
 			if ( $this->is_cpt_edit_screen( $hook_suffix ) || 'bunny-affiliates_page_wpam-affiliates' === $hook_suffix ) {
 				wp_enqueue_media();
@@ -201,16 +225,16 @@ class Admin_Assets {
 					// v0.1.4: afiliados activos con dominios pre-normalizados para DomainDetector.
 					'affiliates' => $this->get_affiliates_for_js(),
 					'i18n'       => array(
-						'no_links'           => __( 'No affiliate links added yet. Click "Add Link" to start.', 'wp-affiliatemanager' ),
-						'no_links_count'     => __( '0 links', 'wp-affiliatemanager' ),
-						'one_link'           => __( '1 link', 'wp-affiliatemanager' ),
+						'no_links'            => __( 'No affiliate links added yet. Click "Add Link" to start.', 'wp-affiliatemanager' ),
+						'no_links_count'      => __( '0 links', 'wp-affiliatemanager' ),
+						'one_link'            => __( '1 link', 'wp-affiliatemanager' ),
 						/* translators: %d: número de links */
-						'n_links'            => __( '%d links', 'wp-affiliatemanager' ),
-						'preview_placeholder'=> __( 'Paste an affiliate URL to detect the affiliate automatically.', 'wp-affiliatemanager' ),
-						'url_invalid'        => __( 'Enter a valid URL (https://...).', 'wp-affiliatemanager' ),
-						'no_affiliate_found' => __( 'No active affiliate found for this URL.', 'wp-affiliatemanager' ),
-						'final_url'          => __( 'Final URL:', 'wp-affiliatemanager' ),
-						'open_tab'           => __( 'Open in new tab', 'wp-affiliatemanager' ),
+						'n_links'             => __( '%d links', 'wp-affiliatemanager' ),
+						'preview_placeholder' => __( 'Paste an affiliate URL to detect the affiliate automatically.', 'wp-affiliatemanager' ),
+						'url_invalid'         => __( 'Enter a valid URL (https://...).', 'wp-affiliatemanager' ),
+						'no_affiliate_found'  => __( 'No active affiliate found for this URL.', 'wp-affiliatemanager' ),
+						'final_url'           => __( 'Final URL:', 'wp-affiliatemanager' ),
+						'open_tab'            => __( 'Open in new tab', 'wp-affiliatemanager' ),
 					),
 				)
 			);

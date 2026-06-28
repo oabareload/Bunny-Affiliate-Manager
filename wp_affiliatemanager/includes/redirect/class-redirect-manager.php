@@ -142,7 +142,7 @@ class Redirect_Manager {
 		if ( $enable_interstitial && $delay > 0 ) {
 			// El renderer hace exit internamente tras mostrar la página.
 			$renderer = new Interstitial_Renderer();
-			$renderer->render( $destination );
+			$renderer->render( array_merge( $destination, array( 'token' => $token ) ) );
 			return; // Nunca se alcanza; defensivo.
 		}
 
