@@ -292,6 +292,47 @@ Yes. Set the **Brand Color** field in each affiliate's settings. The CSS variabl
 [wpam_top_posts layout="horizontal" max_width="800px" show_thumbnail="yes"]
 ```
 
+## 📘 WPAM Top Posts API
+
+### Uso básico
+
+- Permite obtener los posts más populares como objetos `WP_Post`.
+
+```php
+$posts = \WP_AffiliateManager\API\WPAM_API::get_top_posts([
+    'period'    => 'week',   // day | week | month | total
+    'limit'     => 10,
+    'post_type' => 'post'    // post | page | any
+]);
+```
+
+### Resultado
+
+- Devuelve un array de WP_Post con campos adicionales:
+
+```php
+$post->wpam_click_count; // int
+$post->wpam_thumbnail;   // string|null
+```
+
+### Verificación opcional
+
+```php
+if ( class_exists( '\WP_AffiliateManager\API\WPAM_API' ) ) {
+    $posts = \WP_AffiliateManager\API\WPAM_API::get_top_posts([
+        'period' => 'week',
+        'limit'  => 10
+    ]);
+}
+```
+
+### Notas
+
+- API de solo lectura
+- No requiere configuración adicional
+- Usa la misma fuente de datos que el dashboard del plugin
+- Compatible con widgets, dashboard y extensiones externas
+
 #### Comportamiento responsive
 
 - **Desktop / Tablet — `layout=horizontal`:** fila adaptativa de cards (imagen + título debajo). Las cards hacen `flex-wrap` cuando no caben; sin overflow horizontal.

@@ -53,7 +53,11 @@ require_once WPAM_PLUGIN_PATH . 'includes/frontend/helpers-render.php';
 
 // --- v1.0.0: Top Posts Query (compartida entre dashboard y shortcode) ---
 require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-top-posts-query.php';
+require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-top-posts-renderer.php';
 require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-shortcode-top-posts.php';
+require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-widget-top-posts.php';
+
+require_once WPAM_PLUGIN_PATH . 'includes/api/class-wpam-api.php';
 
 /**
  * Class Plugin
@@ -72,7 +76,6 @@ final class Plugin {
 		$this->version = WPAM_VERSION;
 		$this->loader  = new Loader();
 
-		$this->load_textdomain();
 		$this->define_global_hooks();
 		$this->define_admin_hooks();
 		$this->define_frontend_hooks();
@@ -86,7 +89,7 @@ final class Plugin {
 		return self::$instance;
 	}
 
-	private function load_textdomain(): void {
+	public function load_textdomain(): void {
 		load_plugin_textdomain(
 			'wp-affiliatemanager',
 			false,
@@ -100,6 +103,9 @@ final class Plugin {
 	 * @since 2.0.0
 	 */
 	private function define_global_hooks(): void {
+		// Textdomain en init — requerido desde WP 6.7.
+		$this->loader->add_action( 'init', $this, 'load_textdomain' );
+
 		$cpt = new Affiliates\CPT();
 		$this->loader->add_action( 'init', $cpt, 'register' );
 
@@ -117,6 +123,13 @@ final class Plugin {
 		// v0.2.8: Dashboard filter AJAX (admin-only).
 		$admin_menu_filter = new Admin\Admin_Menu();
 		$this->loader->add_action( 'wp_ajax_wpam_dashboard_filter', $admin_menu_filter, 'ajax_dashboard_filter' );
+
+		// v1.0.0: Widget Top Posts — widgets_init corre en admin y frontend (Customizer, panel de widgets, sidebar).
+		// Se registra via closure para evitar instanciar WP_Widget antes del hook init
+		// (el constructor llama a __() que dispara el textdomain demasiado temprano en WP 6.7+).
+		add_action( 'widgets_init', function() {
+			register_widget( Frontend\Widget_Top_Posts::class );
+		} );
 	}
 
 	/**
@@ -204,13 +217,9 @@ final class Plugin {
 		// Los shortcodes se registran via add_shortcode() directamente (no via Loader).
 		Frontend\Shortcode_Top_Posts::register();
 
-		// Registrar el CSS del widget (lazy: se encola solo cuando el shortcode se usa).
-		wp_register_style(
-			'wpam-top-posts-widget',
-			WPAM_PLUGIN_URL . 'assets/css/top-posts-widget.css',
-			array(),
-			WPAM_VERSION
-		);
+		// El CSS del widget (wpam-top-posts-widget) se registra dentro del hook
+		// wp_enqueue_scripts en Frontend_Assets::enqueue_styles().
+		// El encolado real lo realizan el shortcode/widget cuando se renderizan.
 	}
 
 	public function get_version(): string { return $this->version; }

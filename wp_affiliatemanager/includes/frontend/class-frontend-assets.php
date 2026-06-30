@@ -54,6 +54,16 @@ class Frontend_Assets {
 	 * @return void
 	 */
 	public function enqueue_styles(): void {
+		// Registrar siempre el CSS del widget Top Posts dentro del hook correcto.
+		// El encolado real (wp_enqueue_style) lo realizan el shortcode y el widget
+		// cuando realmente se renderizan (lazy enqueue).
+		wp_register_style(
+			'wpam-top-posts-widget',
+			WPAM_PLUGIN_URL . 'assets/css/top-posts-widget.css',
+			array(),
+			$this->version
+		);
+
 		if ( ! $this->should_load_assets() ) {
 			return;
 		}

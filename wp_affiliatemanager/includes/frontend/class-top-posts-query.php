@@ -74,6 +74,33 @@ class Top_Posts_Query {
 	}
 
 	/**
+	 * Retorna los posts con más clicks, con caché de objeto.
+	 *
+	 * Fuente única de caché para shortcode y widget.
+	 * TTL: 300 segundos. Clave: wpam_top_posts_{range}_{limit}.
+	 * Sin object cache externo: vive dentro del request (evita queries duplicadas
+	 * si shortcode y widget coexisten en la misma página con los mismos parámetros).
+	 * Con object cache externo (Redis/Memcached): persiste entre requests.
+	 *
+	 * @param  string $range  today|week|month|total
+	 * @param  int    $limit
+	 * @return array[]
+	 */
+	public static function get_cached( string $range = 'total', int $limit = 10 ): array {
+		$cache_key = 'wpam_top_posts_' . $range . '_' . $limit;
+		$cached    = wp_cache_get( $cache_key, 'wpam' );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$posts = self::get( $range, $limit );
+		wp_cache_set( $cache_key, $posts, 'wpam', 300 );
+
+		return $posts;
+	}
+
+	/**
 	 * Convierte un rango a un datetime UTC usable en cláusulas WHERE.
 	 *
 	 * @param  string $range  today|week|month
