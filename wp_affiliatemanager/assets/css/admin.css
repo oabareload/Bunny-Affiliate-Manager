@@ -618,6 +618,11 @@
 	margin-top: 28px;
 }
 
+/* Grid de views (4 cards) — v1.2.0 */
+.wpam-stats-grid--views {
+	margin-top: 28px;
+}
+
 /* Dos columnas analytics */
 .wpam-analytics-cols {
 	display: grid;
@@ -884,9 +889,33 @@ body.toplevel_page_wpam-dashboard .wpam-stats-grid--clicks .wpam-stat-card--acti
 	filter: none;
 }
 
+/* v1.3.0: mismo tratamiento clickable/activo-inactivo para el grupo Views */
+body.toplevel_page_wpam-dashboard .wpam-stats-grid--views .wpam-stat-card {
+	cursor: pointer;
+	transition: opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+body.toplevel_page_wpam-dashboard .wpam-stats-grid--views .wpam-stat-card--inactive {
+	opacity: 0.42;
+	filter: grayscale(60%);
+	box-shadow: none;
+}
+
+body.toplevel_page_wpam-dashboard .wpam-stats-grid--views .wpam-stat-card--inactive:hover {
+	opacity: 0.72;
+	filter: grayscale(20%);
+	box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+}
+
+body.toplevel_page_wpam-dashboard .wpam-stats-grid--views .wpam-stat-card--active {
+	opacity: 1;
+	filter: none;
+}
+
 /* Loading state for AJAX replacement columns */
 .wpam-filter-affiliates-col .wpam-loading,
-.wpam-filter-posts-col .wpam-loading {
+.wpam-filter-posts-col .wpam-loading,
+.wpam-filter-top-viewed-col .wpam-loading {
 	opacity: 0.6;
 	font-style: italic;
 }

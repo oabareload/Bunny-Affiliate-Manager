@@ -1,22 +1,31 @@
 <?php
 /**
- * WPAM_API — API interna para exponer Top Posts como WP_Post[].
+ * WPAM_API — API interna para exponer Top Posts / Top Viewed Posts como WP_Post[].
  *
  * Pensada para consumo por otros plugins (ej. Bunny Magazine).
  * No ejecuta SQL propio. No genera HTML. No duplica lógica.
- * Reutiliza Top_Posts_Query como fuente única de datos y caché.
+ * Reutiliza Top_Posts_Query / Views_Query como fuente única de datos y caché.
  *
  * v1.1.0: Añadido soporte de filtros (categories, tags, authors, post_type).
- * Los filtros se pasan directamente a Top_Posts_Query::get_cached()
+ * Los filtros se pasan directamente a *_Query::get_cached()
  * como tercer parámetro $filters — sin lógica adicional en esta clase.
+ *
+ * v1.2.0: get_top_posts() y get_top_viewed_posts() comparten toda su lógica
+ * (validación, construcción de $filters, normalización a WP_Post) vía
+ * build_top_posts_response(). La única diferencia real entre ambos métodos
+ * públicos es la fuente de datos (Top_Posts_Query::get_cached() vs
+ * Views_Query::get_cached()) y qué campo del row / propiedad del post se usa
+ * para el conteo (click_count/wpam_click_count vs view_count/wpam_view_count).
  *
  * @package WP_AffiliateManager\API
  * @since   1.1.0
+ * @since   1.2.0 get_top_viewed_posts() añadido, comparte lógica con get_top_posts().
  */
 
 namespace WP_AffiliateManager\API;
 
 use WP_AffiliateManager\Frontend\Top_Posts_Query;
+use WP_AffiliateManager\Views\Views_Query;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -31,7 +40,7 @@ class WPAM_API {
 	const ALLOWED_PERIODS = array( 'day', 'week', 'month', 'total' );
 
 	/**
-	 * Obtiene Top Posts como WP_Post[] enriquecidos.
+	 * Obtiene Top Posts (por clicks) como WP_Post[] enriquecidos.
 	 *
 	 * @param array $args {
 	 *   @type string $period              day|week|month|total. Default 'total'.
@@ -47,6 +56,56 @@ class WPAM_API {
 	 * @return \WP_Post[]
 	 */
 	public static function get_top_posts( array $args = array() ): array {
+		return self::build_top_posts_response(
+			$args,
+			array( Top_Posts_Query::class, 'get_cached' ),
+			'click_count',
+			'wpam_click_count',
+			'wpam_api_top_posts'
+		);
+	}
+
+	/**
+	 * Obtiene Top Viewed Posts (por vistas) como WP_Post[] enriquecidos.
+	 *
+	 * Espejo exacto de get_top_posts(): mismos argumentos, misma validación,
+	 * mismo $filters, misma normalización. Solo cambia la fuente de datos
+	 * (Views_Query::get_cached() en vez de Top_Posts_Query::get_cached()) y el
+	 * campo de conteo (view_count / wpam_view_count en vez de click_count /
+	 * wpam_click_count).
+	 *
+	 * @since  1.2.0
+	 * @param  array $args Ver get_top_posts() para la estructura completa.
+	 * @return \WP_Post[]
+	 */
+	public static function get_top_viewed_posts( array $args = array() ): array {
+		return self::build_top_posts_response(
+			$args,
+			array( Views_Query::class, 'get_cached' ),
+			'view_count',
+			'wpam_view_count',
+			'wpam_api_top_viewed_posts'
+		);
+	}
+
+	/**
+	 * Lógica compartida entre get_top_posts() y get_top_viewed_posts().
+	 *
+	 * Cuerpo idéntico al que tenía get_top_posts() antes de v1.4.0, parametrizado
+	 * únicamente en la fuente de datos y el nombre de campo de conteo. Validación,
+	 * construcción de $filters y normalización a WP_Post no cambian entre proveedores.
+	 *
+	 * @since  1.2.0
+	 *
+	 * @param  array    $args           Argumentos públicos (ver get_top_posts()).
+	 * @param  callable $query_callback Callable con la firma de *_Query::get_cached(
+	 *                                  string $range, int $limit, array $filters ): array[].
+	 * @param  string   $count_field    Clave del row devuelto por $query_callback ('click_count' | 'view_count').
+	 * @param  string   $count_property Propiedad dinámica a asignar en el WP_Post ('wpam_click_count' | 'wpam_view_count').
+	 * @param  string   $filter_hook    Nombre del filtro final aplicado al array de posts.
+	 * @return \WP_Post[]
+	 */
+	private static function build_top_posts_response( array $args, callable $query_callback, string $count_field, string $count_property, string $filter_hook ): array {
 
 		$args = wp_parse_args( $args, array(
 			'period'              => 'total',
@@ -69,10 +128,10 @@ class WPAM_API {
 
 		$limit = max( 1, min( 50, (int) $args['limit'] ) );
 
-		// Mapeo API público → nombre interno de Top_Posts_Query.
+		// Mapeo API público → nombre interno de *_Query.
 		$range = ( 'day' === $period ) ? 'today' : $period;
 
-		// Construir $filters para Top_Posts_Query.
+		// Construir $filters para *_Query.
 		// Solo se incluyen las claves con valor no vacío para mantener
 		// la clave de caché lo más compacta posible.
 		$filters = array();
@@ -97,9 +156,10 @@ class WPAM_API {
 		}
 
 		// -------------------------
-		// DATA SOURCE (sin SQL nuevo)
+		// DATA SOURCE (sin SQL nuevo) — invocado directamente, no via call_user_func(),
+		// ya que ambos proveedores comparten exactamente la misma firma.
 		// -------------------------
-		$rows = Top_Posts_Query::get_cached( $range, $limit, $filters );
+		$rows = $query_callback( $range, $limit, $filters );
 
 		if ( empty( $rows ) ) {
 			return array();
@@ -125,8 +185,8 @@ class WPAM_API {
 
 			// Enriquecimiento seguro — propiedades dinámicas, no se alteran
 			// campos nativos del objeto WP_Post.
-			$post->wpam_click_count = (int) $row['click_count'];
-			$post->wpam_thumbnail   = get_the_post_thumbnail_url( $post_id, 'medium' );
+			$post->{$count_property} = (int) $row[ $count_field ];
+			$post->wpam_thumbnail    = get_the_post_thumbnail_url( $post_id, 'medium' );
 
 			$posts[] = $post;
 		}
@@ -134,7 +194,7 @@ class WPAM_API {
 		// -------------------------
 		// FILTER HOOK
 		// -------------------------
-		return apply_filters( 'wpam_api_top_posts', $posts, $args );
+		return apply_filters( $filter_hook, $posts, $args );
 	}
 
 	/**

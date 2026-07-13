@@ -59,6 +59,13 @@ require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-widget-top-posts.php';
 
 require_once WPAM_PLUGIN_PATH . 'includes/api/class-wpam-api.php';
 
+// --- v1.2.0: Views system (Fase 1 — infraestructura) ---
+require_once WPAM_PLUGIN_PATH . 'includes/views/class-views-table.php';
+require_once WPAM_PLUGIN_PATH . 'includes/views/class-view-tracker.php';
+require_once WPAM_PLUGIN_PATH . 'includes/views/class-views.php';
+require_once WPAM_PLUGIN_PATH . 'includes/views/class-views-query.php';
+require_once WPAM_PLUGIN_PATH . 'includes/views/class-views-importer.php';
+
 /**
  * Class Plugin
  *
@@ -130,6 +137,13 @@ final class Plugin {
 		add_action( 'widgets_init', function() {
 			register_widget( Frontend\Widget_Top_Posts::class );
 		} );
+
+		// v1.2.0: Views tracking AJAX endpoint — debe ir en hooks globales
+		// porque admin-ajax.php corre con is_admin() === true, y define_frontend_hooks()
+		// corta con return temprano en ese caso.
+		$views = new Views\Views();
+		$this->loader->add_action( 'wp_ajax_wpam_track_view',        $views, 'ajax_track' );
+		$this->loader->add_action( 'wp_ajax_nopriv_wpam_track_view', $views, 'ajax_track' );
 	}
 
 	/**
@@ -189,6 +203,7 @@ final class Plugin {
 		$admin_menu_maint = new Admin\Admin_Menu();
 		$this->loader->add_action( 'admin_post_wpam_rebuild_token_map', $admin_menu_maint, 'handle_rebuild_token_map' );
 		$this->loader->add_action( 'admin_post_wpam_clear_analytics',    $admin_menu_maint, 'handle_clear_analytics' );
+		$this->loader->add_action( 'admin_post_wpam_import_post_views_counter', $admin_menu_maint, 'handle_import_post_views_counter' );
 
 		// v0.2.7: Broken link report clear actions (admin-only).
 		$admin_menu_reports = new Admin\Admin_Menu();
@@ -216,6 +231,12 @@ final class Plugin {
 		// v1.0.0: Shortcode [wpam_top_posts].
 		// Los shortcodes se registran via add_shortcode() directamente (no via Loader).
 		Frontend\Shortcode_Top_Posts::register();
+
+		// v1.2.0: Views beacon — enqueue condicional, solo en is_singular('post').
+		// Módulo independiente de Frontend_Assets: las vistas se cuentan tenga o no
+		// el post links afiliados.
+		$views = new Views\Views();
+		$this->loader->add_action( 'wp_enqueue_scripts', $views, 'maybe_enqueue_beacon' );
 
 		// El CSS del widget (wpam-top-posts-widget) se registra dentro del hook
 		// wp_enqueue_scripts en Frontend_Assets::enqueue_styles().

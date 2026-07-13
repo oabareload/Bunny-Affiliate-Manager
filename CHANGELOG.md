@@ -5,6 +5,86 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.0] — WPAM_API: WPAM_API::get_top_viewed_posts()
+
+### Added
+
+- **`WPAM_API::get_top_viewed_posts( array $args = array() ): \WP_Post[]`** — espejo exacto de `get_top_posts()`: mismos argumentos (`period`, `limit`, `post_type`, `categories_include/exclude`, `tags_include/exclude`, `authors_include/exclude`), misma validación, mismo array `$filters`, misma normalización a `WP_Post[]`. Usa `Views_Query::get_cached()` como fuente de datos y asigna `$post->wpam_view_count` (en vez de `Top_Posts_Query::get_cached()` / `$post->wpam_click_count`).
+- Nuevo filter hook `wpam_api_top_viewed_posts`, aplicado al array final de posts — análogo a `wpam_api_top_posts` pero independiente, para no mezclar ambos flujos en integraciones externas (Bunny Magazine).
+
+### Changed
+
+- **Refactor interno de `WPAM_API`**: toda la lógica antes contenida en `get_top_posts()` (validación de inputs, construcción de `$filters`, normalización a `WP_Post`) se movió a un método privado `build_top_posts_response( $args, $query_callback, $count_field, $count_property, $filter_hook )`, compartido por `get_top_posts()` y `get_top_viewed_posts()`. Ambos métodos públicos quedan como wrappers de una llamada. `$query_callback` se invoca directamente (`$query_callback( $range, $limit, $filters )`), no vía `call_user_func()`, porque `Top_Posts_Query::get_cached()` y `Views_Query::get_cached()` comparten exactamente la misma firma.
+- **Cero cambios de comportamiento en `get_top_posts()`**: misma firma, misma validación, mismo output, mismo hook `wpam_api_top_posts` — es un refactor interno, no una reescritura. Bunny Magazine no requiere ningún cambio.
+
+### Notes
+
+- No se modificó `Top_Posts_Query` ni `Views_Query` — el refactor vive enteramente dentro de `WPAM_API`.
+- No se registró ningún hook nuevo en `class-plugin.php`; `WPAM_API` no depende del sistema de hooks del plugin.
+
+---
+
+## [1.2.0] — Views Import + Dashboard: Recent Views & Top Viewed Posts
+
+### Added
+
+- **`Views_Importer`** (`includes/views/class-views-importer.php`) — migración única desde Post Views Counter (`{prefix}post_views`, `type = 0`) hacia `wpam_views`. Merge aditivo (`INSERT ... ON DUPLICATE KEY UPDATE count = count + VALUES(count)`); no destructivo con datos ya trackeados nativamente. Bloqueada por la opción `wpam_post_views_import_completed` tras la primera ejecución exitosa — no vuelve a correr ni a mostrar el botón. Detecta la tabla origen con una lectura directa (`SELECT 1 ... LIMIT 1` + `$wpdb->last_error`), sin `SHOW TABLES`. Nunca escribe en la tabla origen. Ignora posts inexistentes (con caché local de existencia por `post_id` durante la corrida). Invalida el grupo de caché `wpam` al finalizar.
+- **Herramienta de Maintenance**: nueva fila condicional "Import from Post Views Counter", visible solo si `Views_Importer::can_run()` es `true` (tabla origen presente y migración aún no ejecutada). Notice de resultado con imported/updated/omitted/segundos.
+- **`Views_Query::get_recent( int $limit = 20 )`** — filas crudas más recientes de `wpam_views` (`period DESC, id DESC`). `wpam_views` es un agregado diario, no un log de eventos: no hay timestamp exacto.
+- **Dashboard — Recent Views**: nueva sección full-width (Date / Post Title / Views), mismo diseño visual que Recent Clicks. La columna Date muestra el `period` (día), sin hora.
+- **Dashboard — Top Viewed Posts**: nueva sección full-width, mismo diseño visual que Top Posts, con el mismo comportamiento de filtro por Today/Last 7 Days/Last 30 Days/Total que las cards de Clicks. Reutiliza `Views_Query::get_cached()` como única fuente de datos.
+- **`ajax_dashboard_filter()` extendido** con un parámetro `source` (`'clicks'` default, retrocompatible; `'views'` nuevo) para servir el fragmento de Top Viewed Posts sin un segundo endpoint AJAX.
+- **`dashboard.js` refactorizado**: `initFilterGroup()` genérico reemplaza la implementación hardcodeada de un solo grupo; se invoca una vez para el grupo Clicks (existente) y una vez para el grupo Views (nuevo, con `source: 'views'`) — cero JS duplicado entre ambos.
+- **Refactor sin duplicación**: `render_top_list()` extraído de `render_top_posts_section()`, reutilizado por `render_top_posts_section()` (sin cambio de output) y por el nuevo `render_top_viewed_posts_section()`.
+
+### Notes
+
+- El importador es intencionalmente **no idempotente**: sumar en vez de tomar el máximo permite fusionar el histórico completo de Post Views Counter incluso si se solapa con días ya trackeados nativamente, a cambio de que **no puede volver a ejecutarse** sin borrar manualmente la opción `wpam_post_views_import_completed` (deliberado, para evitar duplicar counts en corridas accidentales).
+- Asunción de nombre de tabla origen: `{$wpdb->prefix}post_views` (default de Post Views Counter). Si la instalación usa un nombre distinto, `can_run()` devuelve `false` y la herramienta queda oculta sin error visible.
+- Sigue sin existir `WPAM_API::get_top_viewed_posts()` — la capa de datos (`Views_Query::get()`/`get_cached()`) ya está lista para cuando se decida implementarlo.
+
+---
+
+## [1.2.0] — Views System (Fase 1 — Infraestructura)
+
+### Added
+
+- **Tabla propia `{prefix}wpam_views`** — histórico diario de vistas por post (`post_id`, `period` YYYYMMDD, `count`). No es un contador acumulado: una fila por post y día. `UNIQUE KEY (post_id, period)` permite upsert atómico.
+- **`Views_Table::create_table()`** — creación vía `dbDelta()`, llamada desde `Activator::activate()` junto a `Clicks_Table::create_table()`.
+- **`View_Tracker::record()`** — un único `INSERT ... ON DUPLICATE KEY UPDATE count = count + 1` por vista contada. Sin SELECT previo, sin condición de carrera.
+- **`Views` (orquestador)** — punto único de elegibilidad (`is_eligible()`): solo posts (`post_type = 'post'`), publicados. Excluye páginas, CPTs, previews, feeds, admin, REST, cron y búsquedas/archivos (vía `is_singular('post')` en el enqueue). Filtro adicional de bots conocidos por user-agent en el endpoint AJAX.
+- **Beacon AJAX (`wpam_track_view`)** — `wp_ajax_wpam_track_view` + `wp_ajax_nopriv_wpam_track_view`, registrados en `define_global_hooks()`. Compatible con full-page cache: el registro ocurre vía `fetch()` en el navegador, no depende de que PHP corra en la carga de la página.
+- **`assets/js/views-beacon.js`** — fetch nativo, sin jQuery, sin lectura/escritura de cookies del lado cliente. Se encola condicionalmente solo en `is_singular('post')` vía `Views::maybe_enqueue_beacon()`.
+- **Config del beacon vía `wp_add_inline_script()`** — objeto `window.wpamViews` (`ajaxUrl`, `action`, `postId`, `nonce`) inyectado antes del script, sin `wp_localize_script()`.
+- **Deduplicación por cookie (`wpam_v`)** — cookie `HttpOnly` con lista de post_ids ya contados en el período actual, gestionada enteramente en PHP dentro de `Views::ajax_track()`. Expira a medianoche UTC, alineada con el corte de `period`.
+
+### Notes
+
+- Sin dashboard, sin API pública, sin Top Posts ni migración todavía — solo la infraestructura de registro. Estos puntos quedan para fases posteriores.
+- El `post_id` recibido por AJAX se revalida siempre server-side contra `is_eligible()`; nunca se confía en el valor del cliente.
+- Pendiente conocido: la tabla se crea en `Activator::activate()`. En instalaciones donde el plugin ya está activo, actualizar los archivos sin desactivar/reactivar no crea la tabla automáticamente — no existe todavía una rutina de upgrade por versión en el proyecto. En Local, desactivar y reactivar el plugin tras esta actualización.
+
+---
+
+## [1.2.0] — Views System (Fase 2 — Settings + Dashboard)
+
+### Added
+
+- **3 opciones nuevas en Settings** (sección "Views Tracking"): `count_admin_views` (default `false`), `count_logged_in_users` (default `true`), `count_bot_traffic` (default `false`). Mismo patrón que el resto de checkboxes de Settings.
+- **`Views::is_eligible()` absorbe las 3 reglas** como única fuente de verdad: administradores gobernados por `count_admin_views` (prioridad sobre el resto), usuarios logueados no-admin por `count_logged_in_users`, invitados sin restricción. El filtro de bots (antes suelto en `ajax_track()`) se consolidó también dentro de `is_eligible()`, gobernado por `count_bot_traffic`.
+- **`Views_Query`** (`includes/views/class-views-query.php`) — equivalente completo de `Frontend\Top_Posts_Query`, misma interfaz pública, misma filosofía de caché (grupo `wpam`, TTL 300s):
+  - `get()` / `get_cached()` — Top Viewed Posts (SUM(count) sobre `wpam_views` en vez de COUNT(*) sobre `wpam_clicks`). Preparado para que `WPAM_API::get_top_viewed_posts()` reutilice `get_cached()` sin rediseño cuando se implemente.
+  - `get_stats()` / `get_stats_cached()` — agregados por rango (today/week/month/total) para las tarjetas del Dashboard.
+  - `range_to_period_since()` reutiliza `Top_Posts_Query::range_to_since()` como fuente única de la lógica de "días atrás", adaptando el formato de salida a `period` (CHAR(8) YYYYMMDD).
+- **Dashboard**: nuevo bloque de 4 tarjetas estáticas (Views Today / Last 7 Days / Last 30 Days / Total Views), mismo estilo visual que las tarjetas de Clicks, sin comportamiento de filtro AJAX.
+
+### Notes
+
+- `apply_filters_to_ids()` y `build_cache_key()` de `Views_Query` son duplicado intencional de los de `Top_Posts_Query` (misma lógica, distinto prefijo de caché) — decisión explícita para mantener ambos módulos desacoplados entre sí más allá de `range_to_since()`.
+- Sigue sin existir Top Posts por vistas en UI, ni endpoint público — solo la capa de datos (`Views_Query::get()`/`get_cached()`) queda lista para cuando se decida construir eso.
+
+---
+
 ## [0.2.7] — 2025-08-14
 
 ### Added

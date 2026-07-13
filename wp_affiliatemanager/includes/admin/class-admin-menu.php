@@ -121,10 +121,13 @@ class Admin_Menu {
 
 		<?php
 		// v0.2.3: Analytics section.
-		$click_stats    = $this->get_click_stats();
-		$top_affiliates = $this->get_top_affiliates();
-		$top_posts      = $this->get_top_posts();
-		$recent_clicks  = $this->get_recent_clicks();
+		$click_stats       = $this->get_click_stats();
+		$view_stats        = \WP_AffiliateManager\Views\Views_Query::get_stats_cached();
+		$top_affiliates    = $this->get_top_affiliates();
+		$top_posts         = $this->get_top_posts();
+		$top_viewed_posts  = $this->get_top_viewed_posts();
+		$recent_clicks     = $this->get_recent_clicks();
+		$recent_views      = $this->get_recent_views();
 		?>
 
 		<!-- Click stat cards — v0.2.8: each card is a filter trigger -->
@@ -147,6 +150,22 @@ class Admin_Menu {
 
 		<!-- Recent clicks full width -->
 		<?php $this->render_recent_clicks_section( $recent_clicks ); ?>
+
+		<!-- View stat cards — v1.2.0: tarjetas estáticas, sin filtro AJAX -->
+		<div class="wpam-stats-grid wpam-stats-grid--views">
+			<?php $this->render_stat_card( __( 'Views Today', 'wp-affiliatemanager' ),    (string) $view_stats['today'],   '👁️' ); ?>
+			<?php $this->render_stat_card( __( 'Views Last 7 Days', 'wp-affiliatemanager' ),  (string) $view_stats['week'],  '📅' ); ?>
+			<?php $this->render_stat_card( __( 'Views Last 30 Days', 'wp-affiliatemanager' ), (string) $view_stats['month'], '🗓️' ); ?>
+			<?php $this->render_stat_card( __( 'Total Views', 'wp-affiliatemanager' ),    (string) $view_stats['total'],   '📊' ); ?>
+		</div>
+
+		<!-- Top Viewed Posts full width (v1.3.0: filtro AJAX igual que Top Posts) -->
+		<div class="wpam-filter-top-viewed-col">
+			<?php $this->render_top_viewed_posts_section( $top_viewed_posts ); ?>
+		</div>
+
+		<!-- Recent views full width -->
+		<?php $this->render_recent_views_section( $recent_views ); ?>
 
 		<!-- Maintenance card -->
 		<?php $this->render_maintenance_card(); ?>
@@ -307,6 +326,29 @@ class Admin_Menu {
 			</div>
 			<?php
 		}
+
+		if ( isset( $_GET['wpam_pvc_imported'] ) && '1' === $_GET['wpam_pvc_imported'] ) {
+			$new     = absint( $_GET['wpam_pvc_new']     ?? 0 );
+			$updated = absint( $_GET['wpam_pvc_updated'] ?? 0 );
+			$omitted = absint( $_GET['wpam_pvc_omitted'] ?? 0 );
+			$elapsed = isset( $_GET['wpam_pvc_elapsed'] ) ? (float) $_GET['wpam_pvc_elapsed'] : 0.0;
+			?>
+			<div class="notice notice-success is-dismissible" style="margin:16px 0 0;">
+				<p>
+					<?php
+					printf(
+						/* translators: 1: imported, 2: updated, 3: omitted, 4: seconds elapsed */
+						esc_html__( 'Post Views Counter import complete: %1$d imported, %2$d updated, %3$d omitted (%4$s seconds).', 'wp-affiliatemanager' ),
+						$new,
+						$updated,
+						$omitted,
+						esc_html( (string) $elapsed )
+					);
+					?>
+				</p>
+			</div>
+			<?php
+		}
 		// phpcs:enable
 		?>
 		<div class="wpam-analytics-card wpam-analytics-card--full wpam-maintenance-card">
@@ -340,6 +382,22 @@ class Admin_Menu {
 					</button>
 				</form>
 			</div>
+
+			<?php if ( \WP_AffiliateManager\Views\Views_Importer::can_run() ) : ?>
+			<div class="wpam-maintenance-row">
+				<div class="wpam-maintenance-info">
+					<strong><?php esc_html_e( 'Import from Post Views Counter', 'wp-affiliatemanager' ); ?></strong>
+					<p class="description"><?php esc_html_e( 'One-time migration: imports daily view counts (type=0) from Post Views Counter into wpam_views. Existing counts are added to, never overwritten. The source table is never modified. This can only be run once.', 'wp-affiliatemanager' ); ?></p>
+				</div>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return window.confirm('<?php echo esc_js( __( 'Import view counts from Post Views Counter? This can only be run once.', 'wp-affiliatemanager' ) ); ?>');">
+					<input type="hidden" name="action" value="wpam_import_post_views_counter" />
+					<?php wp_nonce_field( 'wpam_import_post_views_counter', 'wpam_nonce' ); ?>
+					<button type="submit" class="button button-secondary">
+						<?php esc_html_e( 'Import Views', 'wp-affiliatemanager' ); ?>
+					</button>
+				</form>
+			</div>
+			<?php endif; ?>
 		</div>
 		<?php
 	}
@@ -435,6 +493,54 @@ class Admin_Menu {
 				'page'          => 'wpam-dashboard',
 				'wpam_cleared'  => '1',
 				'wpam_deleted'  => $deleted,
+			),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	/**
+	 * Handler del action admin-post para importar desde Post Views Counter.
+	 *
+	 * Migración única: si ya se ejecutó (`Views_Importer::is_completed()`),
+	 * no vuelve a correr y redirige con un flag distinto para que el dashboard
+	 * no muestre un notice engañoso de "importado" cuando en realidad no hizo nada.
+	 *
+	 * @since1.2.0
+	 */
+	public function handle_import_post_views_counter(): void {
+		if (
+			! isset( $_POST['wpam_nonce'] ) ||
+			! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wpam_nonce'] ) ), 'wpam_import_post_views_counter' )
+		) {
+			wp_die( esc_html__( 'Security check failed.', 'wp-affiliatemanager' ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'wp-affiliatemanager' ) );
+		}
+
+		if ( ! \WP_AffiliateManager\Views\Views_Importer::can_run() ) {
+			wp_safe_redirect( add_query_arg(
+				array(
+					'page'              => 'wpam-dashboard',
+					'wpam_pvc_skipped'  => '1',
+				),
+				admin_url( 'admin.php' )
+			) );
+			exit;
+		}
+
+		$stats = \WP_AffiliateManager\Views\Views_Importer::run();
+
+		wp_safe_redirect( add_query_arg(
+			array(
+				'page'               => 'wpam-dashboard',
+				'wpam_pvc_imported'  => '1',
+				'wpam_pvc_new'       => $stats['imported'],
+				'wpam_pvc_updated'   => $stats['updated'],
+				'wpam_pvc_omitted'   => $stats['omitted'],
+				'wpam_pvc_elapsed'   => $stats['elapsed_seconds'],
 			),
 			admin_url( 'admin.php' )
 		) );
@@ -579,6 +685,64 @@ class Admin_Menu {
 		return is_array( $rows ) ? $rows : array();
 	}
 
+	/**
+	 * Top posts por número de vistas.
+	 *
+	 * Delega la query a Views\Views_Query (fuente única de verdad, mismo rol
+	 * que Top_Posts_Query para clicks). Añade thumb_url y edit_url que solo
+	 * necesita el dashboard, igual que get_top_posts().
+	 *
+	 * @since 1.2.0
+	 * @param  string $range today|week|month|total
+	 * @return array[]
+	 */
+	private function get_top_viewed_posts( string $range = 'total' ): array {
+		$rows = \WP_AffiliateManager\Views\Views_Query::get_cached( $range, 10 );
+
+		foreach ( $rows as &$row ) {
+			$thumb_id         = get_post_thumbnail_id( $row['id'] );
+			$row['thumb_url'] = $thumb_id ? (string) wp_get_attachment_image_url( $thumb_id, 'thumbnail' ) : '';
+			$row['edit_url']  = (string) get_edit_post_link( $row['id'], 'raw' );
+		}
+		unset( $row );
+
+		return $rows;
+	}
+
+	/**
+	 * Últimas filas de wpam_views (agregado diario, no evento).
+	 *
+	 * Delega la query cruda a Views\Views_Query::get_recent() y añade el
+	 * título/edit_url del post, igual que get_top_viewed_posts().
+	 *
+	 * @since 1.2.0
+	 * @param  int $limit Número máximo de filas. Default 20.
+	 * @return array[]
+	 */
+	private function get_recent_views( int $limit = 20 ): array {
+		$rows = \WP_AffiliateManager\Views\Views_Query::get_recent( $limit );
+
+		$result = array();
+		foreach ( $rows as $row ) {
+			$post_id = (int) $row['post_id'];
+			$post    = get_post( $post_id );
+
+			if ( ! $post instanceof \WP_Post ) {
+				continue;
+			}
+
+			$result[] = array(
+				'post_id'   => $post_id,
+				'period'    => $row['period'],
+				'count'     => (int) $row['count'],
+				'title'     => $post->post_title,
+				'edit_url'  => (string) get_edit_post_link( $post_id, 'raw' ),
+			);
+		}
+
+		return $result;
+	}
+
 	// -------------------------------------------------------------------------
 	// v0.2.3 — Analytics: render helpers
 	// -------------------------------------------------------------------------
@@ -630,23 +794,62 @@ class Admin_Menu {
 			<?php if ( empty( $posts ) ) : ?>
 				<p class="wpam-analytics-empty"><?php esc_html_e( 'No clicks recorded yet.', 'wp-affiliatemanager' ); ?></p>
 			<?php else : ?>
-				<ul class="wpam-top-list">
-				<?php foreach ( $posts as $post ) : ?>
-					<li class="wpam-top-item">
-						<div class="wpam-top-item-lead">
-							<?php if ( $post['thumb_url'] ) : ?>
-								<img class="wpam-top-thumb" src="<?php echo esc_url( $post['thumb_url'] ); ?>" alt="" />
-							<?php else : ?>
-								<span class="wpam-top-thumb-placeholder">📄</span>
-							<?php endif; ?>
-							<a class="wpam-top-name" href="<?php echo esc_url( $post['edit_url'] ); ?>"><?php echo esc_html( $post['title'] ); ?></a>
-						</div>
-						<span class="wpam-top-count"><?php echo esc_html( number_format_i18n( $post['click_count'] ) ); ?></span>
-					</li>
-				<?php endforeach; ?>
-				</ul>
+				<?php $this->render_top_list( $posts, 'click_count' ); ?>
 			<?php endif; ?>
 		</div>
+		<?php
+	}
+
+	/**
+	 * Top Viewed Posts — mismo diseño visual que Top Posts.
+	 *
+	 * @since 1.2.0
+	 * @param  array[] $posts Ver get_top_viewed_posts().
+	 * @return void
+	 */
+	private function render_top_viewed_posts_section( array $posts ): void {
+		?>
+		<div class="wpam-analytics-card wpam-analytics-card--full">
+			<h3 class="wpam-analytics-card-title">
+				<span>👁️</span> <?php esc_html_e( 'Top Viewed Posts', 'wp-affiliatemanager' ); ?>
+			</h3>
+			<?php if ( empty( $posts ) ) : ?>
+				<p class="wpam-analytics-empty"><?php esc_html_e( 'No views recorded yet.', 'wp-affiliatemanager' ); ?></p>
+			<?php else : ?>
+				<?php $this->render_top_list( $posts, 'view_count' ); ?>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Lista `<ul class="wpam-top-list">` compartida entre Top Posts (clicks) y
+	 * Top Viewed Posts (views). Extraído de render_top_posts_section() para no
+	 * duplicar el markup entre ambos — mismo output exacto que antes para
+	 * Top Posts, solo cambia qué campo de conteo se usa.
+	 *
+	 * @since 1.2.0
+	 * @param  array[] $items       Cada elemento debe tener: title, edit_url, thumb_url y $count_field.
+	 * @param  string  $count_field Nombre del campo de conteo ('click_count' | 'view_count').
+	 * @return void
+	 */
+	private function render_top_list( array $items, string $count_field ): void {
+		?>
+		<ul class="wpam-top-list">
+		<?php foreach ( $items as $item ) : ?>
+			<li class="wpam-top-item">
+				<div class="wpam-top-item-lead">
+					<?php if ( $item['thumb_url'] ) : ?>
+						<img class="wpam-top-thumb" src="<?php echo esc_url( $item['thumb_url'] ); ?>" alt="" />
+					<?php else : ?>
+						<span class="wpam-top-thumb-placeholder">📄</span>
+					<?php endif; ?>
+					<a class="wpam-top-name" href="<?php echo esc_url( $item['edit_url'] ); ?>"><?php echo esc_html( $item['title'] ); ?></a>
+				</div>
+				<span class="wpam-top-count"><?php echo esc_html( number_format_i18n( $item[ $count_field ] ) ); ?></span>
+			</li>
+		<?php endforeach; ?>
+		</ul>
 		<?php
 	}
 
@@ -693,9 +896,49 @@ class Admin_Menu {
 		<?php
 	}
 
-	// -------------------------------------------------------------------------
-	// Helpers de datos existentes
-	// -------------------------------------------------------------------------
+	/**
+	 * Recent Views — mismo diseño visual que Recent Clicks, pero con
+	 * granularidad diaria: la columna Date muestra el `period` (día), sin
+	 * hora, porque wpam_views no registra eventos individuales.
+	 *
+	 * @since 1.2.0
+	 * @param  array[] $views Ver get_recent_views().
+	 * @return void
+	 */
+	private function render_recent_views_section( array $views ): void {
+		?>
+		<div class="wpam-analytics-card wpam-analytics-card--full">
+			<h3 class="wpam-analytics-card-title">
+				<span>👁️</span> <?php esc_html_e( 'Recent Views', 'wp-affiliatemanager' ); ?>
+				<span class="wpam-analytics-card-sub"><?php esc_html_e( 'Last 20', 'wp-affiliatemanager' ); ?></span>
+			</h3>
+			<?php if ( empty( $views ) ) : ?>
+				<p class="wpam-analytics-empty"><?php esc_html_e( 'No views recorded yet.', 'wp-affiliatemanager' ); ?></p>
+			<?php else : ?>
+				<div class="wpam-table-wrap">
+					<table class="wpam-table wpam-recent-views-table">
+						<thead><tr>
+							<th><?php esc_html_e( 'Date', 'wp-affiliatemanager' ); ?></th>
+							<th><?php esc_html_e( 'Post Title', 'wp-affiliatemanager' ); ?></th>
+							<th><?php esc_html_e( 'Views', 'wp-affiliatemanager' ); ?></th>
+						</tr></thead>
+						<tbody>
+						<?php foreach ( $views as $view ) :
+							$date_display = mysql2date( get_option( 'date_format' ), $view['period'] . '000000' );
+						?>
+							<tr>
+								<td class="wpam-recent-ts"><?php echo esc_html( $date_display ); ?></td>
+								<td><?php if ( $view['edit_url'] ) : ?><a href="<?php echo esc_url( $view['edit_url'] ); ?>"><?php echo esc_html( $view['title'] ); ?></a><?php else : ?><?php echo esc_html( $view['title'] ); ?><?php endif; ?></td>
+								<td><?php echo esc_html( number_format_i18n( $view['count'] ) ); ?></td>
+							</tr>
+						<?php endforeach; ?>
+						</tbody>
+					</table>
+				</div>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
 
 	/**
 	 * Cuenta los posts publicados que tienen affiliate links asignados via _wpam_links.
@@ -941,6 +1184,21 @@ class Admin_Menu {
 		$range   = sanitize_text_field( wp_unslash( $_POST['range'] ?? 'total' ) );
 		if ( ! in_array( $range, $allowed, true ) ) {
 			$range = 'total';
+		}
+
+		// v1.3.0: grupo de filtro de Views — responde solo posts_html (Top Viewed Posts).
+		$source = sanitize_text_field( wp_unslash( $_POST['source'] ?? 'clicks' ) );
+
+		if ( 'views' === $source ) {
+			$viewed_posts = $this->get_top_viewed_posts( $range );
+
+			ob_start();
+			$this->render_top_viewed_posts_section( $viewed_posts );
+			$viewed_posts_html = ob_get_clean();
+
+			wp_send_json_success( array(
+				'posts_html' => $viewed_posts_html,
+			) );
 		}
 
 		$affiliates = $this->get_top_affiliates( $range );

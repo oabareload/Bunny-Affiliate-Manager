@@ -118,6 +118,40 @@ class Settings {
 		);
 
 		// ---------------------------------------------------------------------------
+		// Sección: Views Tracking — v1.2.0
+		// ---------------------------------------------------------------------------
+		add_settings_section(
+			'wpam_section_views',
+			__( 'Views Tracking', 'wp-affiliatemanager' ),
+			array( $this, 'render_section_views' ),
+			self::PAGE_SLUG
+		);
+
+		add_settings_field(
+			'wpam_field_count_admin_views',
+			__( 'Count Administrator Views', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_count_admin_views' ),
+			self::PAGE_SLUG,
+			'wpam_section_views'
+		);
+
+		add_settings_field(
+			'wpam_field_count_logged_in_users',
+			__( 'Count Logged-in Users', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_count_logged_in_users' ),
+			self::PAGE_SLUG,
+			'wpam_section_views'
+		);
+
+		add_settings_field(
+			'wpam_field_count_bot_traffic',
+			__( 'Count Bot Traffic', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_count_bot_traffic' ),
+			self::PAGE_SLUG,
+			'wpam_section_views'
+		);
+
+		// ---------------------------------------------------------------------------
 		// Sección: Redirect / Interstitial — v0.2.0-alpha2
 		// ---------------------------------------------------------------------------
 		add_settings_section(
@@ -314,6 +348,16 @@ class Settings {
 	 */
 	public function render_section_redirect(): void {
 		echo '<p>' . esc_html__( 'Configura la página interstitial que aparece antes de redirigir al sitio externo.', 'wp-affiliatemanager' ) . '</p>';
+	}
+
+	/**
+	 * Renderiza la descripción de la sección Views Tracking.
+	 *
+	 * @since  1.2.0
+	 * @return void
+	 */
+	public function render_section_views(): void {
+		echo '<p>' . esc_html__( 'Controla qué tipo de visitantes cuentan para las estadísticas de vistas de posts.', 'wp-affiliatemanager' ) . '</p>';
 	}
 
 	/**
@@ -785,6 +829,75 @@ class Settings {
 	}
 
 	/**
+	 * Renderiza el campo 'count_admin_views'.
+	 *
+	 * @since  1.2.0
+	 * @return void
+	 */
+	public function render_field_count_admin_views(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['views']['count_admin_views'] ?? false;
+		?>
+		<label>
+			<input
+				type="checkbox"
+				name="<?php echo esc_attr( self::OPTION_NAME . '[views][count_admin_views]' ); ?>"
+				value="1"
+				<?php checked( (bool) $value ); ?>
+			/>
+			<?php esc_html_e( 'Count page views made by administrators.', 'wp-affiliatemanager' ); ?>
+		</label>
+		<p class="description"><?php esc_html_e( 'When disabled, visits from users who can manage options are not recorded in wpam_views.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'count_logged_in_users'.
+	 *
+	 * @since  1.2.0
+	 * @return void
+	 */
+	public function render_field_count_logged_in_users(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['views']['count_logged_in_users'] ?? true;
+		?>
+		<label>
+			<input
+				type="checkbox"
+				name="<?php echo esc_attr( self::OPTION_NAME . '[views][count_logged_in_users]' ); ?>"
+				value="1"
+				<?php checked( (bool) $value ); ?>
+			/>
+			<?php esc_html_e( 'Count page views made by logged-in (non-administrator) users.', 'wp-affiliatemanager' ); ?>
+		</label>
+		<p class="description"><?php esc_html_e( 'Administrators are governed separately by "Count Administrator Views" above.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'count_bot_traffic'.
+	 *
+	 * @since  1.2.0
+	 * @return void
+	 */
+	public function render_field_count_bot_traffic(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['views']['count_bot_traffic'] ?? false;
+		?>
+		<label>
+			<input
+				type="checkbox"
+				name="<?php echo esc_attr( self::OPTION_NAME . '[views][count_bot_traffic]' ); ?>"
+				value="1"
+				<?php checked( (bool) $value ); ?>
+			/>
+			<?php esc_html_e( 'Count requests identified as bots (simple user-agent heuristic).', 'wp-affiliatemanager' ); ?>
+		</label>
+		<p class="description"><?php esc_html_e( 'Recommended off. Even when disabled, most bots never trigger the beacon since they do not execute JavaScript.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
 	 * Renderiza el campo 'link_style'.
 	 *
 	 * @since  4.0.0
@@ -983,6 +1096,11 @@ class Settings {
 		$sanitized['general']['nofollow'] = ! empty( $input['general']['nofollow'] );
 		$sanitized['general']['exclude_admins_from_analytics'] = ! empty( $input['general']['exclude_admins_from_analytics'] );
 
+		// Views Tracking — v1.2.0.
+		$sanitized['views']['count_admin_views']     = ! empty( $input['views']['count_admin_views'] );
+		$sanitized['views']['count_logged_in_users'] = ! empty( $input['views']['count_logged_in_users'] );
+		$sanitized['views']['count_bot_traffic']     = ! empty( $input['views']['count_bot_traffic'] );
+
 		// Redirect / Interstitial — v0.2.0-alpha2.
 		$sanitized['redirect']['enable_interstitial'] = ! empty( $input['redirect']['enable_interstitial'] );
 		$sanitized['redirect']['show_related_post_excerpt'] = ! empty( $input['redirect']['show_related_post_excerpt'] );
@@ -1107,6 +1225,11 @@ class Settings {
 				'nofollow'     => true,
 				'track_clicks' => false,
 				'exclude_admins_from_analytics' => true,
+			),
+			'views' => array(
+				'count_admin_views'     => false,
+				'count_logged_in_users' => true,
+				'count_bot_traffic'     => false,
 			),
 			'redirect' => array(
 				'enable_interstitial'          => true,

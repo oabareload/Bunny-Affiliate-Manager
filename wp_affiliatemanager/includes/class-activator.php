@@ -51,6 +51,9 @@ class Activator {
 		// v0.2.1: crear tabla SQL de clicks.
 		Redirect\Clicks_Table::create_table();
 
+		// v1.2.0: crear tabla SQL de vistas.
+		Views\Views_Table::create_table();
+
 		// Limpiar rewrite rules.
 		flush_rewrite_rules();
 	}
