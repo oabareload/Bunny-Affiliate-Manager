@@ -92,21 +92,7 @@ class Views {
 	 * @return bool
 	 */
 	public function is_eligible( int $post_id ): bool {
-		if ( $post_id <= 0 ) {
-			return false;
-		}
-
-		$post = get_post( $post_id );
-
-		if ( ! $post instanceof \WP_Post ) {
-			return false;
-		}
-
-		if ( 'post' !== $post->post_type ) {
-			return false;
-		}
-
-		if ( 'publish' !== $post->post_status ) {
+		if ( ! self::is_valid_post( $post_id ) ) {
 			return false;
 		}
 
@@ -131,6 +117,43 @@ class Views {
 		}
 
 		// Invitados: sin restricción por usuario.
+		return true;
+	}
+
+	/**
+	 * Determina si un post_id corresponde a contenido válido y trackeable:
+	 * existe, es post_type='post', y está publicado.
+	 *
+	 * Extraído de is_eligible() como pieza reutilizable independiente de las
+	 * reglas de Settings (count_admin_views/count_logged_in_users/count_bot_traffic).
+	 * is_eligible() lo usa como primer filtro; otros consumidores del módulo
+	 * Views (como Recently_Viewed) lo usan directamente cuando necesitan saber
+	 * "¿este post_id es contenido real y publicado?" sin acoplarse a las reglas
+	 * específicas de estadísticas.
+	 *
+	 * @since  1.3.0
+	 * @param  int $post_id ID del post a validar.
+	 * @return bool
+	 */
+	public static function is_valid_post( int $post_id ): bool {
+		if ( $post_id <= 0 ) {
+			return false;
+		}
+
+		$post = get_post( $post_id );
+
+		if ( ! $post instanceof \WP_Post ) {
+			return false;
+		}
+
+		if ( 'post' !== $post->post_type ) {
+			return false;
+		}
+
+		if ( 'publish' !== $post->post_status ) {
+			return false;
+		}
+
 		return true;
 	}
 
@@ -241,6 +264,12 @@ class Views {
 
 		$this->tracker->record( $post_id );
 		$this->mark_viewed_today( $post_id );
+
+		// v1.3.0: registrar también en el historial de Recently Viewed (cookie
+		// independiente, propio ciclo de vida). No forma parte de is_eligible():
+		// Recently_Viewed::track() usa Views::is_valid_post() internamente, sin
+		// las reglas de Settings de estadísticas.
+		Recently_Viewed::track( $post_id );
 
 		wp_send_json_success( array( 'counted' => true ) );
 	}

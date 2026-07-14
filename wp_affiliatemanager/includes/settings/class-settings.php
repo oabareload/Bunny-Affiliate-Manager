@@ -152,6 +152,48 @@ class Settings {
 		);
 
 		// ---------------------------------------------------------------------------
+		// Sección: Recently Viewed Posts — v1.3.0
+		// ---------------------------------------------------------------------------
+		add_settings_section(
+			'wpam_section_recently_viewed',
+			__( 'Recently Viewed Posts', 'wp-affiliatemanager' ),
+			array( $this, 'render_section_recently_viewed' ),
+			self::PAGE_SLUG
+		);
+
+		add_settings_field(
+			'wpam_field_rv_enabled',
+			__( 'Enable Recently Viewed', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_rv_enabled' ),
+			self::PAGE_SLUG,
+			'wpam_section_recently_viewed'
+		);
+
+		add_settings_field(
+			'wpam_field_rv_auto_insert',
+			__( 'Auto-insert After Content', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_rv_auto_insert' ),
+			self::PAGE_SLUG,
+			'wpam_section_recently_viewed'
+		);
+
+		add_settings_field(
+			'wpam_field_rv_count',
+			__( 'Number of Posts', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_rv_count' ),
+			self::PAGE_SLUG,
+			'wpam_section_recently_viewed'
+		);
+
+		add_settings_field(
+			'wpam_field_rv_title',
+			__( 'Block Title', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_rv_title' ),
+			self::PAGE_SLUG,
+			'wpam_section_recently_viewed'
+		);
+
+		// ---------------------------------------------------------------------------
 		// Sección: Redirect / Interstitial — v0.2.0-alpha2
 		// ---------------------------------------------------------------------------
 		add_settings_section(
@@ -358,6 +400,16 @@ class Settings {
 	 */
 	public function render_section_views(): void {
 		echo '<p>' . esc_html__( 'Controla qué tipo de visitantes cuentan para las estadísticas de vistas de posts.', 'wp-affiliatemanager' ) . '</p>';
+	}
+
+	/**
+	 * Renderiza la descripción de la sección Recently Viewed Posts.
+	 *
+	 * @since  1.3.0
+	 * @return void
+	 */
+	public function render_section_recently_viewed(): void {
+		echo '<p>' . esc_html__( 'Muestra un bloque con los últimos posts vistos por cada visitante, basado en cookie (sin base de datos).', 'wp-affiliatemanager' ) . '</p>';
 	}
 
 	/**
@@ -898,6 +950,95 @@ class Settings {
 	}
 
 	/**
+	 * Renderiza el campo 'recently_viewed.enabled'.
+	 *
+	 * @since  1.3.0
+	 * @return void
+	 */
+	public function render_field_rv_enabled(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['recently_viewed']['enabled'] ?? false;
+		?>
+		<label>
+			<input
+				type="checkbox"
+				name="<?php echo esc_attr( self::OPTION_NAME . '[recently_viewed][enabled]' ); ?>"
+				value="1"
+				<?php checked( (bool) $value ); ?>
+			/>
+			<?php esc_html_e( 'Enable the Recently Viewed Posts feature.', 'wp-affiliatemanager' ); ?>
+		</label>
+		<p class="description"><?php esc_html_e( 'When disabled, no history cookie is set for any visitor.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'recently_viewed.auto_insert'.
+	 *
+	 * @since  1.3.0
+	 * @return void
+	 */
+	public function render_field_rv_auto_insert(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['recently_viewed']['auto_insert'] ?? true;
+		?>
+		<label>
+			<input
+				type="checkbox"
+				name="<?php echo esc_attr( self::OPTION_NAME . '[recently_viewed][auto_insert]' ); ?>"
+				value="1"
+				<?php checked( (bool) $value ); ?>
+			/>
+			<?php esc_html_e( 'Automatically insert the block at the end of post content.', 'wp-affiliatemanager' ); ?>
+		</label>
+		<p class="description"><?php esc_html_e( 'Only applies when "Enable Recently Viewed" is also on.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'recently_viewed.count'.
+	 *
+	 * @since  1.3.0
+	 * @return void
+	 */
+	public function render_field_rv_count(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = absint( $options['recently_viewed']['count'] ?? 5 );
+		?>
+		<input
+			type="number"
+			name="<?php echo esc_attr( self::OPTION_NAME . '[recently_viewed][count]' ); ?>"
+			value="<?php echo esc_attr( (string) $value ); ?>"
+			min="1"
+			max="20"
+			class="small-text"
+		/>
+		<p class="description"><?php esc_html_e( 'How many posts to show in the block (1–20).', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'recently_viewed.title'.
+	 *
+	 * @since  1.3.0
+	 * @return void
+	 */
+	public function render_field_rv_title(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['recently_viewed']['title'] ?? __( 'Recently Viewed', 'wp-affiliatemanager' );
+		?>
+		<input
+			type="text"
+			name="<?php echo esc_attr( self::OPTION_NAME . '[recently_viewed][title]' ); ?>"
+			value="<?php echo esc_attr( $value ); ?>"
+			class="regular-text"
+			placeholder="<?php esc_attr_e( 'Recently Viewed', 'wp-affiliatemanager' ); ?>"
+		/>
+		<p class="description"><?php esc_html_e( 'Heading shown above the block.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
 	 * Renderiza el campo 'link_style'.
 	 *
 	 * @since  4.0.0
@@ -1101,6 +1242,18 @@ class Settings {
 		$sanitized['views']['count_logged_in_users'] = ! empty( $input['views']['count_logged_in_users'] );
 		$sanitized['views']['count_bot_traffic']     = ! empty( $input['views']['count_bot_traffic'] );
 
+		// Recently Viewed Posts — v1.3.0.
+		$sanitized['recently_viewed']['enabled']     = ! empty( $input['recently_viewed']['enabled'] );
+		$sanitized['recently_viewed']['auto_insert'] = ! empty( $input['recently_viewed']['auto_insert'] );
+
+		$rv_count = absint( $input['recently_viewed']['count'] ?? 5 );
+		$sanitized['recently_viewed']['count'] = max( 1, min( 20, $rv_count ) );
+
+		$rv_title = sanitize_text_field( $input['recently_viewed']['title'] ?? '' );
+		$sanitized['recently_viewed']['title'] = '' !== $rv_title
+			? $rv_title
+			: __( 'Recently Viewed', 'wp-affiliatemanager' );
+
 		// Redirect / Interstitial — v0.2.0-alpha2.
 		$sanitized['redirect']['enable_interstitial'] = ! empty( $input['redirect']['enable_interstitial'] );
 		$sanitized['redirect']['show_related_post_excerpt'] = ! empty( $input['redirect']['show_related_post_excerpt'] );
@@ -1230,6 +1383,12 @@ class Settings {
 				'count_admin_views'     => false,
 				'count_logged_in_users' => true,
 				'count_bot_traffic'     => false,
+			),
+			'recently_viewed' => array(
+				'enabled'     => false,
+				'auto_insert' => true,
+				'count'       => 5,
+				'title'       => 'Recently Viewed',
 			),
 			'redirect' => array(
 				'enable_interstitial'          => true,

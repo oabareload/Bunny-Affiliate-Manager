@@ -66,6 +66,9 @@ require_once WPAM_PLUGIN_PATH . 'includes/views/class-views.php';
 require_once WPAM_PLUGIN_PATH . 'includes/views/class-views-query.php';
 require_once WPAM_PLUGIN_PATH . 'includes/views/class-views-importer.php';
 
+// --- v1.3.0: Recently Viewed Posts (reutiliza el pipeline de tracking de Views) ---
+require_once WPAM_PLUGIN_PATH . 'includes/views/class-recently-viewed.php';
+
 /**
  * Class Plugin
  *
@@ -237,6 +240,13 @@ final class Plugin {
 		// el post links afiliados.
 		$views = new Views\Views();
 		$this->loader->add_action( 'wp_enqueue_scripts', $views, 'maybe_enqueue_beacon' );
+
+		// v1.3.0: Recently Viewed — filtro the_content, prioridad 21 (un paso
+		// después del bloque de affiliate links en 20). La condición de Settings
+		// (enabled/auto_insert) se evalúa dentro del propio callback, por eso se
+		// registra aquí directamente y no de forma diferida como Render_Engine.
+		$recently_viewed = new Views\Recently_Viewed();
+		$this->loader->add_filter( 'the_content', $recently_viewed, 'inject_after_content', 21 );
 
 		// El CSS del widget (wpam-top-posts-widget) se registra dentro del hook
 		// wp_enqueue_scripts en Frontend_Assets::enqueue_styles().

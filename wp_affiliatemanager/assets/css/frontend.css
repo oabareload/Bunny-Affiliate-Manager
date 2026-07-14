@@ -27,7 +27,7 @@
 	--wpam-color-btn-text: #ffffff;
 	--wpam-color-btn-hover:#5538e0;
 	--wpam-radius:         8px;
-	--wpam-gap:            12px;
+	--wpam-gap:            10px;
 	--wpam-font-size:      0.9rem;
 }
 
@@ -216,4 +216,92 @@
 		flex: 1 1 100%;
 		max-width: 100%;
 	}
+}
+
+/* ---------------------------------------------------------------------------
+   Recently Viewed — v1.3.0
+   Inspirado visualmente en Contextual Related Posts (título + lista de
+   tarjetas responsive con imagen destacada, distribución horizontal).
+   Namespace propio (wpam-rv-*): sin clases ni CSS de CRP.
+   Reutiliza las variables --wpam-radius / --wpam-gap / --wpam-color-*
+   definidas más arriba en este mismo archivo.
+   --------------------------------------------------------------------------- */
+.wpam-recently-viewed {
+	--wpam-rv-shadow:       0 2px 8px rgba(0, 0, 0, 0.08);
+	--wpam-rv-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.12);
+	width: 100%;
+	margin: 2rem 0;
+	clear: both;
+}
+
+.wpam-rv-title {
+	margin: 0 0 1rem;
+	color: var(--wpam-color-text);
+}
+
+.wpam-recently-viewed .wpam-rv-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--wpam-gap);
+	padding: 0;
+	margin: 0;
+	list-style: none;
+	font-size: 0.9em;
+}
+
+.wpam-recently-viewed .wpam-rv-list li {
+	flex: 0 1 227px;
+	box-sizing: border-box;
+	box-shadow: var(--wpam-rv-shadow);
+	overflow: hidden;
+	background: var(--wpam-color-bg);
+	text-align: center;
+	transition: box-shadow 0.2s ease;
+}
+
+.wpam-recently-viewed .wpam-rv-list li:hover {
+	box-shadow: var(--wpam-rv-shadow-hover);
+}
+
+.wpam-rv-link {
+	display: block;
+	text-decoration: none !important;
+	border: 0;
+	box-shadow: none;
+}
+
+.wpam-recently-viewed figure {
+	margin: 0 !important;
+}
+
+.wpam-recently-viewed .wpam-rv-list li img {
+	width: 100%;
+	height: auto;
+	display: block;
+	border-radius: 0 !important;
+	margin: 0 auto;
+	object-fit: cover;
+}
+
+@media ( prefers-reduced-motion: reduce ) {
+	.wpam-recently-viewed .wpam-rv-list li {
+		transition: none;
+	}
+}
+
+@media (min-width: 1200px) {
+    .wpam-recently-viewed .wpam-rv-list {
+        column-count: 4;
+    }
+}
+
+@media (min-width: 900px) {
+    .wpam-recently-viewed .wpam-rv-list {
+        column-count: 3;
+    }
+}
+@media (min-width: 700px) {
+    .wpam-recently-viewed .wpam-rv-list {
+        column-count: 2;
+    }
 }
