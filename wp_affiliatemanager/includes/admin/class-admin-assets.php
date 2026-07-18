@@ -23,8 +23,10 @@ class Admin_Assets {
 
 	private array $plugin_screens = array(
 		'toplevel_page_wpam-dashboard',
+		'bunny-affiliates_page_wpam-analytics',
 		'bunny-affiliates_page_wpam-affiliates',
 		'bunny-affiliates_page_wpam-post-affiliates',
+		'bunny-affiliates_page_wpam-broken-reports',
 		'bunny-affiliates_page_wpam-settings',
 	);
 
@@ -117,22 +119,22 @@ class Admin_Assets {
 				)
 			);
 
-			// v0.2.8: Dashboard analytics filter JS.
-			if ( 'toplevel_page_wpam-dashboard' === $hook_suffix ) {
+			// v1.4.0: Analytics filter JS (reemplaza a dashboard.js — el Dashboard ya no filtra nada por AJAX).
+			if ( 'bunny-affiliates_page_wpam-analytics' === $hook_suffix ) {
 				wp_enqueue_script(
-					'wpam-dashboard',
-					WPAM_PLUGIN_URL . 'assets/js/dashboard.js',
+					'wpam-analytics',
+					WPAM_PLUGIN_URL . 'assets/js/analytics.js',
 					array( 'jquery' ),
 					$this->version,
 					true
 				);
 
 				wp_localize_script(
-					'wpam-dashboard',
-					'wpamDashboard',
+					'wpam-analytics',
+					'wpamAnalytics',
 					array(
 						'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-						'nonce'   => wp_create_nonce( 'wpam_dashboard_filter' ),
+						'nonce'   => wp_create_nonce( 'wpam_analytics_filter' ),
 						'i18n'    => array(
 							'loading' => __( 'Loading...', 'wp-affiliatemanager' ),
 							'error'   => __( 'Error loading data.', 'wp-affiliatemanager' ),

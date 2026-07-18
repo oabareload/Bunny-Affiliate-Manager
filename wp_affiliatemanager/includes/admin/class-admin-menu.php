@@ -2,14 +2,24 @@
 /**
  * Módulo de menú de administración.
  *
+ * Desde v1.4.0: solo posee Dashboard, Settings y Broken Reports. Toda la
+ * analítica (Score/Clicks/Views con tabs) vive en Analytics_Screen. Los
+ * datos siempre se obtienen de las Query classes (Top_Posts_Query,
+ * Views_Query, Score_Query) y el markup compartido de renderiza vía
+ * Analytics_Renderer — esta clase no vuelve a tener lógica de datos ni de
+ * render de analítica propia.
+ *
  * @package WP_AffiliateManager\Admin
- * @since   1.0.0 (actualizado en 2.0.0)
+ * @since   1.0.0 (actualizado en 2.0.0, 1.4.0)
  */
 
 namespace WP_AffiliateManager\Admin;
 
 use WP_AffiliateManager\Affiliates\Repository;
 use WP_AffiliateManager\Affiliates\CPT;
+use WP_AffiliateManager\Analytics\Score_Query;
+use WP_AffiliateManager\Frontend\Top_Posts_Query;
+use WP_AffiliateManager\Views\Views_Query;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -43,6 +53,15 @@ class Admin_Menu {
 
 		add_submenu_page(
 			self::PARENT_SLUG,
+			__( 'Analytics — Bunny Affiliate Manager', 'wp-affiliatemanager' ),
+			__( 'Analytics', 'wp-affiliatemanager' ),
+			self::CAPABILITY,
+			'wpam-analytics',
+			array( $this, 'render_analytics_page' )
+		);
+
+		add_submenu_page(
+			self::PARENT_SLUG,
 			__( 'Affiliates — Bunny Affiliate Manager', 'wp-affiliatemanager' ),
 			__( 'Affiliates', 'wp-affiliatemanager' ),
 			self::CAPABILITY,
@@ -61,6 +80,15 @@ class Admin_Menu {
 
 		add_submenu_page(
 			self::PARENT_SLUG,
+			__( 'Broken Reports — Bunny Affiliate Manager', 'wp-affiliatemanager' ),
+			__( 'Broken Reports', 'wp-affiliatemanager' ),
+			self::CAPABILITY,
+			'wpam-broken-reports',
+			array( $this, 'render_broken_reports_page' )
+		);
+
+		add_submenu_page(
+			self::PARENT_SLUG,
 			__( 'Settings — Bunny Affiliate Manager', 'wp-affiliatemanager' ),
 			__( 'Settings', 'wp-affiliatemanager' ),
 			self::CAPABILITY,
@@ -70,19 +98,41 @@ class Admin_Menu {
 	}
 
 	// -------------------------------------------------------------------------
-	// Dashboard
+	// Dashboard — resumen ejecutivo (v1.4.0)
 	// -------------------------------------------------------------------------
 
+	/**
+	 * Dashboard = resumen ejecutivo del plugin.
+	 *
+	 * Solo: totales, última actividad, Top 10 por Score y accesos rápidos.
+	 * Nada de esto ejecuta filtros AJAX ni queries por rango — para eso
+	 * está Analytics. Todos los datos vienen exclusivamente de
+	 * Top_Posts_Query / Views_Query / Score_Query; el markup se delega a
+	 * Analytics_Renderer donde corresponde.
+	 *
+	 * @since 1.4.0
+	 */
 	public function render_dashboard_page(): void {
 		if ( ! current_user_can( self::CAPABILITY ) ) {
 			wp_die( esc_html__( 'No tienes permisos para acceder a esta página.', 'wp-affiliatemanager' ) );
 		}
 
-		// Obtener contadores reales de la DB.
 		$repo        = new Repository();
 		$total       = $repo->count();
 		$active      = $repo->count( true );
 		$posts_count = $this->get_posts_with_affiliates_count();
+
+		// Resumen — solo totales (rango 'total'), sin AJAX.
+		$click_totals = Top_Posts_Query::get_stats_cached();
+		$view_totals  = Views_Query::get_stats_cached();
+		$score_totals = Score_Query::get_stats_cached();
+
+		// Actividad reciente — mismos datos crudos que usará Analytics.
+		$recent_clicks = Top_Posts_Query::get_recent( 20 );
+		$recent_views  = Views_Query::get_recent( 20 );
+
+		// Top 10 general — mismo servicio Score_Query que usará el tab Score de Analytics.
+		$top_scored = Score_Query::get_cached( 'total', 10 );
 
 		$this->render_admin_header( __( 'Dashboard', 'wp-affiliatemanager' ) );
 		?>
@@ -97,84 +147,65 @@ class Admin_Menu {
 			</div>
 
 			<div class="wpam-stats-grid">
-				<?php $this->render_stat_card( __( 'Total Affiliates', 'wp-affiliatemanager' ), (string) $total, '📦' ); ?>
-				<?php $this->render_stat_card( __( 'Active Affiliates', 'wp-affiliatemanager' ), (string) $active, '✅' ); ?>
-				<?php $this->render_stat_card( __( 'Posts with Affiliates', 'wp-affiliatemanager' ), (string) $posts_count, '📝' ); ?>
+				<?php Analytics_Renderer::render_stat_card( __( 'Total Affiliates', 'wp-affiliatemanager' ), (string) $total, '📦' ); ?>
+				<?php Analytics_Renderer::render_stat_card( __( 'Active Affiliates', 'wp-affiliatemanager' ), (string) $active, '✅' ); ?>
+				<?php Analytics_Renderer::render_stat_card( __( 'Posts with Affiliates', 'wp-affiliatemanager' ), (string) $posts_count, '📝' ); ?>
 			</div>
 
-			<?php if ( $total > 0 ) : ?>
-			<div class="wpam-phase-notice">
-			<?php
-			printf(
-			/* translators: 1: number of affiliates, 2: number of active */
-			esc_html__( 'You have %1$d affiliate(s) registered, %2$d active. Go to Affiliates to manage them.', 'wp-affiliatemanager' ),
-			absint( $total ),
-			absint( $active )
-			);
-			?>
+			<h2 class="wpam-section-heading"><?php esc_html_e( 'Overview', 'wp-affiliatemanager' ); ?></h2>
+			<div class="wpam-stats-grid wpam-stats-grid--summary">
+				<?php Analytics_Renderer::render_stat_card( __( 'Total Score', 'wp-affiliatemanager' ), number_format_i18n( $score_totals['total'] ), '⭐' ); ?>
+				<?php Analytics_Renderer::render_stat_card( __( 'Total Views', 'wp-affiliatemanager' ), number_format_i18n( $view_totals['total'] ), '👁️' ); ?>
+				<?php Analytics_Renderer::render_stat_card( __( 'Total Clicks', 'wp-affiliatemanager' ), number_format_i18n( $click_totals['total'] ), '🖱️' ); ?>
+				<?php Analytics_Renderer::render_stat_card( __( 'Total Affiliates', 'wp-affiliatemanager' ), (string) $total, '📦' ); ?>
 			</div>
-			<?php else : ?>
-			<div class="wpam-phase-notice">
-			<?php esc_html_e( 'No affiliates yet. Start by adding your first affiliate program.', 'wp-affiliatemanager' ); ?>
+
+			<h2 class="wpam-section-heading"><?php esc_html_e( 'Recent Activity', 'wp-affiliatemanager' ); ?></h2>
+			<?php Analytics_Renderer::render_recent_clicks_section( $recent_clicks ); ?>
+			<?php Analytics_Renderer::render_recent_views_section( $recent_views ); ?>
+
+			<h2 class="wpam-section-heading"><?php esc_html_e( 'Top 10 Overall', 'wp-affiliatemanager' ); ?></h2>
+			<?php Analytics_Renderer::render_top_scored_posts_section( $top_scored ); ?>
+
+			<h2 class="wpam-section-heading"><?php esc_html_e( 'Quick Access', 'wp-affiliatemanager' ); ?></h2>
+			<div class="wpam-quick-access-grid">
+				<a class="wpam-quick-access-card" href="<?php echo esc_url( admin_url( 'admin.php?page=wpam-analytics' ) ); ?>">
+					<span class="wpam-quick-access-icon">📊</span>
+					<span class="wpam-quick-access-label"><?php esc_html_e( 'Analytics', 'wp-affiliatemanager' ); ?></span>
+				</a>
+				<a class="wpam-quick-access-card" href="<?php echo esc_url( admin_url( 'admin.php?page=wpam-affiliates' ) ); ?>">
+					<span class="wpam-quick-access-icon">📦</span>
+					<span class="wpam-quick-access-label"><?php esc_html_e( 'Affiliates', 'wp-affiliatemanager' ); ?></span>
+				</a>
+				<a class="wpam-quick-access-card" href="<?php echo esc_url( admin_url( 'admin.php?page=wpam-settings' ) ); ?>">
+					<span class="wpam-quick-access-icon">⚙️</span>
+					<span class="wpam-quick-access-label"><?php esc_html_e( 'Settings', 'wp-affiliatemanager' ); ?></span>
+				</a>
+				<a class="wpam-quick-access-card" href="<?php echo esc_url( admin_url( 'admin.php?page=wpam-broken-reports' ) ); ?>">
+					<span class="wpam-quick-access-icon">🔗</span>
+					<span class="wpam-quick-access-label"><?php esc_html_e( 'Broken Link Reports', 'wp-affiliatemanager' ); ?></span>
+				</a>
 			</div>
-			<?php endif; ?>
-
-		<?php
-		// v0.2.3: Analytics section.
-		$click_stats       = $this->get_click_stats();
-		$view_stats        = \WP_AffiliateManager\Views\Views_Query::get_stats_cached();
-		$top_affiliates    = $this->get_top_affiliates();
-		$top_posts         = $this->get_top_posts();
-		$top_viewed_posts  = $this->get_top_viewed_posts();
-		$recent_clicks     = $this->get_recent_clicks();
-		$recent_views      = $this->get_recent_views();
-		?>
-
-		<!-- Click stat cards — v0.2.8: each card is a filter trigger -->
-		<div class="wpam-stats-grid wpam-stats-grid--clicks">
-			<?php $this->render_stat_card( __( 'Clicks Today', 'wp-affiliatemanager' ),   (string) $click_stats['today'],   '📈' ); ?>
-			<?php $this->render_stat_card( __( 'Last 7 Days', 'wp-affiliatemanager' ),    (string) $click_stats['week'],    '📅' ); ?>
-			<?php $this->render_stat_card( __( 'Last 30 Days', 'wp-affiliatemanager' ),   (string) $click_stats['month'],   '🗓️' ); ?>
-			<?php $this->render_stat_card( __( 'Total Clicks', 'wp-affiliatemanager' ),   (string) $click_stats['total'],   '🖱️' ); ?>
-		</div>
-
-		<!-- Two-column: Top Affiliates + Top Posts (v0.2.8: AJAX-replaceable containers) -->
-		<div class="wpam-analytics-cols">
-			<div class="wpam-analytics-col wpam-filter-affiliates-col">
-				<?php $this->render_top_affiliates_section( $top_affiliates, $click_stats['total'] ); ?>
-			</div>
-			<div class="wpam-analytics-col wpam-filter-posts-col">
-				<?php $this->render_top_posts_section( $top_posts ); ?>
-			</div>
-		</div>
-
-		<!-- Recent clicks full width -->
-		<?php $this->render_recent_clicks_section( $recent_clicks ); ?>
-
-		<!-- View stat cards — v1.2.0: tarjetas estáticas, sin filtro AJAX -->
-		<div class="wpam-stats-grid wpam-stats-grid--views">
-			<?php $this->render_stat_card( __( 'Views Today', 'wp-affiliatemanager' ),    (string) $view_stats['today'],   '👁️' ); ?>
-			<?php $this->render_stat_card( __( 'Views Last 7 Days', 'wp-affiliatemanager' ),  (string) $view_stats['week'],  '📅' ); ?>
-			<?php $this->render_stat_card( __( 'Views Last 30 Days', 'wp-affiliatemanager' ), (string) $view_stats['month'], '🗓️' ); ?>
-			<?php $this->render_stat_card( __( 'Total Views', 'wp-affiliatemanager' ),    (string) $view_stats['total'],   '📊' ); ?>
-		</div>
-
-		<!-- Top Viewed Posts full width (v1.3.0: filtro AJAX igual que Top Posts) -->
-		<div class="wpam-filter-top-viewed-col">
-			<?php $this->render_top_viewed_posts_section( $top_viewed_posts ); ?>
-		</div>
-
-		<!-- Recent views full width -->
-		<?php $this->render_recent_views_section( $recent_views ); ?>
-
-		<!-- Maintenance card -->
-		<?php $this->render_maintenance_card(); ?>
-
-		<!-- Broken Link Reports -->
-		<?php $this->render_broken_reports_section(); ?>
 
 		</div><!-- .bunny-page-content -->
 		<?php
+		$this->render_admin_footer();
+	}
+
+	// -------------------------------------------------------------------------
+	// Analytics screen — delegada a Analytics_Screen
+	// -------------------------------------------------------------------------
+
+	public function render_analytics_page(): void {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'No tienes permisos para acceder a esta página.', 'wp-affiliatemanager' ) );
+		}
+
+		$this->render_admin_header( __( 'Analytics', 'wp-affiliatemanager' ) );
+
+		$screen = new Analytics_Screen();
+		$screen->render();
+
 		$this->render_admin_footer();
 	}
 
@@ -227,6 +258,35 @@ class Admin_Menu {
 				submit_button( __( 'Save Settings', 'wp-affiliatemanager' ) );
 				?>
 			</form>
+
+			<?php // v1.4.0: Maintenance se mueve aquí desde el Dashboard — misma UI, mismos handlers. ?>
+			<?php $this->render_maintenance_card(); ?>
+		</div>
+		<?php
+		$this->render_admin_footer();
+	}
+
+	// -------------------------------------------------------------------------
+	// Broken Reports — página propia (v1.4.0)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Página propia de Broken Link Reports.
+	 *
+	 * Se mueve fuera del Dashboard en v1.4.0. Misma tabla, mismos handlers,
+	 * sin cambios de comportamiento — solo cambia dónde vive en el menú.
+	 *
+	 * @since 1.4.0
+	 */
+	public function render_broken_reports_page(): void {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'No tienes permisos para acceder a esta página.', 'wp-affiliatemanager' ) );
+		}
+
+		$this->render_admin_header( __( 'Broken Reports', 'wp-affiliatemanager' ) );
+		?>
+		<div class="bunny-page-content">
+			<?php $this->render_broken_reports_section(); ?>
 		</div>
 		<?php
 		$this->render_admin_footer();
@@ -258,10 +318,12 @@ class Admin_Menu {
 		$current_page = isset( $_GET['page'] ) ? sanitize_key( $_GET['page'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 
 		$nav_items = array(
-			'wpam-dashboard'        => __( 'Dashboard', 'wp-affiliatemanager' ),
-			'wpam-affiliates'       => __( 'Affiliates', 'wp-affiliatemanager' ),
-			'wpam-post-affiliates'  => __( 'Post Affiliates', 'wp-affiliatemanager' ),
-			'wpam-settings'         => __( 'Settings', 'wp-affiliatemanager' ),
+			'wpam-dashboard'       => __( 'Dashboard', 'wp-affiliatemanager' ),
+			'wpam-analytics'       => __( 'Analytics', 'wp-affiliatemanager' ),
+			'wpam-affiliates'      => __( 'Affiliates', 'wp-affiliatemanager' ),
+			'wpam-post-affiliates' => __( 'Post Affiliates', 'wp-affiliatemanager' ),
+			'wpam-broken-reports'  => __( 'Broken Reports', 'wp-affiliatemanager' ),
+			'wpam-settings'        => __( 'Settings', 'wp-affiliatemanager' ),
 		);
 
 		foreach ( $nav_items as $slug => $label ) {
@@ -280,11 +342,14 @@ class Admin_Menu {
 	}
 
 	// -------------------------------------------------------------------------
-	// v0.2.4 — Maintenance
+	// v0.2.4 — Maintenance (movido a la página Settings en v1.4.0)
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Renderiza la card de mantenimiento en el dashboard.
+	 * Renderiza la card de mantenimiento.
+	 *
+	 * Se muestra ahora en la página Settings en vez del Dashboard (v1.4.0).
+	 * Sin cambios de funcionalidad ni de handlers.
 	 *
 	 * @since 0.2.4
 	 */
@@ -405,17 +470,12 @@ class Admin_Menu {
 	/**
 	 * Handler del action admin-post para reconstruir el mapa de tokens.
 	 *
-	 * Flujo:
-	 *  1. Verificar nonce + capability.
-	 *  2. Vaciar completamente wpam_redirect_tokens.
-	 *  3. Buscar todos los posts con _wpam_links.
-	 *  4. Llamar rebuild_token_map() para cada uno.
-	 *  5. Redirigir al dashboard con resultados en query args.
-	 *
 	 * @since 0.2.4
+	 * @since 1.4.0 Redirige a wpam-settings en vez de wpam-dashboard (la
+	 *              card de Maintenance vive ahora en Settings). Sin cambios
+	 *              en nonce, capability ni lógica.
 	 */
 	public function handle_rebuild_token_map(): void {
-		// Seguridad.
 		if (
 			! isset( $_POST['wpam_nonce'] ) ||
 			! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wpam_nonce'] ) ), 'wpam_rebuild_token_map' )
@@ -427,10 +487,8 @@ class Admin_Menu {
 			wp_die( esc_html__( 'You do not have permission to perform this action.', 'wp-affiliatemanager' ) );
 		}
 
-		// 1. Vaciar el mapa completamente antes de reconstruir.
 		update_option( \WP_AffiliateManager\Redirect\Redirect_Manager::TOKEN_MAP_OPTION, array(), false );
 
-		// 2. Buscar todos los posts que tengan _wpam_links.
 		global $wpdb;
 		$post_ids = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
@@ -439,7 +497,6 @@ class Admin_Menu {
 			)
 		);
 
-		// 3. Reconstruir token por token reutilizando la lógica existente.
 		$redirect_manager = new \WP_AffiliateManager\Redirect\Redirect_Manager();
 		$processed        = 0;
 
@@ -448,14 +505,12 @@ class Admin_Menu {
 			$processed++;
 		}
 
-		// 4. Contar tokens generados.
 		$map        = get_option( \WP_AffiliateManager\Redirect\Redirect_Manager::TOKEN_MAP_OPTION, array() );
 		$token_count = is_array( $map ) ? count( $map ) : 0;
 
-		// 5. Redirigir al dashboard con resultados.
 		wp_safe_redirect( add_query_arg(
 			array(
-				'page'          => 'wpam-dashboard',
+				'page'          => 'wpam-settings',
 				'wpam_rebuilt'  => '1',
 				'wpam_posts'    => $processed,
 				'wpam_tokens'   => $token_count,
@@ -469,6 +524,7 @@ class Admin_Menu {
 	 * Handler del action admin-post para borrar registros de analytics.
 	 *
 	 * @since 0.2.5
+	 * @since 1.4.0 Redirige a wpam-settings en vez de wpam-dashboard.
 	 */
 	public function handle_clear_analytics(): void {
 		if (
@@ -490,7 +546,7 @@ class Admin_Menu {
 
 		wp_safe_redirect( add_query_arg(
 			array(
-				'page'          => 'wpam-dashboard',
+				'page'          => 'wpam-settings',
 				'wpam_cleared'  => '1',
 				'wpam_deleted'  => $deleted,
 			),
@@ -502,11 +558,8 @@ class Admin_Menu {
 	/**
 	 * Handler del action admin-post para importar desde Post Views Counter.
 	 *
-	 * Migración única: si ya se ejecutó (`Views_Importer::is_completed()`),
-	 * no vuelve a correr y redirige con un flag distinto para que el dashboard
-	 * no muestre un notice engañoso de "importado" cuando en realidad no hizo nada.
-	 *
-	 * @since1.2.0
+	 * @since 1.2.0
+	 * @since 1.4.0 Redirige a wpam-settings en vez de wpam-dashboard.
 	 */
 	public function handle_import_post_views_counter(): void {
 		if (
@@ -523,7 +576,7 @@ class Admin_Menu {
 		if ( ! \WP_AffiliateManager\Views\Views_Importer::can_run() ) {
 			wp_safe_redirect( add_query_arg(
 				array(
-					'page'              => 'wpam-dashboard',
+					'page'              => 'wpam-settings',
 					'wpam_pvc_skipped'  => '1',
 				),
 				admin_url( 'admin.php' )
@@ -535,7 +588,7 @@ class Admin_Menu {
 
 		wp_safe_redirect( add_query_arg(
 			array(
-				'page'               => 'wpam-dashboard',
+				'page'               => 'wpam-settings',
 				'wpam_pvc_imported'  => '1',
 				'wpam_pvc_new'       => $stats['imported'],
 				'wpam_pvc_updated'   => $stats['updated'],
@@ -547,404 +600,8 @@ class Admin_Menu {
 		exit;
 	}
 
-	private function render_stat_card( string $label, string $value, string $icon ): void {
-		?>
-		<div class="wpam-stat-card">
-			<span class="wpam-stat-icon"><?php echo esc_html( $icon ); ?></span>
-			<span class="wpam-stat-value"><?php echo esc_html( $value ); ?></span>
-			<span class="wpam-stat-label"><?php echo esc_html( $label ); ?></span>
-		</div>
-		<?php
-	}
-
-	// -------------------------------------------------------------------------
-	// v0.2.3 — Analytics: SQL helpers
-	// -------------------------------------------------------------------------
-
-	/**
-	 * Retorna contadores de clicks agrupados por rango de tiempo.
-	 *
-	 * Todas las comparaciones usan UTC (la DB almacena en UTC via CURRENT_TIMESTAMP).
-	 *
-	 * @since  0.2.3
-	 * @return array{ today: int, week: int, month: int, total: int }
-	 */
-	private function get_click_stats(): array {
-		global $wpdb;
-		$table = \WP_AffiliateManager\Redirect\Clicks_Table::table_name();
-
-		$today = gmdate( 'Y-m-d' );
-		$week  = gmdate( 'Y-m-d', strtotime( '-7 days' ) );
-		$month = gmdate( 'Y-m-d', strtotime( '-30 days' ) );
-
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$today_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE ts >= %s", $table, $today . ' 00:00:00' ) );
-		$week_count  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE ts >= %s", $table, $week  . ' 00:00:00' ) );
-		$month_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE ts >= %s", $table, $month . ' 00:00:00' ) );
-		$total_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i", $table ) );
-		// phpcs:enable
-
-		return array(
-			'today' => $today_count,
-			'week'  => $week_count,
-			'month' => $month_count,
-			'total' => $total_count,
-		);
-	}
-
-	/**
-	 * Top 10 afiliados por número de clicks.
-	 *
-	 * @since  0.2.3
-	 * @since  0.2.8 Acepta un rango de tiempo opcional.
-	 * @param  string $range today|week|month|total
-	 * @return array[]
-	 */
-	private function get_top_affiliates( string $range = 'total' ): array {
-		global $wpdb;
-		$table = \WP_AffiliateManager\Redirect\Clicks_Table::table_name();
-
-		$where = '';
-		if ( 'total' !== $range ) {
-			$since = \WP_AffiliateManager\Frontend\Top_Posts_Query::range_to_since( $range );
-			$where = $wpdb->prepare( ' WHERE ts >= %s', $since );
-		}
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT affiliate_id, COUNT(*) AS click_count FROM %i{$where} GROUP BY affiliate_id ORDER BY click_count DESC LIMIT 10",
-				$table
-			),
-			ARRAY_A
-		);
-
-		if ( ! is_array( $rows ) ) { return array(); }
-
-		$result = array();
-		foreach ( $rows as $row ) {
-			$aff_id = (int) $row['affiliate_id'];
-			$post   = get_post( $aff_id );
-			if ( ! $post instanceof \WP_Post ) { continue; }
-
-			$result[] = array(
-				'id'          => $aff_id,
-				'title'       => $post->post_title,
-				'click_count' => (int) $row['click_count'],
-				'logo_url'    => (string) get_post_meta( $aff_id, \WP_AffiliateManager\Affiliates\Meta::KEY_LOGO_URL,    true ),
-				'brand_color' => (string) ( get_post_meta( $aff_id, \WP_AffiliateManager\Affiliates\Meta::KEY_BRAND_COLOR, true ) ?: '#6c47ff' ),
-			);
-		}
-
-		return $result;
-	}
-
-	/**
-	 * Top posts por número de clicks.
-	 *
-	 * @since  0.2.3
-	 * @since  0.2.8 Acepta un rango de tiempo opcional.
-	 * @since  1.0.0 Delega la query a Frontend\Top_Posts_Query (fuente compartida con el shortcode).
-	 *              Añade thumb_url y edit_url que sólo necesita el dashboard.
-	 * @param  string $range today|week|month|total
-	 * @return array[]
-	 */
-	private function get_top_posts( string $range = 'total' ): array {
-		$rows = \WP_AffiliateManager\Frontend\Top_Posts_Query::get( $range, 10 );
-
-		// Añadir campos extra que sólo usa el dashboard (thumb_url, edit_url).
-		foreach ( $rows as &$row ) {
-			$thumb_id        = get_post_thumbnail_id( $row['id'] );
-			$row['thumb_url'] = $thumb_id ? (string) wp_get_attachment_image_url( $thumb_id, 'thumbnail' ) : '';
-			$row['edit_url']  = (string) get_edit_post_link( $row['id'], 'raw' );
-		}
-		unset( $row );
-
-		return $rows;
-	}
-
-	/**
-	 * Últimos 20 clicks.
-	 *
-	 * @since  0.2.3
-	 * @return array[]
-	 */
-	private function get_recent_clicks(): array {
-		global $wpdb;
-		$table = \WP_AffiliateManager\Redirect\Clicks_Table::table_name();
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT ts, post_id, affiliate_id, destination_url FROM %i ORDER BY ts DESC LIMIT 20",
-				$table
-			),
-			ARRAY_A
-		);
-
-		return is_array( $rows ) ? $rows : array();
-	}
-
-	/**
-	 * Top posts por número de vistas.
-	 *
-	 * Delega la query a Views\Views_Query (fuente única de verdad, mismo rol
-	 * que Top_Posts_Query para clicks). Añade thumb_url y edit_url que solo
-	 * necesita el dashboard, igual que get_top_posts().
-	 *
-	 * @since 1.2.0
-	 * @param  string $range today|week|month|total
-	 * @return array[]
-	 */
-	private function get_top_viewed_posts( string $range = 'total' ): array {
-		$rows = \WP_AffiliateManager\Views\Views_Query::get_cached( $range, 10 );
-
-		foreach ( $rows as &$row ) {
-			$thumb_id         = get_post_thumbnail_id( $row['id'] );
-			$row['thumb_url'] = $thumb_id ? (string) wp_get_attachment_image_url( $thumb_id, 'thumbnail' ) : '';
-			$row['edit_url']  = (string) get_edit_post_link( $row['id'], 'raw' );
-		}
-		unset( $row );
-
-		return $rows;
-	}
-
-	/**
-	 * Últimas filas de wpam_views (agregado diario, no evento).
-	 *
-	 * Delega la query cruda a Views\Views_Query::get_recent() y añade el
-	 * título/edit_url del post, igual que get_top_viewed_posts().
-	 *
-	 * @since 1.2.0
-	 * @param  int $limit Número máximo de filas. Default 20.
-	 * @return array[]
-	 */
-	private function get_recent_views( int $limit = 20 ): array {
-		$rows = \WP_AffiliateManager\Views\Views_Query::get_recent( $limit );
-
-		$result = array();
-		foreach ( $rows as $row ) {
-			$post_id = (int) $row['post_id'];
-			$post    = get_post( $post_id );
-
-			if ( ! $post instanceof \WP_Post ) {
-				continue;
-			}
-
-			$result[] = array(
-				'post_id'   => $post_id,
-				'period'    => $row['period'],
-				'count'     => (int) $row['count'],
-				'title'     => $post->post_title,
-				'edit_url'  => (string) get_edit_post_link( $post_id, 'raw' ),
-			);
-		}
-
-		return $result;
-	}
-
-	// -------------------------------------------------------------------------
-	// v0.2.3 — Analytics: render helpers
-	// -------------------------------------------------------------------------
-
-	private function render_top_affiliates_section( array $affiliates, int $total_clicks ): void {
-		?>
-		<div class="wpam-analytics-card">
-			<h3 class="wpam-analytics-card-title">
-				<span>🏆</span> <?php esc_html_e( 'Top Affiliates', 'wp-affiliatemanager' ); ?>
-			</h3>
-			<?php if ( empty( $affiliates ) ) : ?>
-				<p class="wpam-analytics-empty"><?php esc_html_e( 'No clicks recorded yet.', 'wp-affiliatemanager' ); ?></p>
-			<?php else : ?>
-				<ul class="wpam-top-list">
-				<?php foreach ( $affiliates as $aff ) :
-					$pct   = $total_clicks > 0 ? round( ( $aff['click_count'] / $total_clicks ) * 100 ) : 0;
-					$color = esc_attr( $aff['brand_color'] ?: '#6c47ff' );
-				?>
-					<li class="wpam-top-item">
-						<div class="wpam-top-item-lead">
-							<?php if ( $aff['logo_url'] ) : ?>
-								<img class="wpam-top-logo" src="<?php echo esc_url( $aff['logo_url'] ); ?>" alt="" />
-							<?php else : ?>
-								<span class="wpam-top-initial" style="background:<?php echo $color; ?>"><?php echo esc_html( strtoupper( substr( $aff['title'], 0, 1 ) ) ); ?></span>
-							<?php endif; ?>
-							<span class="wpam-top-name"><?php echo esc_html( $aff['title'] ); ?></span>
-						</div>
-						<div class="wpam-top-item-meta">
-							<div class="wpam-top-bar-wrap">
-								<div class="wpam-top-bar" style="width:<?php echo esc_attr( (string) $pct ); ?>%;background:<?php echo $color; ?>"></div>
-							</div>
-							<span class="wpam-top-count"><?php echo esc_html( number_format_i18n( $aff['click_count'] ) ); ?></span>
-							<span class="wpam-top-pct"><?php echo esc_html( $pct . '%' ); ?></span>
-						</div>
-					</li>
-				<?php endforeach; ?>
-				</ul>
-			<?php endif; ?>
-		</div>
-		<?php
-	}
-
-	private function render_top_posts_section( array $posts ): void {
-		?>
-		<div class="wpam-analytics-card">
-			<h3 class="wpam-analytics-card-title">
-				<span>📝</span> <?php esc_html_e( 'Top Posts', 'wp-affiliatemanager' ); ?>
-			</h3>
-			<?php if ( empty( $posts ) ) : ?>
-				<p class="wpam-analytics-empty"><?php esc_html_e( 'No clicks recorded yet.', 'wp-affiliatemanager' ); ?></p>
-			<?php else : ?>
-				<?php $this->render_top_list( $posts, 'click_count' ); ?>
-			<?php endif; ?>
-		</div>
-		<?php
-	}
-
-	/**
-	 * Top Viewed Posts — mismo diseño visual que Top Posts.
-	 *
-	 * @since 1.2.0
-	 * @param  array[] $posts Ver get_top_viewed_posts().
-	 * @return void
-	 */
-	private function render_top_viewed_posts_section( array $posts ): void {
-		?>
-		<div class="wpam-analytics-card wpam-analytics-card--full">
-			<h3 class="wpam-analytics-card-title">
-				<span>👁️</span> <?php esc_html_e( 'Top Viewed Posts', 'wp-affiliatemanager' ); ?>
-			</h3>
-			<?php if ( empty( $posts ) ) : ?>
-				<p class="wpam-analytics-empty"><?php esc_html_e( 'No views recorded yet.', 'wp-affiliatemanager' ); ?></p>
-			<?php else : ?>
-				<?php $this->render_top_list( $posts, 'view_count' ); ?>
-			<?php endif; ?>
-		</div>
-		<?php
-	}
-
-	/**
-	 * Lista `<ul class="wpam-top-list">` compartida entre Top Posts (clicks) y
-	 * Top Viewed Posts (views). Extraído de render_top_posts_section() para no
-	 * duplicar el markup entre ambos — mismo output exacto que antes para
-	 * Top Posts, solo cambia qué campo de conteo se usa.
-	 *
-	 * @since 1.2.0
-	 * @param  array[] $items       Cada elemento debe tener: title, edit_url, thumb_url y $count_field.
-	 * @param  string  $count_field Nombre del campo de conteo ('click_count' | 'view_count').
-	 * @return void
-	 */
-	private function render_top_list( array $items, string $count_field ): void {
-		?>
-		<ul class="wpam-top-list">
-		<?php foreach ( $items as $item ) : ?>
-			<li class="wpam-top-item">
-				<div class="wpam-top-item-lead">
-					<?php if ( $item['thumb_url'] ) : ?>
-						<img class="wpam-top-thumb" src="<?php echo esc_url( $item['thumb_url'] ); ?>" alt="" />
-					<?php else : ?>
-						<span class="wpam-top-thumb-placeholder">📄</span>
-					<?php endif; ?>
-					<a class="wpam-top-name" href="<?php echo esc_url( $item['edit_url'] ); ?>"><?php echo esc_html( $item['title'] ); ?></a>
-				</div>
-				<span class="wpam-top-count"><?php echo esc_html( number_format_i18n( $item[ $count_field ] ) ); ?></span>
-			</li>
-		<?php endforeach; ?>
-		</ul>
-		<?php
-	}
-
-	private function render_recent_clicks_section( array $clicks ): void {
-		?>
-		<div class="wpam-analytics-card wpam-analytics-card--full">
-			<h3 class="wpam-analytics-card-title">
-				<span>🕐</span> <?php esc_html_e( 'Recent Clicks', 'wp-affiliatemanager' ); ?>
-				<span class="wpam-analytics-card-sub"><?php esc_html_e( 'Last 20', 'wp-affiliatemanager' ); ?></span>
-			</h3>
-			<?php if ( empty( $clicks ) ) : ?>
-				<p class="wpam-analytics-empty"><?php esc_html_e( 'No clicks recorded yet.', 'wp-affiliatemanager' ); ?></p>
-			<?php else : ?>
-				<div class="wpam-table-wrap">
-					<table class="wpam-table wpam-recent-clicks-table">
-						<thead><tr>
-							<th><?php esc_html_e( 'Date / Time', 'wp-affiliatemanager' ); ?></th>
-							<th><?php esc_html_e( 'Affiliate', 'wp-affiliatemanager' ); ?></th>
-							<th><?php esc_html_e( 'Post', 'wp-affiliatemanager' ); ?></th>
-							<th><?php esc_html_e( 'Destination', 'wp-affiliatemanager' ); ?></th>
-						</tr></thead>
-						<tbody>
-						<?php foreach ( $clicks as $click ) :
-							$aff_post  = get_post( absint( $click['affiliate_id'] ) );
-							$aff_name  = $aff_post instanceof \WP_Post ? $aff_post->post_title : '—';
-							$src_post  = get_post( absint( $click['post_id'] ) );
-							$src_title = $src_post instanceof \WP_Post ? $src_post->post_title : '—';
-							$src_url   = $src_post instanceof \WP_Post ? (string) get_edit_post_link( $src_post->ID, 'raw' ) : '';
-							$dest_host = (string) ( wp_parse_url( $click['destination_url'], PHP_URL_HOST ) ?: $click['destination_url'] );
-							$ts_local  = get_date_from_gmt( $click['ts'], 'd M Y · H:i' );
-						?>
-							<tr>
-								<td class="wpam-recent-ts"><?php echo esc_html( $ts_local ); ?></td>
-								<td><?php echo esc_html( $aff_name ); ?></td>
-								<td><?php if ( $src_url ) : ?><a href="<?php echo esc_url( $src_url ); ?>"><?php echo esc_html( $src_title ); ?></a><?php else : ?><?php echo esc_html( $src_title ); ?><?php endif; ?></td>
-								<td><span class="wpam-dest-host"><?php echo esc_html( $dest_host ); ?></span></td>
-							</tr>
-						<?php endforeach; ?>
-						</tbody>
-					</table>
-				</div>
-			<?php endif; ?>
-		</div>
-		<?php
-	}
-
-	/**
-	 * Recent Views — mismo diseño visual que Recent Clicks, pero con
-	 * granularidad diaria: la columna Date muestra el `period` (día), sin
-	 * hora, porque wpam_views no registra eventos individuales.
-	 *
-	 * @since 1.2.0
-	 * @param  array[] $views Ver get_recent_views().
-	 * @return void
-	 */
-	private function render_recent_views_section( array $views ): void {
-		?>
-		<div class="wpam-analytics-card wpam-analytics-card--full">
-			<h3 class="wpam-analytics-card-title">
-				<span>👁️</span> <?php esc_html_e( 'Recent Views', 'wp-affiliatemanager' ); ?>
-				<span class="wpam-analytics-card-sub"><?php esc_html_e( 'Last 20', 'wp-affiliatemanager' ); ?></span>
-			</h3>
-			<?php if ( empty( $views ) ) : ?>
-				<p class="wpam-analytics-empty"><?php esc_html_e( 'No views recorded yet.', 'wp-affiliatemanager' ); ?></p>
-			<?php else : ?>
-				<div class="wpam-table-wrap">
-					<table class="wpam-table wpam-recent-views-table">
-						<thead><tr>
-							<th><?php esc_html_e( 'Date', 'wp-affiliatemanager' ); ?></th>
-							<th><?php esc_html_e( 'Post Title', 'wp-affiliatemanager' ); ?></th>
-							<th><?php esc_html_e( 'Views', 'wp-affiliatemanager' ); ?></th>
-						</tr></thead>
-						<tbody>
-						<?php foreach ( $views as $view ) :
-							$date_display = mysql2date( get_option( 'date_format' ), $view['period'] . '000000' );
-						?>
-							<tr>
-								<td class="wpam-recent-ts"><?php echo esc_html( $date_display ); ?></td>
-								<td><?php if ( $view['edit_url'] ) : ?><a href="<?php echo esc_url( $view['edit_url'] ); ?>"><?php echo esc_html( $view['title'] ); ?></a><?php else : ?><?php echo esc_html( $view['title'] ); ?><?php endif; ?></td>
-								<td><?php echo esc_html( number_format_i18n( $view['count'] ) ); ?></td>
-							</tr>
-						<?php endforeach; ?>
-						</tbody>
-					</table>
-				</div>
-			<?php endif; ?>
-		</div>
-		<?php
-	}
-
 	/**
 	 * Cuenta los posts publicados que tienen affiliate links asignados via _wpam_links.
-	 *
-	 * Solo cuenta post_type = 'post' con post_status = 'publish'.
-	 * Excluye revisiones, borradores y cualquier meta vacía o inválida.
 	 *
 	 * @since  2.0.0
 	 * @since  0.0.6 Query corregida: usa Post_Links::META_KEY (_wpam_links) y filtra por post real publicado.
@@ -984,11 +641,11 @@ class Admin_Menu {
 	}
 
 	// -------------------------------------------------------------------------
-	// v0.2.7 — Broken Link Reports
+	// v0.2.7 — Broken Link Reports (página propia desde v1.4.0)
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Renderiza la sección de reportes de enlaces rotos en el dashboard.
+	 * Renderiza la tabla de reportes de enlaces rotos.
 	 *
 	 * @since 0.2.7
 	 */
@@ -1090,13 +747,11 @@ class Admin_Menu {
 	 * @since 0.2.7
 	 */
 	public function handle_report_broken_link(): void {
-		// FIX 2: nonce verification (nonce generated server-side in the renderer).
 		check_ajax_referer( 'wpam_report_nonce', 'nonce' );
 
 		$token   = sanitize_text_field( wp_unslash( $_POST['token']   ?? '' ) );
 		$post_id = absint( $_POST['post_id'] ?? 0 );
 
-		// Validate token format matches the 8-char hex pattern used by the plugin.
 		if ( ! preg_match( '/^[a-f0-9]{8}$/', $token ) ) {
 			wp_die( '', '', array( 'response' => 400 ) );
 		}
@@ -1105,14 +760,12 @@ class Admin_Menu {
 		$reports = is_array( $reports ) ? $reports : array();
 
 		if ( isset( $reports[ $token ] ) ) {
-			// FIX 3: throttle — skip if already reported within the last 10 minutes.
 			$last_ts = strtotime( $reports[ $token ]['last_reported'] ?? '' );
 			if ( $last_ts && ( time() - $last_ts ) < 600 ) {
-				wp_die( '', '', array( 'response' => 200 ) ); // Silently accept; don't increment.
+				wp_die( '', '', array( 'response' => 200 ) );
 			}
 			$reports[ $token ]['count']         = absint( $reports[ $token ]['count'] ) + 1;
 			$reports[ $token ]['last_reported'] = gmdate( 'Y-m-d H:i:s' );
-			// FIX 4: backfill post_id if the first report stored 0.
 			if ( 0 === absint( $reports[ $token ]['post_id'] ?? 0 ) && $post_id > 0 ) {
 				$reports[ $token ]['post_id'] = $post_id;
 			}
@@ -1132,6 +785,7 @@ class Admin_Menu {
 	 * Admin-post handler: limpia un reporte individual por token.
 	 *
 	 * @since 0.2.7
+	 * @since 1.4.0 Redirige a wpam-broken-reports en vez de wpam-dashboard.
 	 */
 	public function handle_clear_broken_report(): void {
 		if (
@@ -1154,7 +808,7 @@ class Admin_Menu {
 
 		wp_safe_redirect( add_query_arg(
 			array(
-				'page'                => 'wpam-dashboard',
+				'page'                => 'wpam-broken-reports',
 				'wpam_report_cleared' => '1',
 			),
 			admin_url( 'admin.php' )
@@ -1162,90 +816,11 @@ class Admin_Menu {
 		exit;
 	}
 
-	// -------------------------------------------------------------------------
-	// v0.2.8 — Dashboard analytics filter AJAX
-	// -------------------------------------------------------------------------
-
-	/**
-	 * AJAX handler: returns filtered Top Affiliates + Top Posts HTML.
-	 *
-	 * Accepted ranges: today | week | month | total.
-	 *
-	 * @since 0.2.8
-	 */
-	public function ajax_dashboard_filter(): void {
-		check_ajax_referer( 'wpam_dashboard_filter', 'nonce' );
-
-		if ( ! current_user_can( self::CAPABILITY ) ) {
-			wp_send_json_error( array( 'message' => 'Forbidden' ), 403 );
-		}
-
-		$allowed = array( 'today', 'week', 'month', 'total' );
-		$range   = sanitize_text_field( wp_unslash( $_POST['range'] ?? 'total' ) );
-		if ( ! in_array( $range, $allowed, true ) ) {
-			$range = 'total';
-		}
-
-		// v1.3.0: grupo de filtro de Views — responde solo posts_html (Top Viewed Posts).
-		$source = sanitize_text_field( wp_unslash( $_POST['source'] ?? 'clicks' ) );
-
-		if ( 'views' === $source ) {
-			$viewed_posts = $this->get_top_viewed_posts( $range );
-
-			ob_start();
-			$this->render_top_viewed_posts_section( $viewed_posts );
-			$viewed_posts_html = ob_get_clean();
-
-			wp_send_json_success( array(
-				'posts_html' => $viewed_posts_html,
-			) );
-		}
-
-		$affiliates = $this->get_top_affiliates( $range );
-		$posts      = $this->get_top_posts( $range );
-
-		// Total clicks for the same range (for percentage bars).
-		global $wpdb;
-		$table       = \WP_AffiliateManager\Redirect\Clicks_Table::table_name();
-		$range_total = $this->get_range_total( $table, $range );
-
-		ob_start();
-		$this->render_top_affiliates_section( $affiliates, $range_total );
-		$affiliates_html = ob_get_clean();
-
-		ob_start();
-		$this->render_top_posts_section( $posts );
-		$posts_html = ob_get_clean();
-
-		wp_send_json_success( array(
-			'affiliates_html' => $affiliates_html,
-			'posts_html'      => $posts_html,
-		) );
-	}
-
-	/**
-	 * Returns total click count for a given range (used for percentage bars in AJAX response).
-	 *
-	 * @since  0.2.8
-	 * @param  string $table DB table name.
-	 * @param  string $range today|week|month|total
-	 * @return int
-	 */
-	private function get_range_total( string $table, string $range ): int {
-		global $wpdb;
-		if ( 'total' === $range ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $table ) );
-		}
-		$since = \WP_AffiliateManager\Frontend\Top_Posts_Query::range_to_since( $range );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
-		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE ts >= %s', $table, $since ) );
-	}
-
 	/**
 	 * Admin-post handler: limpia todos los reportes.
 	 *
 	 * @since 0.2.7
+	 * @since 1.4.0 Redirige a wpam-broken-reports en vez de wpam-dashboard.
 	 */
 	public function handle_clear_all_broken_reports(): void {
 		if (
@@ -1263,7 +838,7 @@ class Admin_Menu {
 
 		wp_safe_redirect( add_query_arg(
 			array(
-				'page'                      => 'wpam-dashboard',
+				'page'                      => 'wpam-broken-reports',
 				'wpam_reports_cleared_all'  => '1',
 			),
 			admin_url( 'admin.php' )

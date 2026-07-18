@@ -315,4 +315,176 @@ class Top_Posts_Query {
 				return '1970-01-01 00:00:00';
 		}
 	}
+
+	// -------------------------------------------------------------------------
+	// Dashboard / Analytics stat cards — equivalente a Views_Query::get_stats()
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Retorna contadores de clicks agrupados por rango de tiempo.
+	 *
+	 * Movido desde Admin_Menu::get_click_stats() en v1.4.0 para que
+	 * Top_Posts_Query quede simétrica a Views_Query::get_stats() y sea la
+	 * única fuente de datos de clicks tanto para el Dashboard como para
+	 * Analytics.
+	 *
+	 * @since  1.4.0
+	 * @return array{ today: int, week: int, month: int, total: int }
+	 */
+	public static function get_stats(): array {
+		global $wpdb;
+		$table = Clicks_Table::table_name();
+
+		$today = gmdate( 'Y-m-d' );
+		$week  = gmdate( 'Y-m-d', strtotime( '-7 days' ) );
+		$month = gmdate( 'Y-m-d', strtotime( '-30 days' ) );
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$today_count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE ts >= %s', $table, $today . ' 00:00:00' ) );
+		$week_count  = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE ts >= %s', $table, $week  . ' 00:00:00' ) );
+		$month_count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE ts >= %s', $table, $month . ' 00:00:00' ) );
+		$total_count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $table ) );
+		// phpcs:enable
+
+		return array(
+			'today' => $today_count,
+			'week'  => $week_count,
+			'month' => $month_count,
+			'total' => $total_count,
+		);
+	}
+
+	/**
+	 * get_stats() con caché de objeto. Mismo TTL/grupo que el resto de la clase.
+	 *
+	 * @since  1.4.0
+	 * @return array{ today: int, week: int, month: int, total: int }
+	 */
+	public static function get_stats_cached(): array {
+		$cached = wp_cache_get( 'wpam_clicks_stats', 'wpam' );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$stats = self::get_stats();
+		wp_cache_set( 'wpam_clicks_stats', $stats, 'wpam', 300 );
+
+		return $stats;
+	}
+
+	/**
+	 * Retorna el total de clicks para un rango dado (usado para las barras
+	 * de porcentaje en Top Affiliates).
+	 *
+	 * Movido desde Admin_Menu::get_range_total() en v1.4.0.
+	 *
+	 * @since  1.4.0
+	 * @param  string $range today|week|month|total
+	 * @return int
+	 */
+	public static function get_range_total( string $range = 'total' ): int {
+		global $wpdb;
+		$table = Clicks_Table::table_name();
+
+		if ( 'total' === $range ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $table ) );
+		}
+
+		$since = self::range_to_since( $range );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE ts >= %s', $table, $since ) );
+	}
+
+	// -------------------------------------------------------------------------
+	// Top Affiliates — movido desde Admin_Menu::get_top_affiliates()
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Top afiliados por número de clicks.
+	 *
+	 * Movido desde Admin_Menu::get_top_affiliates() en v1.4.0. Único cambio
+	 * de comportamiento: ahora es público y estático, sin lógica adicional.
+	 *
+	 * @since  1.4.0
+	 * @param  string $range today|week|month|total
+	 * @param  int    $limit Número máximo de resultados. Default 10.
+	 * @return array[]
+	 */
+	public static function get_top_affiliates( string $range = 'total', int $limit = 10 ): array {
+		global $wpdb;
+		$table = Clicks_Table::table_name();
+
+		$where = '';
+		if ( 'total' !== $range ) {
+			$since = self::range_to_since( $range );
+			$where = $wpdb->prepare( ' WHERE ts >= %s', $since );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT affiliate_id, COUNT(*) AS click_count FROM %i{$where} GROUP BY affiliate_id ORDER BY click_count DESC LIMIT %d",
+				$table,
+				$limit
+			),
+			ARRAY_A
+		);
+
+		if ( ! is_array( $rows ) ) {
+			return array();
+		}
+
+		$result = array();
+		foreach ( $rows as $row ) {
+			$aff_id = (int) $row['affiliate_id'];
+			$post   = get_post( $aff_id );
+			if ( ! $post instanceof \WP_Post ) {
+				continue;
+			}
+
+			$result[] = array(
+				'id'          => $aff_id,
+				'title'       => $post->post_title,
+				'click_count' => (int) $row['click_count'],
+				'logo_url'    => (string) get_post_meta( $aff_id, \WP_AffiliateManager\Affiliates\Meta::KEY_LOGO_URL, true ),
+				'brand_color' => (string) ( get_post_meta( $aff_id, \WP_AffiliateManager\Affiliates\Meta::KEY_BRAND_COLOR, true ) ?: '#6c47ff' ),
+			);
+		}
+
+		return $result;
+	}
+
+	// -------------------------------------------------------------------------
+	// Recent Clicks — movido desde Admin_Menu::get_recent_clicks()
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Retorna las filas más recientes de wpam_clicks, sin caché (dato "vivo").
+	 *
+	 * Movido desde Admin_Menu::get_recent_clicks() en v1.4.0. Datos crudos,
+	 * sin enriquecer — el enriquecimiento (título de post/afiliado, host de
+	 * destino) es responsabilidad del renderer, igual que Views_Query::get_recent().
+	 *
+	 * @since  1.4.0
+	 * @param  int $limit Número máximo de filas. Default 20.
+	 * @return array[] Cada elemento: [ ts, post_id, affiliate_id, destination_url ]
+	 */
+	public static function get_recent( int $limit = 20 ): array {
+		global $wpdb;
+		$table = Clicks_Table::table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT ts, post_id, affiliate_id, destination_url FROM %i ORDER BY ts DESC LIMIT %d',
+				$table,
+				$limit
+			),
+			ARRAY_A
+		);
+
+		return is_array( $rows ) ? $rows : array();
+	}
 }

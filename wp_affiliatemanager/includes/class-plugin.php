@@ -14,6 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // --- Core ---
 require_once WPAM_PLUGIN_PATH . 'includes/admin/class-admin.php';
+require_once WPAM_PLUGIN_PATH . 'includes/admin/class-analytics-renderer.php';
 require_once WPAM_PLUGIN_PATH . 'includes/admin/class-admin-menu.php';
 require_once WPAM_PLUGIN_PATH . 'includes/admin/class-admin-assets.php';
 require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-frontend.php';
@@ -68,6 +69,10 @@ require_once WPAM_PLUGIN_PATH . 'includes/views/class-views-importer.php';
 
 // --- v1.3.0: Recently Viewed Posts (reutiliza el pipeline de tracking de Views) ---
 require_once WPAM_PLUGIN_PATH . 'includes/views/class-recently-viewed.php';
+
+// --- v1.4.0: Analytics reorganization (Score system + Analytics screen) ---
+require_once WPAM_PLUGIN_PATH . 'includes/analytics/class-score-query.php';
+require_once WPAM_PLUGIN_PATH . 'includes/admin/class-analytics-screen.php';
 
 /**
  * Class Plugin
@@ -130,9 +135,11 @@ final class Plugin {
 		$this->loader->add_action( 'wp_ajax_nopriv_wpam_report_broken_link', $admin_menu_report, 'handle_report_broken_link' );
 		$this->loader->add_action( 'wp_ajax_wpam_report_broken_link',        $admin_menu_report, 'handle_report_broken_link' );
 
-		// v0.2.8: Dashboard filter AJAX (admin-only).
-		$admin_menu_filter = new Admin\Admin_Menu();
-		$this->loader->add_action( 'wp_ajax_wpam_dashboard_filter', $admin_menu_filter, 'ajax_dashboard_filter' );
+		// v1.4.0: Analytics filter AJAX (admin-only) — reemplaza a wp_ajax_wpam_dashboard_filter.
+		// Registrado en hooks globales (no en define_admin_hooks()) por el mismo motivo que
+		// el resto de los wp_ajax_* de este bloque: admin-ajax.php corre con is_admin() === true.
+		$analytics_screen_filter = new Admin\Analytics_Screen();
+		$this->loader->add_action( 'wp_ajax_wpam_analytics_filter', $analytics_screen_filter, 'ajax_filter' );
 
 		// v1.0.0: Widget Top Posts — widgets_init corre en admin y frontend (Customizer, panel de widgets, sidebar).
 		// Se registra via closure para evitar instanciar WP_Widget antes del hook init

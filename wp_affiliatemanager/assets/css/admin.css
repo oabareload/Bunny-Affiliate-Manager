@@ -915,7 +915,148 @@ body.toplevel_page_wpam-dashboard .wpam-stats-grid--views .wpam-stat-card--activ
 /* Loading state for AJAX replacement columns */
 .wpam-filter-affiliates-col .wpam-loading,
 .wpam-filter-posts-col .wpam-loading,
-.wpam-filter-top-viewed-col .wpam-loading {
+.wpam-filter-top-viewed-col .wpam-loading,
+.wpam-analytics-affiliates-col .wpam-loading,
+.wpam-analytics-clicked-posts-col .wpam-loading,
+.wpam-analytics-viewed-posts-col .wpam-loading,
+.wpam-analytics-scored-posts-col .wpam-loading {
 	opacity: 0.6;
 	font-style: italic;
+}
+
+/* ==========================================================================
+   v1.4.0 — Dashboard: Overview summary + Quick Access
+   ========================================================================== */
+
+.wpam-section-heading {
+	font-size: 15px !important;
+	font-weight: 700 !important;
+	color: var(--wpam-gray-900) !important;
+	margin: 32px 0 14px !important;
+	padding: 0 !important;
+	border: none !important;
+}
+
+.wpam-section-heading:first-of-type {
+	margin-top: 8px !important;
+}
+
+.wpam-stats-grid--summary .wpam-stat-card {
+	padding: 28px 20px;
+}
+
+.wpam-stats-grid--summary .wpam-stat-value {
+	font-size: 36px;
+}
+
+.wpam-quick-access-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+	gap: 14px;
+}
+
+.wpam-quick-access-card {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	background: #fff;
+	border: 1px solid var(--wpam-gray-200);
+	border-radius: var(--wpam-radius);
+	padding: 20px 16px;
+	text-decoration: none;
+	transition: box-shadow var(--wpam-transition), transform var(--wpam-transition), border-color var(--wpam-transition);
+}
+
+.wpam-quick-access-card:hover {
+	box-shadow: var(--wpam-shadow-hover);
+	transform: translateY(-2px);
+	border-color: var(--wpam-primary-light);
+	text-decoration: none;
+}
+
+.wpam-quick-access-icon {
+	font-size: 26px;
+	line-height: 1;
+}
+
+.wpam-quick-access-label {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--wpam-gray-900);
+	text-align: center;
+}
+
+/* ==========================================================================
+   v1.4.0 — Analytics screen: tabs + per-tab filter cards
+   ========================================================================== */
+
+.wpam-tabs {
+	display: flex;
+	gap: 4px;
+	border-bottom: 1px solid var(--wpam-gray-200);
+	margin-bottom: 24px;
+}
+
+.wpam-tab-item {
+	appearance: none;
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 10px 18px 12px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--wpam-gray-400);
+	border-bottom: 3px solid transparent;
+	transition: color var(--wpam-transition), border-color var(--wpam-transition);
+}
+
+.wpam-tab-item:hover {
+	color: var(--wpam-primary);
+}
+
+.wpam-tab-item.wpam-tab-item--active {
+	color: var(--wpam-primary);
+	border-bottom-color: var(--wpam-primary);
+}
+
+.wpam-tab-panel {
+	margin-top: 4px;
+}
+
+/* Cards-filtro por tab — mismo tratamiento visual clickable/activo-inactivo
+   que ya usaba el Dashboard (v0.2.8/v1.3.0), ahora scoped a la página Analytics. */
+body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--score .wpam-stat-card,
+body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--clicks .wpam-stat-card,
+body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--views .wpam-stat-card {
+	cursor: pointer;
+	transition: opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--score .wpam-stat-card--inactive,
+body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--clicks .wpam-stat-card--inactive,
+body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--views .wpam-stat-card--inactive {
+	opacity: 0.42;
+	filter: grayscale(60%);
+	box-shadow: none;
+}
+
+body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--score .wpam-stat-card--inactive:hover,
+body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--clicks .wpam-stat-card--inactive:hover,
+body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--views .wpam-stat-card--inactive:hover {
+	opacity: 0.72;
+	filter: grayscale(20%);
+	box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+}
+
+body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--score .wpam-stat-card--active,
+body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--clicks .wpam-stat-card--active,
+body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--views .wpam-stat-card--active {
+	opacity: 1;
+	filter: none;
+}
+
+@media screen and (max-width: 782px) {
+	.wpam-tabs { overflow-x: auto; }
+	.wpam-tab-item { padding: 10px 12px 12px; font-size: 12px; white-space: nowrap; }
 }

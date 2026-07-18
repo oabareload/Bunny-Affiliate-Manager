@@ -5,6 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.0] — Analytics reorganization: Score system + Analytics screen
+
+### Added
+
+- **Score system**: `WP_AffiliateManager\Analytics\Score_Query` (`includes/analytics/class-score-query.php`), nuevo servicio que combina `wpam_views` y `wpam_clicks` en un ranking ponderado (`score = views * FACTOR_VIEWS + clicks * FACTOR_CLICKS`, factores por defecto 1 y 25 respectivamente, expuestos como constantes públicas `Score_Query::DEFAULT_FACTOR_VIEWS` / `DEFAULT_FACTOR_CLICKS` para una futura migración a Settings). Mismo patrón público que `Top_Posts_Query` / `Views_Query`: `get()`, `get_cached()`, `get_stats()`, `get_stats_cached()`.
+- **`WPAM_API::get_top_scored_posts( array $args = array() ): \WP_Post[]`** — espejo exacto de `get_top_posts()` / `get_top_viewed_posts()`, vía `build_top_posts_response()`. Nuevo filter hook `wpam_api_top_scored_posts`.
+- **Página Analytics** (`wpam-analytics`): nueva pantalla `Admin\Analytics_Screen` con tabs horizontales Score / Clicks / Views. Cada tab reutiliza el mismo mecanismo de cards-filtro (Today / Last 7 Days / Last 30 Days / All Time) sobre un único endpoint AJAX (`wp_ajax_wpam_analytics_filter`), diferenciado por el parámetro `source`.
+- **Página Broken Reports** (`wpam-broken-reports`): Broken Link Reports se separa del Dashboard a su propia página. Misma tabla, mismos handlers, mismos nonces — sin cambios de comportamiento.
+- **`Admin\Analytics_Renderer`** (`includes/admin/class-analytics-renderer.php`): nueva clase de renderizado puro (sin SQL propio) compartida entre Dashboard y Analytics — `render_stat_card()`, `render_top_affiliates_section()`, `render_top_clicked_posts_section()`, `render_top_viewed_posts_section()`, `render_top_scored_posts_section()`, `render_recent_clicks_section()`, `render_recent_views_section()`.
+- `Top_Posts_Query::get_stats()`, `get_stats_cached()`, `get_top_affiliates()`, `get_recent()` — la clase crece para quedar simétrica a `Views_Query`, centralizando toda la obtención de datos de clicks que antes vivía suelta en `Admin_Menu`.
+- `assets/js/analytics.js` — reemplaza a `dashboard.js`. Mismo mecanismo de filtro (`initFilterGroup()`) reutilizado sin cambios para los 3 tabs de Analytics, más el toggle de tabs.
+
+### Changed
+
+- **Dashboard** simplificado a un resumen ejecutivo: cards de Total/Active Affiliates + Posts with Affiliates, cards de Overview (Total Score/Views/Clicks/Affiliates), Actividad Reciente (Recent Clicks + Recent Views), Top 10 Overall (por Score) y Accesos Rápidos. Ya no ejecuta queries filtrables por rango ni AJAX propio.
+- **Settings**: la card de Maintenance (Rebuild Token Map, Clear Analytics, Import Post Views Counter) se mueve aquí desde el Dashboard. Mismos handlers, mismos nonces, solo cambia dónde se renderiza y a qué página redirige.
+- **"Top Posts" → "Top Clicked Posts"** en toda la interfaz de administración (texto visible, `Analytics_Renderer::render_top_clicked_posts_section()`, clave AJAX `clicked_posts_html`, clase CSS `.wpam-analytics-clicked-posts-col`). **Sin cambios** en la API pública: `WPAM_API::get_top_posts()`, la clase `Top_Posts_Query`, el shortcode `[wpam_top_posts]`, `Widget_Top_Posts` y los prefijos de caché existentes permanecen idénticos — son contrato público consumido por Bunny Magazine y por contenido ya publicado en bunnychase.net.
+- AJAX action `wp_ajax_wpam_dashboard_filter` reemplazado por `wp_ajax_wpam_analytics_filter`, registrado sobre `Analytics_Screen` en vez de `Admin_Menu`.
+
+### Removed
+
+- `assets/js/dashboard.js` — sin uso tras la reorganización (el Dashboard ya no filtra nada por AJAX).
+- Métodos de datos y de render de analítica que vivían en `Admin_Menu` (`get_click_stats`, `get_top_affiliates`, `get_top_posts`, `get_recent_clicks`, `get_top_viewed_posts`, `get_recent_views`, `render_top_affiliates_section`, `render_top_posts_section`, `render_top_viewed_posts_section`, `render_top_list`, `render_recent_clicks_section`, `render_recent_views_section`, `ajax_dashboard_filter`) — movidos a `Top_Posts_Query`, `Views_Query`, `Score_Query` y `Analytics_Renderer`.
+
+---
+
 ## [1.2.0] — WPAM_API: WPAM_API::get_top_viewed_posts()
 
 ### Added
@@ -198,6 +224,549 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `wp_safe_redirect()` for instant redirects; `allowed_redirect_hosts` filter for external domains.
 
 ---
+
+### 1.0.0 — Top Posts Shortcode
+
+**New feature:** shortcode `[wpam_top_posts]` para mostrar los posts con más clicks en el frontend, reutilizando exactamente la misma fuente de datos que el Dashboard de Analytics.
+
+#### Atributos
+
+| Atributo | Valores | Default | Descripción |
+|---|---|---|---|
+| `title` | cualquier texto | vacío | Encabezado del widget. Si está vacío no se muestra. |
+| `period` | `today` `week` `month` `total` | `total` | Rango temporal de los clicks. |
+| `layout` | `horizontal` `vertical` | `horizontal` | Layout del widget. |
+| `thumbnail_size` | cualquier tamaño WordPress registrado | `medium` | Tamaño de la imagen. |
+| `limit` | entero 1-100 | `10` | Cantidad de posts a mostrar. |
+| `max_width` | valor CSS (`400px`, `100%`) | vacío | Ancho máximo del widget. |
+| `show_thumbnail` | `yes` `no` | `yes` | Mostrar o no la imagen del post. |
+
+#### Ejemplos
+
+```
+[wpam_top_posts]
+[wpam_top_posts period="month"]
+[wpam_top_posts period="week" layout="vertical"]
+[wpam_top_posts period="total" limit="20"]
+[wpam_top_posts title="Popular Figures" period="month" thumbnail_size="medium"]
+[wpam_top_posts layout="horizontal" max_width="800px" show_thumbnail="yes"]
+```
+
+## 📘 WPAM Top Posts API
+
+### Uso básico
+
+- Permite obtener los posts más populares como objetos `WP_Post`.
+
+```php
+$posts = \WP_AffiliateManager\API\WPAM_API::get_top_posts([
+    'period'    => 'week',   // day | week | month | total
+    'limit'     => 10,
+    'post_type' => 'post'    // post | page | any
+]);
+```
+
+### Resultado
+
+- Devuelve un array de WP_Post con campos adicionales:
+
+```php
+$post->wpam_click_count; // int
+$post->wpam_thumbnail;   // string|null
+```
+
+### Verificación opcional
+
+```php
+if ( class_exists( '\WP_AffiliateManager\API\WPAM_API' ) ) {
+    $posts = \WP_AffiliateManager\API\WPAM_API::get_top_posts([
+        'period' => 'week',
+        'limit'  => 10
+    ]);
+}
+```
+
+### Notas
+
+- API de solo lectura
+- No requiere configuración adicional
+- Usa la misma fuente de datos que el dashboard del plugin
+- Compatible con widgets, dashboard y extensiones externas
+
+#### Comportamiento responsive
+
+- **Desktop / Tablet — `layout=horizontal`:** fila adaptativa de cards (imagen + título debajo). Las cards hacen `flex-wrap` cuando no caben; sin overflow horizontal.
+- **Desktop / Tablet — `layout=vertical`:** lista apilada con imagen a la izquierda y título a la derecha.
+- **Móvil (≤ 640px):** ambos layouts usan tarjetas compactas con imagen a la izquierda y título a la derecha con ellipsis. Mismo patrón visual que el board Post Affiliates del plugin.
+
+#### Notas técnicas
+
+- El CSS del widget (`top-posts-widget.css`) se registra en `wp_enqueue_scripts` pero solo se encola cuando el shortcode es ejecutado en la página. Cero impacto en páginas que no usan el shortcode.
+- La query SQL se encapsula en `Frontend\Top_Posts_Query::get()`, clase compartida entre el Dashboard y el shortcode — sin duplicación de consultas.
+- `Admin_Menu::get_top_posts()` delega en `Top_Posts_Query::get()` y añade `thumb_url` + `edit_url` que solo necesita el dashboard.
+
+**Archivos nuevos:**
+- `includes/frontend/class-top-posts-query.php` — query compartida (rango + límite).
+- `includes/frontend/class-shortcode-top-posts.php` — shortcode `[wpam_top_posts]`.
+- `assets/css/top-posts-widget.css` — estilos del widget (horizontal, vertical, móvil).
+
+**Archivos modificados:**
+- `wp_affiliatemanager.php` — versión `0.2.8 → 1.0.0`, `WPAM_VERSION` actualizado.
+- `includes/class-plugin.php` — `require_once` de las dos clases nuevas; registro del shortcode vía `Shortcode_Top_Posts::register()`; `wp_register_style` del CSS del widget.
+- `includes/admin/class-admin-menu.php` — `get_top_posts()` ahora delega en `Top_Posts_Query::get()` en vez de ejecutar su propio SQL.
+
+### 0.2.8 — Dashboard Analytics Filters
+
+**New feature:** the four click-stat metric cards at the top of the analytics dashboard are now interactive time-range filters.
+
+**How it works:**
+
+Clicking any of the four cards — 📈 Clicks Today, 📅 Last 7 Days, 🗓️ Last 30 Days, 🖱️ Total Clicks — immediately updates both **Top Affiliates** and **Top Posts** to reflect that time range, without a page reload.
+
+- The active card remains fully visible; inactive cards appear grayed out.
+- Hovering an inactive card signals it is clickable.
+- The selected filter is persisted in `localStorage` and automatically restored when returning to the dashboard.
+- Percentage bars in Top Affiliates are calculated relative to the total clicks within the selected range.
+
+**Files changed:**
+
+- `wp_affiliatemanager.php`: version bumped to `0.2.8`, `WPAM_VERSION` updated.
+- `includes/admin/class-admin-menu.php`:
+  - Top Affiliates and Top Posts column wrappers now carry `wpam-filter-affiliates-col` / `wpam-filter-posts-col` CSS classes as stable AJAX targets.
+  - `get_top_affiliates()` and `get_top_posts()` accept an optional `$range` param (`today|week|month|total`); a `WHERE ts >= ?` clause is applied when range is not `total`.
+  - New `ajax_dashboard_filter()` public method — AJAX handler secured with nonce + `manage_options` capability check.
+  - New private helpers `get_range_total()` and `range_to_since()`.
+- `includes/class-plugin.php`: registered `wp_ajax_wpam_dashboard_filter` hook.
+- `includes/admin/class-admin-assets.php`: enqueues `assets/js/dashboard.js` and localizes `wpamDashboard` object only on the dashboard screen.
+- `assets/js/dashboard.js` *(new)*: card click handler, active/inactive state toggling, AJAX request, `localStorage` persistence and restore on load.
+- `assets/css/admin.css`: added scoped styles for card `--active`, `--inactive`, and `--inactive:hover` states (opacity + grayscale filter), scoped to `body.toplevel_page_wpam-dashboard`.
+
+### 0.2.7 — Security Hardening & Broken Link Reporting
+
+**`includes/settings/class-settings.php`:**
+
+* Added a new **Interstitial Width** setting with 5 predefined sizes:
+
+  * 460px (default)
+  * 600px
+  * 800px
+  * 1000px
+  * Full Width
+* Added a new **Content Slots** section for custom content inside the interstitial page.
+* Supported slot types:
+
+  * Custom HTML
+  * Image + Link
+* Available slot positions:
+
+  * Before Disclaimer
+  * After Disclaimer
+  * Before Related Post
+  * After Related Post
+* Introduced a scalable `content_slots` structure to support multiple slots in future releases.
+
+**`includes/redirect/class-interstitial-renderer.php`:**
+
+* Added dynamic Content Slot rendering based on configured position.
+* Added configurable width classes for the interstitial card.
+* Improved extensibility for future promotional content, embeds, banners, and custom layouts.
+
+**`assets/css/interstitial.css`:**
+
+* Added responsive width classes for configurable interstitial layouts.
+* Added styling for Custom HTML slots.
+* Added styling for Image + Link promotional blocks.
+* Improved support for wider layouts and future monetization features.
+
+**Admin UI Fixes:**
+
+* Fixed a WordPress admin footer overlap issue that could cover controls at the bottom of plugin settings pages.
+* Improved compatibility with custom content rendered inside the interstitial page.
+
+## 0.2.5 — Interstitial Improvements & Analytics Controls
+
+### Added
+
+* Affiliate-specific disclaimer support.
+* Affiliate-related post support.
+* Optional related post excerpt display.
+* Setting to exclude administrators from analytics (enabled by default).
+* "Clear Analytics" maintenance tool.
+* Maintenance section in Dashboard for analytics and token map utilities.
+
+### Improved
+
+* Interstitial can now display related content cards.
+* Better flexibility for affiliate-specific messaging.
+* Cleaner maintenance workflow from the Dashboard.
+
+### Fixed
+
+* Fixed administrator exclusion logic in analytics tracking.
+* Fixed redirect flow when admin analytics exclusion is enabled.
+* Fixed undefined variable warning in `Redirect_Manager`.
+* Improved interstitial stability and redirect handling.
+
+### Notes
+
+* No database migrations required.
+* No changes to redirect tokens.
+* No changes to the `wpam_clicks` table structure.
+* Fully compatible with existing 0.2.x installations.
+
+### 0.2.4 — Maintenance: Rebuild Token Map
+
+**`includes/admin/class-admin-menu.php`:**
+- Nueva card "Maintenance" al final del Dashboard.
+- Botón "Rebuild Token Map": vacía completamente `wpam_redirect_tokens`,
+  busca todos los posts con `_wpam_links` via SQL, llama
+  `Redirect_Manager::rebuild_token_map()` para cada uno (reutiliza
+  la lógica existente sin duplicarla), redirige al dashboard con un
+  notice que muestra posts procesados y tokens generados.
+- Seguridad: nonce + `manage_options` capability check.
+
+**`includes/class-plugin.php`:**
+- Registrado hook `admin_post_wpam_rebuild_token_map`.
+
+
+### 0.2.3 — Dashboard Analytics MVP
+
+* Nuevo dashboard de analytics integrado directamente en la pantalla principal del plugin.
+* Visualización de métricas reales obtenidas desde la tabla SQL `wpam_clicks`.
+
+**`includes/admin/class-admin-menu.php`:**
+
+* 4 stat cards nuevas en el dashboard: Clicks Today, Last 7 Days, Last 30 Days y Total Clicks.
+* Queries SQL directas sobre `wpam_clicks`.
+* Top Affiliates: top 10 por clicks con logo, nombre, barra de progreso y porcentaje respecto al total.
+* Top Posts: top 10 por clicks con thumbnail, título y acceso rápido al editor.
+* Recent Clicks: tabla compacta con los últimos 20 clicks registrados.
+* Muestra fecha/hora (timezone local), afiliado, post y dominio destino.
+* No muestra IP, user agent ni referer.
+* Layout reorganizado con métricas superiores, columnas para rankings y sección de actividad reciente.
+* Todas las queries limitadas (Top 10 / Recent 20) para mantener rendimiento óptimo.
+
+**`assets/css/admin.css`:**
+
+* Nuevas clases para analytics dashboard.
+* Grid responsive para métricas y rankings.
+* Barras de progreso visuales para Top Affiliates.
+* Tabla moderna para actividad reciente.
+* Chips visuales para dominios de destino.
+* Responsive automático a una columna en pantallas menores a 900px.
+
+### 0.2.1 — Tracking SQL + migración de clicks legacy
+
+**Nuevo archivo `includes/redirect/class-clicks-table.php`:**
+- `create_table()`: crea `{prefix}wpam_clicks` con dbDelta(). Columnas:
+  id, ts (DATETIME DEFAULT CURRENT_TIMESTAMP), post_id, affiliate_id,
+  destination_url (TEXT), referer (TEXT), ip_hash (CHAR 64), user_agent (TEXT).
+  Índices en affiliate_id, post_id, ts.
+- `maybe_migrate_legacy_clicks()`: idempotente via option `wpam_clicks_migrated`.
+  Sale inmediatamente si ya existe. Itera afiliados, inserta clicks legacy en SQL,
+  borra el meta _wpam_clicks solo si todos los inserts fueron exitosos.
+- `has_legacy_meta()`: query ligera para detectar si hay datos legacy sin iterar posts.
+- `migrate_affiliate_clicks()`: migra un afiliado específico. Normaliza timestamps
+  del formato legacy (Unix int) a DATETIME para SQL.
+
+**`includes/redirect/class-click-tracker.php`:**
+- `record()`: inserta en SQL. IP nunca guardada en texto plano;
+  se usa `hash_hmac('sha256', $ip, wp_salt())`. Registra también referer
+  (via `wp_get_raw_referer()`) y user_agent sanitizado.
+- `get_clicks()`: SELECT con ORDER BY ts DESC.
+- `count()`: SELECT COUNT(*).
+
+**`includes/class-activator.php`:**
+- `activate()` llama `Clicks_Table::create_table()` y
+  `Clicks_Table::maybe_migrate_legacy_clicks()` tras registrar la rewrite rule
+  y antes del flush_rewrite_rules().
+
+**`includes/class-plugin.php`:**
+- `require_once` de `class-clicks-table.php` añadido antes de `class-click-tracker.php`.
+
+### 0.2.0-alpha3.2 — Texto del botón interstitial configurable
+
+**`includes/settings/class-settings.php`:**
+- Nuevo campo `interstitial_button_text` en la sección "Redirect / Interstitial".
+- Sanitización con `sanitize_text_field()`. Fallback automático a "Continuar"
+  si el campo queda vacío.
+- Default añadido en `get_defaults()`.
+
+**`includes/redirect/class-interstitial-renderer.php`:**
+- El botón principal del interstitial ya no tiene texto hardcoded.
+- Lee `interstitial_button_text` de las settings del plugin.
+- Fallback a "Continuar" si el setting no existe.
+
+### 0.2.0-alpha3.1 — Settings UI fixes
+
+**`assets/css/settings.css`:**
+- Fix del toggle/switch: el checkmark nativo de WordPress ya no aparece encima
+  del toggle custom. Se añadieron `border:none`, `box-shadow:none`,
+  `color:transparent`, `overflow:hidden` y `::before{display:none}` para
+  suprimir cualquier pseudo-elemento o decoración nativa del browser.
+- Foco del toggle ahora usa `outline` en lugar de `box-shadow` para mantener
+  accesibilidad por teclado sin interferir con el thumb del switch.
+- Botón Save restaurado y visible: selectores ampliados a
+  `input[type="submit"]` además de `.button-primary`. Añadidos
+  `display:block !important` y `visibility:visible !important` al contenedor
+  `.submit` y `p.submit` para evitar herencia del admin de WordPress.
+
+**`includes/settings/class-settings.php`:**
+- Campo `redirect_delay` cambiado de `<input type="number">` a `<select>`
+  con opciones fijas: 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 segundos.
+- Máximo permitido actualizado de 30s a 60s.
+- Sanitización actualizada: valida contra la lista de valores permitidos.
+  Valores fuera de lista hacen fallback a 5s. Clamp absoluto a 60s para
+  valores enviados manualmente fuera del select.
+- La opción 0s muestra "0s — Redirect instantáneo" para dejar claro el comportamiento.
+
+### 0.1.4 — Auto-detección de afiliado en el editor de posts
+
+**Nuevo archivo `assets/js/domain-detector.js`:**
+- Módulo compartido `window.WPAMDomainDetector` con `normalizeDomain()`,
+  `extractDomain()` y `findByDomain()`.
+- Elimina la duplicación de lógica de detección entre el board Post Affiliates
+  y el editor de posts. Un solo archivo, dos consumidores.
+
+**`assets/js/post-links.js`:**
+- Eliminado el select manual de afiliado del formulario.
+- Auto-detección por dominio con debounce 500ms usando `WPAMDomainDetector`.
+- Chip preview visual al detectar afiliado (logo + nombre + color).
+- Preview de URL final generada client-side con param/value del afiliado detectado.
+- Error inline si no hay afiliado para el dominio.
+- Detección inicial en filas ya cargadas al abrir el editor.
+
+**`assets/js/post-affiliates.js`:**
+- `DomainDetector` local reemplazado por alias de `window.WPAMDomainDetector`.
+- Sin cambios funcionales; comportamiento idéntico a v0.1.3.
+
+**`includes/posts/class-post-links.php`:**
+- Eliminado el `<select>` de afiliado del formulario del meta box.
+- `render_link_item()`: ahora muestra URL + `.wpam-detect-preview` + `.wpam-detect-error` + Label.
+- Nuevo método `render_detect_chip()` para el chip inicial en items existentes.
+- `save()`: ya no recibe `provider_id` del formulario. Detecta el afiliado
+  automáticamente por dominio usando `Repository::find_by_domain()` +
+  `wpam_extract_domain_from_url()`, exactamente igual que `ajax_save_post_links()`.
+  Links sin afiliado coincidente se descartan silenciosamente.
+- `render_meta_box()`: añade `data-affiliates` con dominios pre-normalizados
+  para matching JS sin AJAX.
+
+**`includes/admin/class-admin-assets.php`:**
+- Encola `domain-detector.js` como dependencia de `post-links.js` en el editor de posts.
+- Encola `domain-detector.js` como dependencia de `post-affiliates.js` en el board.
+- Añade campo `affiliates` a `wpamPostLinksData` (afiliados activos con dominios
+  pre-normalizados, param y value).
+- Nuevo método privado `get_affiliates_for_js()`.
+- Actualizado string `preview_placeholder` en i18n.
+
+**`assets/css/post-links.css`:**
+- `.wpam-link-row--detected`: borde verde cuando el afiliado es detectado.
+- `.wpam-link-row--error`: borde rojo cuando no hay coincidencia.
+- `.wpam-detect-preview` / `.wpam-detect-chip`: chip visual del afiliado detectado.
+- `.wpam-detect-error`: mensaje de error inline animado.
+
+**Compatibilidad:**
+- Links existentes en DB siguen funcionando sin migración.
+- `provider_id` se sigue guardando en meta; ahora lo asigna el backend por dominio.
+- Compatible con editor clásico y Gutenberg (meta box estándar de WordPress).
+- No interfiere con el flujo de publicación nativo de WordPress.
+
+### 0.1.3 — Auto-detección de afiliado por dominio
+
+**Nuevas funciones en `helpers.php`:**
+- `wpam_normalize_domain( string $domain ): string`
+  Normaliza cualquier dominio o URL a su forma canónica (lowercase, sin www., sin
+  protocolo, sin trailing slash). Usa `wp_parse_url()` internamente.
+- `wpam_extract_domain_from_url( string $url ): string`
+  Extrae y normaliza el dominio del host de una URL completa.
+
+**`class-repository.php`:**
+- Nuevo método `find_by_domain( string $domain ): ?array`
+  Recorre todos los afiliados activos y compara sus `domains` (campo separado por
+  comas) con el dominio dado. Soporta matching exacto y por sufijo. Case-insensitive.
+
+**`class-post-affiliates-screen.php`:**
+- Eliminado el `<select>` de afiliado/proveedor del editor inline.
+- Nuevo método `render_detect_chip()` para el chip de preview en items existentes.
+- `render_link_item()` ahora muestra solo: URL + preview de detección + Label opcional.
+- `render_post_row()` pre-normaliza los dominios de cada afiliado como array JSON en
+  `data-affiliates`, listo para matching JS sin AJAX.
+- `ajax_save_post_links()`: valida la detección en PHP de forma independiente al JS.
+  Detecta el afiliado por dominio, guarda `provider_id` automáticamente, rechaza URLs
+  sin coincidencia y URLs duplicadas.
+- Nuevo método privado `normalize_url_for_comparison()`.
+
+**`post-affiliates.js`:**
+- Nuevo módulo `DomainDetector` con `normalizeDomain()`, `extractDomain()` y
+  `findByDomain()`. Espejo de las funciones PHP para consistencia cliente/servidor.
+- `Editor.detectAffiliate()`: detección con debounce 500ms al escribir en el campo URL.
+- `Editor.setDetectSuccess()`: renderiza el chip visual del afiliado detectado.
+- `Editor.setDetectError()`: muestra error inline sin `alert()`.
+- `Editor.clearDetectState()`: limpia el estado durante la espera del debounce.
+- `Editor.refreshSaveBtn()`: habilita/deshabilita Save según estado de todos los items.
+- `Save.readItem()`: ya no lee `provider_id` del DOM; solo envía `original_url` + `custom_label`.
+- `normalizeUrlForComparison()`: normaliza URLs para detección de duplicados en cliente.
+
+**`post-affiliates.css`:**
+- `.wpam-pa-detect-preview` / `.wpam-pa-detect-chip`: chip visual del afiliado detectado.
+- `.wpam-pa-link-item--detected`: borde verde cuando el afiliado es detectado.
+- `.wpam-pa-link-item--error`: borde rojo cuando no hay coincidencia.
+- `.wpam-pa-url-error`: mensaje de error inline animado.
+- `.wpam-pa-save-btn:disabled`: botón Save bloqueado con opacidad reducida.
+
+**Compatibilidad:**
+- Los links existentes en DB no se modifican.
+- El campo `provider_id` se sigue guardando en meta; ahora lo asigna el backend.
+- Afiliados con `domains` vacío no participan en la detección automática.
+
+### 0.1.2 — Post Affiliates State Fixes & Visual Polish
+
+- Fix: Remove + Cancel ya no elimina afiliados visualmente de forma permanente. El botón X ahora solo afecta el estado temporal del editor abierto; Cancel restaura el estado original desde un snapshot HTML serializado inmutable capturado en `open()`, garantizando que los nodos eliminados en sesión reaparezcen exactamente como estaban.
+- Fix: El snapshot anterior guardaba referencias jQuery vivas (`$item: $( this )`) al DOM; cuando el nodo era eliminado por `.remove()`, la referencia quedaba huérfana y Cancel no podía restaurarlo. El snapshot ahora es `{ listHtml: string, emptyVisible: bool }` — una cadena de texto serializada con `$list.html()` que `.remove()` no puede mutar.
+- Fix: `cancel()` reconstruye la lista completa con `$list.html( snap.listHtml )` en lugar de iterar nodos vivos con índices desincronizados. Esto garantiza restauración exacta aunque se hayan eliminado, reordenado o añadido filas temporales durante la sesión.
+- Fix: El snapshot se elimina con `delete Editor._snapshots[ postId ]` tanto en `cancel()` como en `save()`, evitando snapshots huérfanos que podrían contaminar aperturas posteriores del editor.
+- Fix: Layout horizontal del board corregido de `display: grid` con `grid-template-areas` a `display: flex; flex-wrap: wrap`. El título del post usa `flex: 1 1 200px; max-width: 340px` y la área de chips usa `flex: 1 1 180px` sin `max-width` fijo, eliminando el gran hueco vacío a la derecha.
+- Fix: El editor inline usa `width: 100%; flex-basis: 100%` para ocupar fila completa dentro del contenedor flex, reemplazando el `grid-area: editor` que ya no aplica.
+- Mejora visual: Chips de afiliados cambian de pill ultra-redondeada (`border-radius: 20px`) a mini-card compacta (`border-radius: 6px`) con borde sutil `rgba(0,0,0,0.07)`, eliminando el aspecto de badge/tag genérico.
+- Mejora visual: Logo/inicial dentro del chip aumenta de 16px a 18px y cambia de `border-radius: 50%` (círculo) a `border-radius: 3px` (cuadrado suave), más legible y consistente con el estilo card.
+- Mejora visual: Hover de chips simplificado a `filter: brightness(0.94)` + `box-shadow` suave, eliminando `transform: translateY(-1px)` innecesario.
+- Mejora visual: Botón "+" adopta `border-radius: 6px` coherente con los chips, altura 30px, sin animación de elevar en hover.
+- Version bumped to `0.1.2`.
+
+### 0.1.1 — Post Affiliates UX/UI Fixes
+
+- Fix: "Add Link" ahora siempre inyecta una fila nueva clonada dinámicamente desde JS. Eliminado el contenedor reutilizable `#wpam-pa-new-wrap-{id}` — cada clic crea un nódo `<div>` único con ID basado en `Date.now()`. Resuelve el problema donde clics adicionales no producían nueva fila.
+- Fix: Cancel y Save ahora destruyen el estado temporal completamente. Save reemplaza el row completo con HTML fresco del servidor (editor colapsado). Cancel elimina todas las filas marcadas como `.wpam-pa-link-item--new` y restaura los valores originales de las filas existentes desde atributos `data-orig-*`.
+- Fix: El editor ya no reaparece con datos stale al reabrir después de Cancel, porque el DOM fue limpiado antes de cerrar.
+- New: Filtro de status en toolbar (segmented control: All / Published / Draft / Scheduled). La selección activa aplica `post_status` a la query AJAX `wpam_load_posts`. El PHP valida el valor contra `VALID_STATUSES` whitelist.
+- New: `query_posts()` acepta parámetro `$status` y aplica `post_status` dinámico; `ajax_load_posts()` acepta `status` POST var.
+- Mejora: Chips de afiliados rediseñados como mini-cards visuales: logo 16px circular + label + color del afiliado via `--chip-color`/`--chip-bg` CSS custom properties. PHP calcula el `rgba()` del `brand_color` con `hex_to_rgba()`. Hover con `filter: brightness + transform + box-shadow`.
+- Mejora: Botón "+" rediseñado como chip dashed con icono y label “Add”, coherente con la galía de chips.
+- Mejora: Toolbar rediseñado: todos los controles tienen la misma altura (36px), icono de lupa en el search, `background: var(--wpam-gray-100)`, `box-shadow` suave, transición al foco.
+- Mejora: Load More rediseñado como botón pill con borde `var(--wpam-primary)`, flecha animada en hover.
+- Mejora: Filas nuevas aparecen con animación `wpam-pa-item-appear` (fade + slide down 4px).
+- Mejora: Clase `wpam-pa-status--draft` ahora tiene borde `var(--wpam-gray-200)` para mejor contraste en fondo blanco.
+- `class-admin-assets.php`: añadidas strings i18n para el constructor dinámico de filas JS (`label_affiliate`, `label_url`, `label_label`, `label_optional`, `label_placeholder`, `select_placeholder`, `remove_link`).
+- Version bumped to `0.1.1`.
+
+### 0.1.0 — Post Affiliates Board
+
+- New screen: **Post Affiliates** (`wpam-post-affiliates`) — visual board to manage affiliate links per post from a single place.
+- New file: `includes/admin/class-post-affiliates-screen.php` — renders the board, AJAX handlers.
+- New file: `assets/js/post-affiliates.js` — toolbar search/filter with debounce, load more (append), inline editor expand/collapse, save via AJAX, replace row on response.
+- New file: `assets/css/post-affiliates.css` — board styles: row card with thumbnail, chips, inline editor.
+- New AJAX action: `wpam_load_posts` (unified: initial load + load more + search/filter). Params: `offset`, `limit`, `search`, `category`, `tag`. Returns HTML + `has_more`.
+- New AJAX action: `wpam_save_post_links` — receives full links array from client, validates/sanitizes, writes to `_wpam_links`, returns updated row HTML.
+- `class-admin-menu.php`: added `wpam-post-affiliates` submenu page and nav item.
+- `class-admin-assets.php`: registers and enqueues `post-affiliates.js` + `post-affiliates.css` only on the new screen.
+- `class-plugin.php`: `require_once` for new screen class + two AJAX hooks registered.
+- Fix: removed counter badge `<span class="wpam-count-badge">` from Affiliates screen title (cosmetic zero display).
+- Performance: `query_posts()` uses `fields => ids`, `no_found_rows => true`, `update_post_meta_cache => false`, `update_post_term_cache => false` — safe for 500-1000+ posts.
+- Reutilization: editor inline reuses `.wpam-edit-form`, `.wpam-edit-grid`, `.wpam-input`, `.wpam-saving-indicator` from existing `admin.css`.
+- Version bumped to `0.1.0` in plugin header and `WPAM_VERSION` constant.
+
+### 0.0.7 — Bunny Admin UI Homologation
+
+- **Bunny Admin UI system:** adopted the shared `bunny-*` admin UI convention used across all Bunny plugins. The admin header, tab navigation, wrappers, badges, and spacing now use `.bunny-*` classes and `--bunny-*` CSS custom properties.
+- **New `bunny-admin.css`:** added a plugin-agnostic stylesheet containing only shared admin chrome: sticky header, horizontal tab nav, version badge, page-content wrapper, and responsive breakpoints. Loaded as a WordPress style dependency before `admin.css`.
+- **Sticky admin header:** the header is now `position: sticky; top: 32px`, keeping the plugin name, tabs, and version badge visible while scrolling any admin page.
+- **Page subtitle:** each admin page now shows the current section name (Dashboard, Affiliates, Settings) as a small uppercase label below the plugin name, using `.bunny-page-subtitle`.
+- **`admin.css` refactored:** the header, nav, wrap, and page-content sections were removed. Plugin-specific `--wpam-*` variables are now declared as aliases of `--bunny-*` tokens so all downstream WPAM styles continue to work without changes.
+- **`class-admin-assets.php`:** `bunny-admin.css` is now enqueued before `admin.css` with an explicit dependency declaration.
+- **`class-admin-menu.php`:** `render_admin_header()` and `render_admin_nav()` updated to emit `bunny-*` classes exclusively; `wpam-admin-wrap` class retained alongside `bunny-wrap` for backward-compatible specificity.
+- **`class-affiliates-screen.php`:** `wpam-page-content` replaced with `bunny-page-content`.
+- **No functional changes:** all plugin logic, AJAX handlers, REST endpoints, affiliate CRUD, meta boxes, and frontend rendering are unchanged.
+
+### 0.0.6 — Inline CRUD + Bug Fix Dashboard
+
+- New: Inline affiliate creation — "Add Affiliate" now inserts an editable row at the top of the table without leaving the page.
+- New: Inline affiliate editing — the ✏️ button replaces the row with an editable form in-place; no separate screen.
+- New: Affiliate field `domains` — free-text field to note associated domains (e.g. `amazon.com, amzn.to`). Informational only.
+- New: Affiliate field `visible` — checkbox to mark affiliate visibility, separate from active status.
+- New: AJAX actions `wpam_save_affiliate` and `wpam_get_edit_row` with nonce `wpam_inline_crud`.
+- New: inline notice area `#wpam-ajax-notice` for save feedback without page reload.
+- New: CSS animation flash on newly saved rows.
+- Fix: Dashboard "Posts with Affiliates" counter now correctly queries `_wpam_links` meta key joined against `wp_posts`, filtering by `post_type = 'post'` and `post_status = 'publish'`. Previously it was counting `_wpam_active` records (affiliate CPT meta), not actual posts with links.
+- Fix: Dashboard "Add New Affiliate" button now points to the Affiliates screen instead of the native CPT editor.
+- Improvement: Affiliates table gains two new columns: Domains and Flags (visible indicator).
+- Improvement: `class-repository.php` `save()` and `normalize()` updated to include `domains` and `visible` fields.
+- Improvement: `class-meta.php` adds `KEY_DOMAINS` and `KEY_VISIBLE` constants.
+- Improvement: `wpamAdminData` JS object gains `crudNonce` property.
+
+### 0.0.4 — FASE 4: Render Engine
+
+- New: `Render_Engine` class — central frontend rendering module with in-memory cache.
+- New: `the_content` filter integration supporting `after_content` and `before_content` modes.
+- New: shortcode `[wpam_links]` with `style` (`vertical`/`horizontal`) and `post_id` attributes.
+- New: setting `render_mode` with four options: `disabled`, `after_content`, `before_content`, `shortcode_only`.
+- New: setting `link_style` for global default template style (`vertical` / `horizontal`).
+- New: template `link-item.php` — individual link row with logo, name, and CTA button.
+- New: template `links-wrapper.php` — outer wrapper with style class and data attributes.
+- New: theme override support: drop templates in `/wp-content/themes/THEME/wpam/`.
+- New: public helpers `wpam_render_links()` and `wpam_get_rendered_links()`.
+- New: `frontend.css` — clean, lightweight styles for vertical and horizontal layouts.
+- New: CSS variable `--wpam-brand-color` injected per affiliate for accent styling and left border.
+- Improvement: `Frontend_Assets` now loads CSS/JS only when post has active links and `render_mode` is not `disabled`.
+- Improvement: `Render_Engine` uses in-memory cache per `post_id + style` to avoid duplicate renders.
+- Improvement: orphan links silently omitted from frontend render (no warnings, no broken HTML).
+- Improvement: `maybe_enqueue_assets()` handles late shortcode rendering outside `wp_enqueue_scripts`.
+- Improvement: `Frontend` class exposes `get_render_engine()` for external access.
+- Fix: explicit `null` check added in `build_html()` when `link-item` template is not found — avoids silent null-to-string coercion on concatenation.
+- Fix: `// Already escaped above.` comments replaced with inline `phpcs:ignore` directives in all templates.
+- Fix: escaping in `link-item.php` hardened — each output point uses its own escape function instead of relying on pre-escaped variables.
+- Fix: `wrapper_class` and `style` re-escaped with `esc_attr()` at the output point in `links-wrapper.php`.
+- Fix: dead include `class-post-affiliates.php` removed from `class-plugin.php` (FASE 1 placeholder superseded by `class-post-links.php` in FASE 3).
+- Docs: architectural note added to `Render_Engine::register()` explaining why hooks bypass the Loader.
+
+### 0.0.3 — Polish & Stability
+
+- Fix: `order` field now always saves with correct incremental values (0, 1, 2...) in both PHP and JS.
+- Fix: URL validation upgraded to `filter_var( FILTER_VALIDATE_URL )` plus scheme verification (http/https only).
+- Fix: orphan providers no longer generate PHP warnings; `get_links()` returns `_orphan => true` with `_orphan_title` for the UI.
+- Fix: orphan rows display a visual warning (yellow background) and a bordered provider select.
+- Fix: orphan row preview shows the original URL with a "no affiliate applied" indicator.
+- Improvement: "Add Link" button is disabled automatically when no active affiliates exist, with a notice and a direct link to the affiliates screen.
+- Improvement: empty list placeholder improved with icon and better visual spacing.
+- Improvement: `wpam_get_post_links()` accepts `$active_only` to filter orphans easily.
+- Improvement: `wpam_normalize_link_item()` guarantees all array keys for safe access.
+- Improvement: `wpam_post_link_is_orphan()` added as a direct helper for templates.
+- Improvement: client-side URL validation via the URL API with immediate visual feedback.
+- Improvement: `updateCounter` now targets `#wpam-links-count` (specific ID, more robust).
+
+### 0.0.2 — FASE 3: Per-Post Link System
+
+- New: "Affiliate Links" meta box on posts.
+- New: per-post link system (provider, URL, label, order).
+- New: real-time affiliate URL preview without AJAX.
+- New: save pipeline with nonce, sanitization, and provider validation.
+- New: helpers `wpam_get_post_links()`, `wpam_get_post_link()`, `wpam_post_has_links()`, `wpam_get_post_links_count()`.
+- New: JavaScript for row management (add, remove, preview).
+- New: dedicated CSS for the meta box (loaded only on post screens).
+
+### 0.0.1 — FASE 1 & 2: Base Architecture + Affiliate System
+
+- Modular class-oriented architecture with PHP 8 namespaces.
+- Central hook Loader (actions and filters).
+- Activation/deactivation hooks with requirements validation.
+- Custom Post Type `wpam_affiliate` (private, visible in admin).
+- Affiliate meta boxes: Details, Appearance, Status.
+- Affiliate repository with full CRUD.
+- Admin affiliate screen with table, toggle, and deletion.
+- URL generator: `wpam_generate_affiliate_url()`.
+- WordPress Settings API with per-field sanitization.
+- Template system with theme-override support.
+- REST API endpoint `/wp-json/wpam/v1/status`.
+- Dashboard with live affiliate counters.
+
+## Future extensibility notes
+
+- Add click statistics per link and per affiliate.
+- Build Gutenberg blocks for inline affiliate link insertion.
+- Add drag-and-drop reordering of links within the meta box.
+- Extend support to additional post types via `wpam_post_links_post_types` filter.
+- Consider WooCommerce integration for product affiliate links.
+- Keep statistics, automation, and notifications separate from core affiliate services.
+
 
 ## [0.1.4] — Auto-detect Affiliate in Post Editor
 

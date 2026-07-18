@@ -24,6 +24,7 @@
 
 namespace WP_AffiliateManager\API;
 
+use WP_AffiliateManager\Analytics\Score_Query;
 use WP_AffiliateManager\Frontend\Top_Posts_Query;
 use WP_AffiliateManager\Views\Views_Query;
 
@@ -85,6 +86,28 @@ class WPAM_API {
 			'view_count',
 			'wpam_view_count',
 			'wpam_api_top_viewed_posts'
+		);
+	}
+
+	/**
+	 * Obtiene Top Scored Posts (score = views*factor + clicks*factor) como WP_Post[] enriquecidos.
+	 *
+	 * Espejo exacto de get_top_posts() / get_top_viewed_posts(): mismos
+	 * argumentos, misma validación, mismo $filters, misma normalización.
+	 * Solo cambia la fuente de datos (Score_Query::get_cached()) y el campo
+	 * de conteo (score / wpam_score).
+	 *
+	 * @since  1.4.0
+	 * @param  array $args Ver get_top_posts() para la estructura completa.
+	 * @return \WP_Post[]
+	 */
+	public static function get_top_scored_posts( array $args = array() ): array {
+		return self::build_top_posts_response(
+			$args,
+			array( Score_Query::class, 'get_cached' ),
+			'score',
+			'wpam_score',
+			'wpam_api_top_scored_posts'
 		);
 	}
 
