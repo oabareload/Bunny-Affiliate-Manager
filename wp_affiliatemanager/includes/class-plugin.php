@@ -49,6 +49,12 @@ require_once WPAM_PLUGIN_PATH . 'includes/redirect/class-interstitial-renderer.p
 require_once WPAM_PLUGIN_PATH . 'includes/redirect/helpers-redirect.php';
 
 // --- FASE 4: Render Engine ---
+// v1.6.0: sistema de Layouts (Card / Showcase), separado de Render_Engine.
+require_once WPAM_PLUGIN_PATH . 'includes/frontend/layouts/interface-layout.php';
+require_once WPAM_PLUGIN_PATH . 'includes/frontend/layouts/class-layout-registry.php';
+require_once WPAM_PLUGIN_PATH . 'includes/frontend/layouts/class-layout-card.php';
+require_once WPAM_PLUGIN_PATH . 'includes/frontend/layouts/class-layout-showcase.php';
+require_once WPAM_PLUGIN_PATH . 'includes/frontend/components/class-button-row.php';
 require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-render-engine.php';
 require_once WPAM_PLUGIN_PATH . 'includes/frontend/helpers-render.php';
 

@@ -124,6 +124,7 @@ class Affiliates_Screen {
 			'active'      => ! empty( $_POST['active'] ),
 			'visible'     => ! empty( $_POST['visible'] ),
 			'domains'     => sanitize_textarea_field( wp_unslash( $_POST['domains'] ?? '' ) ),
+			'default_url' => sanitize_text_field( wp_unslash( $_POST['default_url'] ?? '' ) ),
 			'use_global_disclaimer' => ! empty( $_POST['use_global_disclaimer'] ),
 			'custom_disclaimer'     => wp_kses_post( wp_unslash( $_POST['custom_disclaimer'] ?? '' ) ),
 			'related_post_id'       => absint( $_POST['related_post_id'] ?? 0 ),
@@ -390,6 +391,7 @@ class Affiliates_Screen {
 		$active      = $affiliate ? (bool) $affiliate['active']   : true;
 		$visible     = $affiliate ? (bool) $affiliate['visible']  : true;
 		$domains     = $affiliate ? esc_textarea( $affiliate['domains'] ) : '';
+		$default_url = $affiliate ? esc_attr( $affiliate['default_url'] ) : '';
 		$use_global_disclaimer = $affiliate ? (bool) $affiliate['use_global_disclaimer'] : true;
 		$custom_disclaimer     = $affiliate ? esc_textarea( $affiliate['custom_disclaimer'] ) : '';
 		$related_post_id       = $affiliate ? absint( $affiliate['related_post_id'] ) : 0;
@@ -463,6 +465,12 @@ class Affiliates_Screen {
 						<div class="wpam-edit-field wpam-edit-field--value">
 							<label><?php esc_html_e( 'Value', 'wp-affiliatemanager' ); ?></label>
 							<input type="text" class="wpam-input wpam-ef-value" value="<?php echo $value; ?>" placeholder="bunny-20" />
+						</div>
+
+						<!-- Default URL (fallback) -->
+						<div class="wpam-edit-field wpam-edit-field--default-url">
+							<label><?php esc_html_e( 'Default URL (Fallback)', 'wp-affiliatemanager' ); ?></label>
+							<input type="url" class="wpam-input wpam-ef-default-url" value="<?php echo $default_url; ?>" placeholder="https://example.com/store" />
 						</div>
 
 						<!-- Brand color -->

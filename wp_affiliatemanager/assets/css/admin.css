@@ -928,19 +928,6 @@ body.toplevel_page_wpam-dashboard .wpam-stats-grid--views .wpam-stat-card--activ
    v1.4.0 — Dashboard: Overview summary + Quick Access
    ========================================================================== */
 
-.wpam-section-heading {
-	font-size: 15px !important;
-	font-weight: 700 !important;
-	color: var(--wpam-gray-900) !important;
-	margin: 32px 0 14px !important;
-	padding: 0 !important;
-	border: none !important;
-}
-
-.wpam-section-heading:first-of-type {
-	margin-top: 8px !important;
-}
-
 .wpam-stats-grid--summary .wpam-stat-card {
 	padding: 28px 20px;
 }

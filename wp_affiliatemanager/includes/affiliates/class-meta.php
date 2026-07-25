@@ -55,6 +55,8 @@ class Meta {
 	const KEY_CUSTOM_DISCLAIMER     = '_wpam_custom_disclaimer';
 	/** @since 0.2.5 */
 	const KEY_RELATED_POST_ID       = '_wpam_related_post_id';
+	/** @since 1.5.0 */
+	const KEY_DEFAULT_URL           = '_wpam_default_url';
 
 	/**
 	 * Registra los meta boxes en el CPT.
@@ -111,9 +113,10 @@ class Meta {
 	public function render_details_meta_box( \WP_Post $post ): void {
 		wp_nonce_field( 'wpam_save_affiliate_meta_' . $post->ID, 'wpam_affiliate_nonce' );
 
-		$slug  = get_post_meta( $post->ID, self::KEY_SLUG,  true );
-		$param = get_post_meta( $post->ID, self::KEY_PARAM, true );
-		$value = get_post_meta( $post->ID, self::KEY_VALUE, true );
+		$slug         = get_post_meta( $post->ID, self::KEY_SLUG,  true );
+		$param        = get_post_meta( $post->ID, self::KEY_PARAM, true );
+		$value        = get_post_meta( $post->ID, self::KEY_VALUE, true );
+		$default_url  = get_post_meta( $post->ID, self::KEY_DEFAULT_URL, true );
 
 		// Parámetros comunes sugeridos.
 		$common_params = array( 'tag', 'ref', 'aff', 'affiliate', 'partner', 'via', 'utm_source' );
@@ -164,6 +167,19 @@ class Meta {
 					/>
 					<p class="wpam-description"><?php esc_html_e( 'Value assigned to the parameter.', 'wp-affiliatemanager' ); ?></p>
 				</div>
+			</div>
+
+			<div class="wpam-field-row">
+				<label for="wpam_default_url"><?php esc_html_e( 'Default URL (Fallback)', 'wp-affiliatemanager' ); ?></label>
+				<input
+					type="url"
+					id="wpam_default_url"
+					name="wpam_default_url"
+					value="<?php echo esc_url( $default_url ); ?>"
+					placeholder="https://example.com/store"
+					class="wpam-input"
+				/>
+				<p class="wpam-description"><?php esc_html_e( 'Used automatically on posts that do not have a specific link for this affiliate. Leave empty to disable the fallback.', 'wp-affiliatemanager' ); ?></p>
 			</div>
 
 			<?php if ( $param && $value ) : ?>
@@ -417,6 +433,14 @@ class Meta {
 			$color = sanitize_hex_color( wp_unslash( $_POST['wpam_brand_color'] ) );
 			if ( $color ) {
 				update_post_meta( $post_id, self::KEY_BRAND_COLOR, $color );
+			}
+		}
+
+		// Default URL (fallback): debe ser una URL válida o estar vacía.
+		if ( isset( $_POST['wpam_default_url'] ) ) {
+			$raw_default_url = trim( (string) wp_unslash( $_POST['wpam_default_url'] ) );
+			if ( '' === $raw_default_url || false !== filter_var( $raw_default_url, FILTER_VALIDATE_URL ) ) {
+				update_post_meta( $post_id, self::KEY_DEFAULT_URL, esc_url_raw( $raw_default_url ) );
 			}
 		}
 

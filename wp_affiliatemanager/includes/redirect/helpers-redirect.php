@@ -34,3 +34,27 @@ function wpam_go_url( int $post_id, int $link_index ): string {
 
 	return home_url( '/' . WP_AffiliateManager\Redirect\Redirect_Manager::SLUG . '/' . $token );
 }
+
+/**
+ * Retorna la URL interna /goa/{post_id}/{affiliate_id}/ para un link de
+ * fallback (Default URL) de un post.
+ *
+ * A diferencia de wpam_go_url(), no genera ni depende de ningún token
+ * precalculado: la resolución ocurre en vivo en Redirect_Manager::resolve_default()
+ * contra Post_Links::get_links(), así que no hay mapa que mantener sincronizado.
+ *
+ * Uso en Render_Engine, solo para links donde $link['_wpam_is_default'] === true:
+ *   $url = wpam_go_default_url( $post_id, $link['provider_id'] );
+ *
+ * @since  1.5.0
+ * @param  int $post_id      ID del post.
+ * @param  int $affiliate_id ID del afiliado.
+ * @return string URL interna tipo https://site.com/goa/123/45/, o '' si inválido.
+ */
+function wpam_go_default_url( int $post_id, int $affiliate_id ): string {
+	if ( $post_id <= 0 || $affiliate_id <= 0 ) {
+		return '';
+	}
+
+	return home_url( '/' . WP_AffiliateManager\Redirect\Redirect_Manager::SLUG_DEFAULT . '/' . $post_id . '/' . $affiliate_id );
+}

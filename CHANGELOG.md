@@ -5,6 +5,59 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.6.0] — Layout system (Card / Showcase) + Default URL fixes
+
+### Added
+
+- **Layout system**: new `Frontend\Layouts` namespace with `Layout_Interface`, `Layout_Registry`, `Layout_Card`, `Layout_Showcase`, and a shared `Frontend\Components\Button_Row`. `Render_Engine::build_html()` no longer contains any layout-specific markup — it resolves the active layout via `Layout_Registry::get()` and delegates entirely. Adding a future layout is: implement `Layout_Interface`, register it in `Layout_Registry::get_layouts()` (or via the new `wpam_render_layouts` filter), done — zero changes to `Render_Engine`.
+- **`Layout_Card`**: the plugin's original (and, until now, only real) rendering path, moved out of `Render_Engine` verbatim — same templates (`link-item.php`, `links-wrapper.php`), same options, same HTML output. No behavior change for existing sites.
+- **`Layout_Showcase`** (new): single large "product card" — image left / text right on desktop, stacked on mobile — with the same affiliate buttons row at the bottom (via `Button_Row`, not a separate button system). New dedicated stylesheet `assets/css/showcase.css`, enqueued only when the Showcase layout is active. Options (all under `appearance.showcase`): `image_source` (Featured Image | custom URL), `title_source` (post title | custom | hide), `desc_source` (excerpt | custom | hide — **only the manual post excerpt is ever used, same principle as the interstitial's related-post excerpt; content is never auto-trimmed**).
+- **Shared section heading**: one single heading (`appearance.section_heading`: enabled / text / HTML tag H1–H6/div, default H2), rendered once by `Render_Engine` before delegating to whichever layout is active. Not duplicated per layout — Card and Showcase (and any future layout) get it for free.
+- **Settings**: new "Layout" radio selector (Card / Showcase) replaces the old, non-functional "Estilo de botón" field. Layout-specific fields (`link_style` for Card; the three `showcase.*` fields) are marked with `data-wpam-layout-only` and shown/hidden client-side by the new `assets/js/settings.js`, enqueued only on the plugin's Settings screen. Button-display options (`display_content`, `cta_text`, `cta_hidden`, `frontend_order`) are explicitly shared by both layouts — not duplicated.
+
+### Fixed
+
+- **Root cause of "Card / Minimal / Banner always render the same"**: `appearance.button_style` (the old Minimal/Card/Banner selector) was saved to the database but never read anywhere — not in `Render_Engine`, not in any template, not in any CSS file. There was only ever one real visual implementation (what users perceived as "Card"). Confirmed via static analysis before writing any code, per request.
+- **Default URL fallback no longer creates a block on posts that never had any affiliate configured.** `Post_Links::get_links()` now only merges Default URL fallback links when the post has at least one explicit entry ever saved in `_wpam_links` (`$raw_valid_count > 0`, checked before any `active_only` filtering) — a post with zero saved links returns an empty array regardless of how many affiliates have a Default URL. `Frontend_Assets::should_load_assets()` updated to match this exact rule (checks raw link presence, not `active_only`), so CSS/JS enqueueing and rendering now agree in every case, including a post whose only explicit link is orphaned but another affiliate would otherwise qualify as fallback.
+
+### Removed (dead code, confirmed unused before deletion)
+
+- **`appearance.button_style`** setting (Minimal/Card/Banner) and its sanitization — never connected to any rendering logic (see Fixed, above).
+- **`appearance.template`** default key (`'default'`) — present in `Settings::get_defaults()` but never read anywhere in the codebase.
+
+### Notes
+
+- `templates/views/affiliate-card.php` and the `[data-wpam-link]` tracking code in `assets/js/frontend.js` were identified as likely dead code from a pre-`Render_Engine` version (nothing in the current render path calls or emits either), but were **not** removed — out of scope for this change, flagged separately for a future cleanup pass.
+- No SQL migration required. `appearance.layout` defaults to `card`, so existing installations keep their exact current output after updating.
+- Compatibility verified for: shortcodes (`[wpam_links]` unchanged), automatic render (`the_content` filter unchanged), public helpers (`wpam_render_links()`, `wpam_get_rendered_links()`, `wpam_get_post_links()`, `wpam_get_resolved_post_links()` all unchanged), `WPAM_API` (untouched), Recently Viewed (untouched), Default URLs / `/goa/` redirects (untouched beyond the Fixed item above).
+
+---
+
+## [1.5.0] — Affiliate Default URL (fallback links)
+
+### Added
+
+- **Default URL field per affiliate** (`_wpam_default_url` post meta, `Meta::KEY_DEFAULT_URL`): optional fallback URL used automatically on any post that does NOT have a specific link for that affiliate. Validated as URL or empty on save (both the native CPT meta box and the inline Affiliates screen). No checkboxes: the mere presence of a Default URL makes the affiliate eligible as a fallback — priority is always: post-specific link > Default URL > not rendered.
+- **`Post_Links::get_links( int $post_id, array $options = [] )`** — single internal entry point for reading a post's links, now accepting `'active_only'` and `'include_defaults'` options (both default `false`, fully backward compatible with the previous no-args signature). `'include_defaults' => true` merges in synthetic fallback links for every active affiliate with a Default URL that doesn't already have a valid link on the post, generated via the same `wpam_generate_affiliate_url()` used by explicit links. A new filter hook `wpam_resolved_links` fires only when defaults are included.
+- **`wpam_get_resolved_post_links( int $post_id, bool $active_only = true )`** — new public helper, separate from `wpam_get_post_links()` on purpose: it's the one that includes Default URL fallback, delegating to `Post_Links::get_links()` with `include_defaults = true`. `Render_Engine` calls this one; `wpam_get_post_links()` (explicit links only, unchanged signature) keeps being used by the "Affiliate Links" meta box and the Post Affiliates board.
+- **`/goa/{post_id}/{affiliate_id}/` redirect route** (`Redirect_Manager::SLUG_DEFAULT`): a second, stateless rewrite rule for fallback links only. Unlike `/go/{token}`, it does **not** use the `wpam_redirect_tokens` map — `resolve_default()` resolves live against `Post_Links::get_links( ..., ['active_only' => true, 'include_defaults' => true] )`, the exact same canonical method `Render_Engine` uses (via `wpam_get_resolved_post_links()`), so there is zero duplicated business logic and the post-specific link always wins automatically even if it was added after the page was rendered/cached. No map to keep in sync means no proactive rebuild is needed when an affiliate's Default URL changes, and no writes happen during render (Render_Engine only renders; Redirect_Manager only resolves).
+- **`wpam_go_default_url( int $post_id, int $affiliate_id )`** helper, mirroring `wpam_go_url()` for the new route.
+- **Version-triggered `flush_rewrite_rules()`** in `Admin::init()`: compares the stored `wpam_version` option against `WPAM_VERSION` and flushes once per version bump — required so already-active installations pick up the new `/goa/` rewrite rule without deactivating/reactivating the plugin.
+
+### Changed
+
+- `Post_Links::get_links()`: internal `order` numbering for synthetic fallback links is now based on the raw count of valid items in `_wpam_links` (before any `active_only` filtering), preventing an `order` collision with an orphaned explicit link that active_only had excluded.
+- Every link item (explicit or synthetic) now carries a `'_wpam_is_default'` key (`wpam_normalize_link_item()` updated to guarantee it). `Render_Engine::build_html()` uses it to choose between `wpam_go_url()` and `wpam_go_default_url()`.
+- `Interstitial_Renderer`: the "Report broken link" button is now hidden when no `/go/{token}` token is present (i.e. for `/goa/` fallback redirects), since the broken-report AJAX handler only accepts the 8-hex token format. No change for existing `/go/` links.
+
+### Notes
+
+- No SQL migration: affiliates are CPT + post meta, so the new field is just a meta key. Existing installs are unaffected — an affiliate without a Default URL behaves exactly as before.
+- `Post_Affiliates_Screen` board and the "Affiliate Links" post meta box are unchanged: both call `wpam_get_post_links()` / `get_links()` with default options (no fallback merging), since they manage explicit links only.
+- `WPAM_API` is unchanged — it doesn't currently expose per-post links.
+
+---
+
 ## [1.4.0] — Analytics reorganization: Score system + Analytics screen
 
 ### Added

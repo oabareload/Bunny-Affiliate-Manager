@@ -512,64 +512,175 @@ class Post_Links {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Retorna los links guardados de un post, normalizados y seguros.
+	 * Retorna los links de un post, normalizados y seguros.
+	 *
+	 * Punto único de entrada para obtener links de un post. El comportamiento
+	 * se controla via $options:
+	 *
+	 *   'active_only'      (bool) Si true, excluye links con provider huérfano/inactivo.
+	 *                              Default: false.
+	 *   'include_defaults' (bool) Si true, agrega al final un link sintético por cada
+	 *                              afiliado activo que (a) tenga Default URL configurada
+	 *                              y (b) no tenga ya un link específico válido en este post.
+	 *                              El link específico del post siempre tiene prioridad.
+	 *                              SOLO se aplica si el post ya tiene al menos un link
+	 *                              explícito guardado (activo o huérfano); un post que
+	 *                              nunca tuvo afiliados configurados nunca recibe fallback.
+	 *                              Default: false.
+	 *
+	 * Consumidores:
+	 *   - Meta box "Affiliate Links" / Post Affiliates board → opciones por defecto
+	 *     (gestión de links explícitos guardados en _wpam_links, sin fallback).
+	 *   - Render_Engine → 'active_only' => true, 'include_defaults' => true.
 	 *
 	 * @since  3.0.0
 	 * @since  0.0.3 Maneja providers huérfanos; re-asigna order correcto.
+	 * @since  1.5.0 Añade $options (active_only, include_defaults) y filtro 'wpam_resolved_links'.
 	 *
-	 * @param  int $post_id ID del post.
+	 * @param  int   $post_id ID del post.
+	 * @param  array $options Ver descripción arriba.
 	 * @return array[]
 	 */
-	public function get_links( int $post_id ): array {
-		$raw = get_post_meta( $post_id, self::META_KEY, true );
+	public function get_links( int $post_id, array $options = array() ): array {
+		$options = wp_parse_args( $options, array(
+			'active_only'      => false,
+			'include_defaults' => false,
+		) );
 
-		if ( ! is_array( $raw ) || empty( $raw ) ) {
-			return array();
-		}
-
+		$raw   = get_post_meta( $post_id, self::META_KEY, true );
 		$repo  = new Repository();
 		$links = array();
-		$order = 0;
+		$raw_valid_count = 0;
 
-		foreach ( $raw as $item ) {
-			if ( ! is_array( $item ) ) {
-				continue;
-			}
+		if ( is_array( $raw ) && ! empty( $raw ) ) {
+			$order = 0;
 
-			$provider_id  = absint( $item['provider_id'] ?? 0 );
-			$original_url = esc_url_raw( (string) ( $item['original_url'] ?? '' ) );
-			$custom_label = sanitize_text_field( (string) ( $item['custom_label'] ?? '' ) );
-
-			if ( ! $provider_id || ! $original_url ) {
-				continue;
-			}
-
-			$affiliate    = $repo->find( $provider_id );
-			$is_orphan    = false;
-			$orphan_title = '';
-			$final_url    = '';
-
-			if ( null === $affiliate ) {
-				$is_orphan     = true;
-				$provider_post = get_post( $provider_id );
-				if ( $provider_post instanceof \WP_Post ) {
-					$orphan_title = $provider_post->post_title;
+			foreach ( $raw as $item ) {
+				if ( ! is_array( $item ) ) {
+					continue;
 				}
-			} elseif ( ! $affiliate['active'] ) {
-				$is_orphan    = true;
-				$orphan_title = $affiliate['title'];
-			} else {
-				$final_url = wpam_generate_affiliate_url( $provider_id, $original_url );
+
+				$provider_id  = absint( $item['provider_id'] ?? 0 );
+				$original_url = esc_url_raw( (string) ( $item['original_url'] ?? '' ) );
+				$custom_label = sanitize_text_field( (string) ( $item['custom_label'] ?? '' ) );
+
+				if ( ! $provider_id || ! $original_url ) {
+					continue;
+				}
+
+				$affiliate    = $repo->find( $provider_id );
+				$is_orphan    = false;
+				$orphan_title = '';
+				$final_url    = '';
+
+				if ( null === $affiliate ) {
+					$is_orphan     = true;
+					$provider_post = get_post( $provider_id );
+					if ( $provider_post instanceof \WP_Post ) {
+						$orphan_title = $provider_post->post_title;
+					}
+				} elseif ( ! $affiliate['active'] ) {
+					$is_orphan    = true;
+					$orphan_title = $affiliate['title'];
+				} else {
+					$final_url = wpam_generate_affiliate_url( $provider_id, $original_url );
+				}
+
+				$links[] = array(
+					'provider_id'   => $provider_id,
+					'original_url'  => $original_url,
+					'custom_label'  => $custom_label,
+					'order'         => $order,
+					'final_url'     => $final_url,
+					'_orphan'       => $is_orphan,
+					'_orphan_title' => $orphan_title,
+					'_wpam_is_default' => false,
+				);
+
+				$order++;
+			}
+
+			$raw_valid_count = $order;
+		}
+
+		if ( $options['active_only'] ) {
+			$links = array_values( array_filter( $links, fn( $link ) => ! $link['_orphan'] ) );
+		}
+
+		if ( $options['include_defaults'] && $raw_valid_count > 0 ) {
+			// v1.6.0: el fallback por Default URL solo se aplica a posts que YA
+			// tienen al menos un link explicito guardado en _wpam_links (activo
+			// o huérfano, no importa). Un post que nunca tuvo afiliados configurados
+			// ($raw_valid_count === 0) no debe generar un bloque desde cero solo
+			// porque un afiliado activo tenga Default URL. Los Default URL completan
+			// un bloque existente, no crean uno nuevo.
+			$links = $this->merge_default_links( $links, $repo, $raw_valid_count );
+
+			/**
+			 * Filtra la lista final de links resueltos (explícitos + fallback por Default URL).
+			 *
+			 * @since 1.5.0
+			 * @param array[] $links   Links resueltos, normalizados.
+			 * @param int     $post_id ID del post.
+			 */
+			$links = apply_filters( 'wpam_resolved_links', $links, $post_id );
+		}
+
+		return $links;
+	}
+
+	/**
+	 * Agrega links sintéticos de fallback (Default URL) para afiliados activos
+	 * que no tienen ya un link específico válido en $links.
+	 *
+	 * Reutiliza wpam_generate_affiliate_url() como único punto de construcción
+	 * de URL, igual que los links explícitos. No escribe en _wpam_links: el
+	 * resultado es efimero, calculado en cada llamada.
+	 *
+	 * El 'order' de cada sintético arranca en $raw_valid_count (el total de
+	 * items válidos guardados en _wpam_links, ANTES de cualquier filtro por
+	 * active_only), no en count($links). Esto evita colisionar con el 'order'
+	 * de un link explícito huérfano que haya sido excluido por active_only
+	 * pero que sigue existiendo en el meta guardado del post.
+	 *
+	 * @since  1.5.0
+	 * @param  array[]    $links           Links ya resueltos (explícitos, posiblemente filtrados).
+	 * @param  Repository $repo            Instancia reutilizada de Repository.
+	 * @param  int        $raw_valid_count Total de items válidos en _wpam_links (sin filtrar).
+	 * @return array[] Links con los fallback añadidos al final.
+	 */
+	private function merge_default_links( array $links, Repository $repo, int $raw_valid_count ): array {
+		$covered = array();
+		foreach ( $links as $link ) {
+			if ( empty( $link['_orphan'] ) ) {
+				$covered[ (int) $link['provider_id'] ] = true;
+			}
+		}
+
+		$result = $repo->find_all( array( 'active' => true, 'orderby' => 'title', 'order' => 'ASC' ) );
+		$order  = $raw_valid_count;
+
+		foreach ( $result['items'] as $affiliate ) {
+			$affiliate_id = (int) $affiliate['id'];
+
+			if ( isset( $covered[ $affiliate_id ] ) ) {
+				continue;
+			}
+
+			$default_url = trim( (string) ( $affiliate['default_url'] ?? '' ) );
+			if ( '' === $default_url ) {
+				continue;
 			}
 
 			$links[] = array(
-				'provider_id'   => $provider_id,
-				'original_url'  => $original_url,
-				'custom_label'  => $custom_label,
+				'provider_id'   => $affiliate_id,
+				'original_url'  => $default_url,
+				'custom_label'  => '',
 				'order'         => $order,
-				'final_url'     => $final_url,
-				'_orphan'       => $is_orphan,
-				'_orphan_title' => $orphan_title,
+				'final_url'     => wpam_generate_affiliate_url( $affiliate_id, $default_url ),
+				'_orphan'       => false,
+				'_orphan_title' => '',
+				'_wpam_is_default' => true,
 			);
 
 			$order++;

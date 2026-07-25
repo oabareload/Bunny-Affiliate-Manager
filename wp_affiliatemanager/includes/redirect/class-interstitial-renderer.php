@@ -181,6 +181,7 @@ class Interstitial_Renderer {
 	<?php echo $this->render_content_slots( 'after_related', $content_slots ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 
 	<div class="wpam-interstitial-report-wrap">
+		<?php if ( '' !== $token ) : ?>
 		<button
 			type="button"
 			class="wpam-interstitial-report-btn"
@@ -192,6 +193,7 @@ class Interstitial_Renderer {
 		>
 			<?php esc_html_e( 'Report broken link', 'wp-affiliatemanager' ); ?>
 		</button>
+		<?php endif; ?>
 	</div>
 
 </div>

@@ -148,6 +148,17 @@ class Admin_Assets {
 				wp_enqueue_media();
 			}
 
+			// v1.6.0: toggle de opciones de Layout (Card/Showcase) en la página de Settings.
+			if ( 'bunny-affiliates_page_wpam-settings' === $hook_suffix ) {
+				wp_enqueue_script(
+					'wpam-settings-scripts',
+					WPAM_PLUGIN_URL . 'assets/js/settings.js',
+					array(),
+					$this->version,
+					true
+				);
+			}
+
 			// Post Affiliates screen (v0.1.0).
 			// v0.1.4: domain-detector.js como dependencia compartida con post-links.js.
 			if ( 'bunny-affiliates_page_wpam-post-affiliates' === $hook_suffix ) {

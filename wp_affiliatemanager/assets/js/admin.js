@@ -120,6 +120,7 @@
 					logo_url:    $form.find( '.wpam-ef-logo' ).val().trim(),
 					brand_color: $form.find( '.wpam-ef-color' ).val(),
 					domains:     $form.find( '.wpam-ef-domains' ).val().trim(),
+					default_url: $form.find( '.wpam-ef-default-url' ).val().trim(),
 					active:      $form.find( '.wpam-ef-active' ).is( ':checked' ) ? '1' : '',
 					visible:     $form.find( '.wpam-ef-visible' ).is( ':checked' ) ? '1' : '',
 					use_global_disclaimer: $form.find( '.wpam-ef-use-global-disclaimer' ).is( ':checked' ) ? '1' : '',

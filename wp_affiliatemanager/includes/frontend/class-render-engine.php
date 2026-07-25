@@ -17,6 +17,8 @@
 
 namespace WP_AffiliateManager\Frontend;
 
+use WP_AffiliateManager\Frontend\Layouts\Layout_Registry;
+
 // Prevenir acceso directo.
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -210,8 +212,10 @@ class Render_Engine {
 			return $this->cache[ $cache_key ];
 		}
 
-		// Obtener links activos del post (excluir orphans).
-		$links = wpam_get_post_links( $post_id, true );
+		// Obtener links activos del post, incluyendo fallback por Default URL
+		// (excluir orphans; Post_Links::get_links() prioriza siempre el link
+		// específico del post sobre el Default URL del afiliado).
+		$links = wpam_get_resolved_post_links( $post_id, true );
 
 		if ( empty( $links ) ) {
 			$this->cache[ $cache_key ] = '';
@@ -246,108 +250,79 @@ class Render_Engine {
 	/**
 	 * Construye el HTML del bloque completo de links de un post.
 	 *
+	 * v1.6.0: esta clase ya NO conoce cómo se ve un Card ni un Showcase.
+	 * Su única responsabilidad aquí es: (1) preparar las opciones planas que
+	 * necesitan los layouts, (2) resolver cuál layout está activo vía
+	 * Layout_Registry, (3) delegar el render, y (4) anteponer el título de
+	 * sección compartido (ver build_section_heading()) si está activado.
+	 * Agregar un layout nuevo en el futuro no requiere tocar este método.
+	 *
 	 * @since  4.0.0
+	 * @since  1.6.0 Delega a Layout_Registry en lugar de renderizar Card inline.
 	 * @param  int    $post_id ID del post.
 	 * @param  array  $links   Links activos normalizados.
-	 * @param  string $style   'vertical' | 'horizontal'.
+	 * @param  string $style   'vertical' | 'horizontal' (solo relevante para Layout_Card).
 	 * @return string HTML del bloque.
 	 */
 	private function build_html( int $post_id, array $links, string $style ): string {
-		$options     = get_option( WPAM_OPTION_KEY, array() );
-		$link_target = $options['general']['link_target'] ?? '_blank';
-		$nofollow    = ! empty( $options['general']['nofollow'] );
-		$rel         = $nofollow ? 'nofollow sponsored noopener noreferrer' : 'sponsored noopener noreferrer';
+		$options = get_option( WPAM_OPTION_KEY, array() );
 
-		// --- Opciones v0.0.5 ---
-		$display_content = $options['appearance']['display_content'] ?? 'show_logo_and_name';
-		$cta_text        = $options['appearance']['cta_text'] ?? 'Ver oferta';
-		$cta_hidden      = ! empty( $options['appearance']['cta_hidden'] );
-		$frontend_order  = $options['appearance']['frontend_order'] ?? 'preserve_post_order';
+		// Opciones planas compartidas por todos los layouts: opciones de botón
+		// (display_content, cta_text, cta_hidden, frontend_order, showcase, etc.
+		// desde `appearance`) + link_target/nofollow desde `general` + el style
+		// resuelto por get_html()/shortcode (solo lo usa Layout_Card).
+		$render_options = array_merge(
+			$options['appearance'] ?? array(),
+			array(
+				'link_target' => $options['general']['link_target'] ?? '_blank',
+				'nofollow'    => ! empty( $options['general']['nofollow'] ),
+				'link_style'  => $style,
+			)
+		);
 
-		// Reordenar solo en memoria para el render — NO toca DB ni drag/drop.
-		// mb_strtolower() con la locale del sitio garantiza comparación correcta
-		// para UTF-8 y caracteres acentuados (ej: á, é, ñ, ü...).
-		if ( 'alphabetical' === $frontend_order ) {
-			$site_locale = get_locale();
-			usort(
-				$links,
-				function ( array $a, array $b ) use ( $site_locale ): int {
-					$name_a = mb_strtolower( $this->get_affiliate_name( $a['provider_id'] ), 'UTF-8' );
-					$name_b = mb_strtolower( $this->get_affiliate_name( $b['provider_id'] ), 'UTF-8' );
-					return strcmp( $name_a, $name_b );
-				}
-			);
-		}
+		$layout_id = wpam_get_option( 'appearance.layout', Layout_Registry::DEFAULT_LAYOUT );
+		$layout    = Layout_Registry::get( $layout_id );
 
-		$template_engine = new \WP_AffiliateManager\Templates\Templates();
-		$items_html      = '';
+		$layout_html = $layout->render( $post_id, $links, $render_options );
 
-		foreach ( $links as $link ) {
-			// Doble verificación: omitir orphans silenciosamente.
-			if ( $link['_orphan'] || '' === $link['final_url'] ) {
-				continue;
-			}
-
-			// v0.2.0-alpha1: usar URL interna /go/{token} en lugar de la URL de afiliado directa.
-			$go_url = wpam_go_url( $post_id, (int) $link['order'] );
-			if ( '' === $go_url ) {
-				continue;
-			}
-
-			$label = '' !== $link['custom_label']
-				? $link['custom_label']
-				: $this->get_affiliate_name( $link['provider_id'] );
-
-			$item_html = $template_engine->render(
-				'link-item',
-				array(
-					'final_url'       => $go_url,
-					'label'           => $label,
-					'link_target'     => $link_target,
-					'rel'             => $rel,
-					'provider_id'     => $link['provider_id'],
-					'affiliate'       => wpam_get_affiliate( $link['provider_id'] ),
-					'display_content' => $display_content,
-					'cta_text'        => $cta_text,
-					'cta_hidden'      => $cta_hidden,
-				),
-				true
-			);
-
-			// Si el template no existe o retornó null, omitir este link
-			// silenciosamente en lugar de concatenar null como string vacío.
-			if ( null === $item_html ) {
-				continue;
-			}
-
-			if ( '' !== $item_html ) {
-				$items_html .= $item_html;
-			}
-		}
-
-		if ( '' === $items_html ) {
+		if ( '' === $layout_html ) {
 			return '';
 		}
 
-		$wrapper_class = 'wpam-links-wrapper wpam-style-' . esc_attr( $style );
+		return $this->build_section_heading( $options ) . $layout_html;
+	}
 
-		$wrapper_html = $template_engine->render(
-			'links-wrapper',
-			array(
-				'items_html'    => $items_html,
-				'style'         => $style,
-				'wrapper_class' => $wrapper_class,
-				'post_id'       => $post_id,
-			),
-			true
-		);
+	/**
+	 * Construye el título de sección, compartido por TODOS los layouts.
+	 *
+	 * Único punto de renderizado del heading — así Card y Showcase (y
+	 * cualquier layout futuro) lo obtienen gratis sin duplicar 3 campos de
+	 * Settings por layout. Ver Settings: appearance.section_heading.
+	 *
+	 * @since  1.6.0
+	 * @param  array $options Opciones completas del plugin (get_option( WPAM_OPTION_KEY )).
+	 * @return string HTML del heading, o '' si está desactivado o sin texto.
+	 */
+	private function build_section_heading( array $options ): string {
+		$heading = $options['appearance']['section_heading'] ?? array();
 
-		// Fallback si el template wrapper no existe.
-		if ( null === $wrapper_html || '' === $wrapper_html ) {
-			return '<div class="' . esc_attr( $wrapper_class ) . '">' . $items_html . '</div>';
+		if ( empty( $heading['enabled'] ) ) {
+			return '';
 		}
 
-		return $wrapper_html;
+		$text = trim( (string) ( $heading['text'] ?? '' ) );
+		if ( '' === $text ) {
+			return '';
+		}
+
+		$allowed_tags = array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div' );
+		$tag          = in_array( $heading['tag'] ?? '', $allowed_tags, true ) ? $heading['tag'] : 'h2';
+
+		return sprintf(
+			'<%1$s class="wpam-section-heading">%2$s</%1$s>',
+			esc_attr( $tag ),
+			esc_html( $text )
+		);
 	}
 
 	// ---------------------------------------------------------------------------
@@ -382,22 +357,11 @@ class Render_Engine {
 	}
 
 	/**
-	 * Retorna el nombre del afiliado por ID.
-	 *
-	 * @since  4.0.0
-	 * @param  int $affiliate_id ID del afiliado.
-	 * @return string Nombre o cadena vacía.
-	 */
-	private function get_affiliate_name( int $affiliate_id ): string {
-		$affiliate = wpam_get_affiliate( $affiliate_id );
-		return $affiliate['title'] ?? '';
-	}
-
-	/**
 	 * Encola los assets del frontend si aún no están encolados.
 	 * Útil cuando el shortcode se ejecuta fuera del hook wp_enqueue_scripts.
 	 *
 	 * @since  4.0.0
+	 * @since  1.6.0 Encola también showcase.css cuando el layout activo es Showcase.
 	 * @return void
 	 */
 	private function maybe_enqueue_assets(): void {
@@ -406,6 +370,16 @@ class Render_Engine {
 				'wpam-frontend-styles',
 				WPAM_PLUGIN_URL . 'assets/css/frontend.css',
 				array(),
+				WPAM_VERSION
+			);
+		}
+
+		$layout_id = wpam_get_option( 'appearance.layout', Layout_Registry::DEFAULT_LAYOUT );
+		if ( 'showcase' === $layout_id && ! wp_style_is( 'wpam-showcase-styles', 'enqueued' ) ) {
+			wp_enqueue_style(
+				'wpam-showcase-styles',
+				WPAM_PLUGIN_URL . 'assets/css/showcase.css',
+				array( 'wpam-frontend-styles' ),
 				WPAM_VERSION
 			);
 		}

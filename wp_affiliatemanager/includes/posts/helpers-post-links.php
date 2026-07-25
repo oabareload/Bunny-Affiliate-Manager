@@ -15,20 +15,22 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Retorna todos los affiliate links de un post, normalizados y seguros.
  *
  * Cada link del array incluye las siguientes claves garantizadas:
- *   'provider_id'   (int)    ID del afiliado (wpam_affiliate post ID).
- *   'original_url'  (string) URL base sin parámetros afiliados.
- *   'custom_label'  (string) Etiqueta personalizada. Vacía si no se definió.
- *   'order'         (int)    Posición incremental desde 0.
- *   'final_url'     (string) URL con parámetro afiliado. Vacía si provider inactivo/eliminado.
- *   '_orphan'       (bool)   true si el provider no existe o está inactivo.
- *   '_orphan_title' (string) Nombre del provider huérfano (vacío si fue borrado de la DB).
+ *   'provider_id'      (int)    ID del afiliado (wpam_affiliate post ID).
+ *   'original_url'     (string) URL base sin parámetros afiliados.
+ *   'custom_label'     (string) Etiqueta personalizada. Vacía si no se definió.
+ *   'order'            (int)    Posición incremental desde 0.
+ *   'final_url'        (string) URL con parámetro afiliado. Vacía si provider inactivo/eliminado.
+ *   '_orphan'          (bool)   true si el provider no existe o está inactivo.
+ *   '_orphan_title'    (string) Nombre del provider huérfano (vacío si fue borrado de la DB).
+ *   '_wpam_is_default' (bool)   true si este link es un fallback sintético generado a
+ *                                partir del Default URL del afiliado (no viene de _wpam_links).
  *
  * @since  3.0.0
  * @since  0.0.3 Garantiza todas las claves; filtra orphans opcionalemente.
  *
- * @param  int  $post_id      ID del post.
- * @param  bool $active_only  Si true, excluye links con provider huérfano/inactivo.
- * @return array[] Lista de links normalizados. Array vacío si no hay links.
+ * @param  int  $post_id     ID del post.
+ * @param  bool $active_only Si true, excluye links con provider huérfano/inactivo.
+ * @return array[] Lista de links normalizados (solo explícitos, sin fallback). Array vacío si no hay links.
  */
 function wpam_get_post_links( int $post_id, bool $active_only = false ): array {
 	if ( $post_id <= 0 ) {
@@ -36,13 +38,41 @@ function wpam_get_post_links( int $post_id, bool $active_only = false ): array {
 	}
 
 	$handler = new WP_AffiliateManager\Posts\Post_Links();
-	$links   = $handler->get_links( $post_id );
+	$links   = $handler->get_links( $post_id, array(
+		'active_only' => $active_only,
+	) );
 
-	if ( $active_only ) {
-		$links = array_values(
-			array_filter( $links, fn( $link ) => ! ( $link['_orphan'] ?? false ) )
-		);
+	// Garantizar todas las claves en cada item para evitar undefined index en templates.
+	return array_map( 'wpam_normalize_link_item', $links );
+}
+
+/**
+ * Retorna los links "resueltos" de un post para renderizar en frontend: links
+ * específicos del post, más fallback automático por Default URL de afiliado
+ * para cualquier afiliado activo que no tenga ya un link específico válido
+ * en este post. El link específico siempre tiene prioridad sobre el Default URL.
+ *
+ * API separada de wpam_get_post_links() a propósito: ese helper gestiona
+ * únicamente los links guardados explícitamente en _wpam_links (usado por el
+ * meta box "Affiliate Links" y el board Post Affiliates), mientras que este
+ * es el punto que usa Render_Engine para pintar el frontend.
+ *
+ * @since  1.5.0
+ * @param  int  $post_id     ID del post.
+ * @param  bool $active_only Si true, excluye links con provider huérfano/inactivo.
+ *                            Por defecto true: no tiene sentido renderizar links inválidos.
+ * @return array[] Lista de links normalizados, incluyendo fallback. Array vacío si no hay ninguno.
+ */
+function wpam_get_resolved_post_links( int $post_id, bool $active_only = true ): array {
+	if ( $post_id <= 0 ) {
+		return array();
 	}
+
+	$handler = new WP_AffiliateManager\Posts\Post_Links();
+	$links   = $handler->get_links( $post_id, array(
+		'active_only'      => $active_only,
+		'include_defaults' => true,
+	) );
 
 	// Garantizar todas las claves en cada item para evitar undefined index en templates.
 	return array_map( 'wpam_normalize_link_item', $links );
@@ -135,5 +165,6 @@ function wpam_normalize_link_item( array $item ): array {
 		'final_url'     => (string) ( $item['final_url']     ?? '' ),
 		'_orphan'       => (bool)   ( $item['_orphan']       ?? false ),
 		'_orphan_title' => (string) ( $item['_orphan_title'] ?? '' ),
+		'_wpam_is_default' => (bool) ( $item['_wpam_is_default'] ?? false ),
 	);
 }

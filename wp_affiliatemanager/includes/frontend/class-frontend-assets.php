@@ -124,7 +124,13 @@ class Frontend_Assets {
 			return false;
 		}
 
-		// Solo cargar si el post tiene al menos un link activo (excluye orphans).
-		return wpam_post_has_links( $post_id, true );
+		// Solo cargar si el post alguna vez tuvo al menos un link explícito guardado
+		// en _wpam_links (activo o huérfano, no importa). NO usar active_only aquí:
+		// un post cuyo único link está huérfano pero que tiene otros afiliados con
+		// Default URL activo debe seguir cargando assets (Post_Links::get_links()
+		// completará el bloque con el fallback). Un post SIN ningún link guardado
+		// nunca carga assets, sin importar cuántos afiliados tengan Default URL
+		// (los Default URL completan un bloque existente, no crean uno nuevo).
+		return wpam_post_has_links( $post_id );
 	}
 }

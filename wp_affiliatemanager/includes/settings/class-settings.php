@@ -10,6 +10,8 @@
 
 namespace WP_AffiliateManager\Settings;
 
+use WP_AffiliateManager\Frontend\Layouts\Layout_Registry;
+
 // Prevenir acceso directo.
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -320,24 +322,56 @@ class Settings {
 		);
 
 		add_settings_field(
+			'wpam_field_layout',
+			__( 'Layout', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_layout' ),
+			self::PAGE_SLUG,
+			'wpam_section_appearance'
+		);
+
+		add_settings_field(
+			'wpam_field_section_heading',
+			__( 'Título de sección', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_section_heading' ),
+			self::PAGE_SLUG,
+			'wpam_section_appearance'
+		);
+
+		add_settings_field(
 			'wpam_field_link_style',
-			__( 'Estilo de template', 'wp-affiliatemanager' ),
+			__( 'Orientación (Card)', 'wp-affiliatemanager' ),
 			array( $this, 'render_field_link_style' ),
 			self::PAGE_SLUG,
 			'wpam_section_appearance'
 		);
 
 		add_settings_field(
-			'wpam_field_button_style',
-			__( 'Estilo de botón', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_button_style' ),
+			'wpam_field_showcase_image',
+			__( 'Imagen (Showcase)', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_showcase_image' ),
+			self::PAGE_SLUG,
+			'wpam_section_appearance'
+		);
+
+		add_settings_field(
+			'wpam_field_showcase_title',
+			__( 'Título (Showcase)', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_showcase_title' ),
+			self::PAGE_SLUG,
+			'wpam_section_appearance'
+		);
+
+		add_settings_field(
+			'wpam_field_showcase_description',
+			__( 'Descripción (Showcase)', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_showcase_description' ),
 			self::PAGE_SLUG,
 			'wpam_section_appearance'
 		);
 
 		add_settings_field(
 			'wpam_field_display_content',
-			__( 'Contenido de la card', 'wp-affiliatemanager' ),
+			__( 'Contenido del botón', 'wp-affiliatemanager' ),
 			array( $this, 'render_field_display_content' ),
 			self::PAGE_SLUG,
 			'wpam_section_appearance'
@@ -558,12 +592,6 @@ class Settings {
 	}
 
 	/**
-	 * Renderiza la descripción de la sección Apariencia.
-	 *
-	 * @since  1.0.0
-	 * @return void
-	 */
-	/**
 	 * Renderiza el campo show_related_post_excerpt.
 	 *
 	 * @since  0.2.5
@@ -749,8 +777,15 @@ class Settings {
 		<?php
 	}
 
+	/**
+	 * Renderiza la descripción de la sección Apariencia.
+	 *
+	 * @since  1.0.0
+	 * @since  1.6.0 Menciona el sistema de Layouts y las opciones compartidas.
+	 * @return void
+	 */
 	public function render_section_appearance(): void {
-		echo '<p>' . esc_html__( 'Personaliza la apariencia de los bloques de afiliados en el frontend.', 'wp-affiliatemanager' ) . '</p>';
+		echo '<p>' . esc_html__( 'Elige el Layout del bloque de afiliados. Cada Layout muestra solo sus propias opciones; las opciones de botón (contenido, CTA, orden) son compartidas por todos los Layouts.', 'wp-affiliatemanager' ) . '</p>';
 	}
 
 	// ---------------------------------------------------------------------------
@@ -1039,24 +1074,220 @@ class Settings {
 	}
 
 	/**
-	 * Renderiza el campo 'link_style'.
+	 * Renderiza el campo 'layout' — selector principal Card / Showcase.
+	 *
+	 * Reemplaza al antiguo 'button_style' (Minimal/Card/Banner), que nunca
+	 * estuvo conectado a ninguna implementación real. Las opciones válidas se
+	 * leen de Layout_Registry::get_ids(), así que un layout nuevo agregado
+	 * vía el filtro 'wpam_render_layouts' aparece aquí automáticamente.
+	 *
+	 * @since  1.6.0
+	 * @return void
+	 */
+	public function render_field_layout(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['appearance']['layout'] ?? Layout_Registry::DEFAULT_LAYOUT;
+
+		$labels = array(
+			'card'     => __( 'Card', 'wp-affiliatemanager' ),
+			'showcase' => __( 'Showcase', 'wp-affiliatemanager' ),
+		);
+		?>
+		<fieldset id="wpam-layout-selector">
+			<?php foreach ( Layout_Registry::get_ids() as $layout_id ) : ?>
+				<label style="display:block;margin-bottom:6px;">
+					<input
+						type="radio"
+						name="<?php echo esc_attr( self::OPTION_NAME . '[appearance][layout]' ); ?>"
+						value="<?php echo esc_attr( $layout_id ); ?>"
+						<?php checked( $value, $layout_id ); ?>
+					/>
+					<?php echo esc_html( $labels[ $layout_id ] ?? ucfirst( $layout_id ) ); ?>
+				</label>
+			<?php endforeach; ?>
+		</fieldset>
+		<p class="description"><?php esc_html_e( 'Estructura visual del bloque de afiliados. Al cambiar de Layout, solo se muestran sus opciones correspondientes.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'section_heading' — título de sección compartido.
+	 *
+	 * Compartido por TODOS los layouts a propósito (ver Render_Engine::
+	 * build_section_heading()). No existe una copia por layout.
+	 *
+	 * @since  1.6.0
+	 * @return void
+	 */
+	public function render_field_section_heading(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$heading = $options['appearance']['section_heading'] ?? array();
+		$enabled = ! empty( $heading['enabled'] );
+		$text    = $heading['text'] ?? '';
+		$tag     = $heading['tag'] ?? 'h2';
+		$field   = self::OPTION_NAME . '[appearance][section_heading]';
+		$tags    = array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div' );
+		?>
+		<label style="display:block;margin-bottom:8px;">
+			<input type="checkbox" name="<?php echo esc_attr( $field . '[enabled]' ); ?>" value="1" <?php checked( $enabled ); ?> />
+			<?php esc_html_e( 'Mostrar título de sección', 'wp-affiliatemanager' ); ?>
+		</label>
+		<table class="form-table" style="margin:0;">
+			<tr>
+				<th style="padding-left:0;width:140px;"><?php esc_html_e( 'Texto', 'wp-affiliatemanager' ); ?></th>
+				<td>
+					<input
+						type="text"
+						name="<?php echo esc_attr( $field . '[text]' ); ?>"
+						value="<?php echo esc_attr( $text ); ?>"
+						class="regular-text"
+						placeholder="<?php esc_attr_e( 'Dónde comprar', 'wp-affiliatemanager' ); ?>"
+					/>
+				</td>
+			</tr>
+			<tr>
+				<th style="padding-left:0;"><?php esc_html_e( 'Etiqueta HTML', 'wp-affiliatemanager' ); ?></th>
+				<td>
+					<select name="<?php echo esc_attr( $field . '[tag]' ); ?>">
+						<?php foreach ( array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div' ) as $t ) : ?>
+							<option value="<?php echo esc_attr( $t ); ?>" <?php selected( $tag, $t ); ?>><?php echo esc_html( strtoupper( $t ) ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</td>
+			</tr>
+		</table>
+		<p class="description"><?php esc_html_e( 'Encabezado mostrado antes del bloque de afiliados, sin importar el Layout elegido (Card o Showcase). Recomendado: H2.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'link_style' — orientación del Layout Card.
+	 *
+	 * Solo aplica a Layout_Card (Showcase tiene una estructura fija de dos
+	 * columnas, no tiene concepto de orientación). Marcado con
+	 * data-wpam-layout-only="card" para que settings.js lo oculte cuando el
+	 * layout activo es Showcase.
 	 *
 	 * @since  4.0.0
+	 * @since  1.6.0 Envuelto en wrapper data-wpam-layout-only="card".
 	 * @return void
 	 */
 	public function render_field_link_style(): void {
 		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
 		$value   = $options['appearance']['link_style'] ?? 'vertical';
 		?>
-		<select name="<?php echo esc_attr( self::OPTION_NAME . '[appearance][link_style]' ); ?>">
-			<option value="vertical" <?php selected( $value, 'vertical' ); ?>>
-				<?php esc_html_e( 'Vertical (lista apilada)', 'wp-affiliatemanager' ); ?>
-			</option>
-			<option value="horizontal" <?php selected( $value, 'horizontal' ); ?>>
-				<?php esc_html_e( 'Horizontal (fila)', 'wp-affiliatemanager' ); ?>
-			</option>
-		</select>
-		<p class="description"><?php esc_html_e( 'Disposición visual de los links de afiliado en el frontend.', 'wp-affiliatemanager' ); ?></p>
+		<div data-wpam-layout-only="card">
+			<select name="<?php echo esc_attr( self::OPTION_NAME . '[appearance][link_style]' ); ?>">
+				<option value="vertical" <?php selected( $value, 'vertical' ); ?>>
+					<?php esc_html_e( 'Vertical (lista apilada)', 'wp-affiliatemanager' ); ?>
+				</option>
+				<option value="horizontal" <?php selected( $value, 'horizontal' ); ?>>
+					<?php esc_html_e( 'Horizontal (fila)', 'wp-affiliatemanager' ); ?>
+				</option>
+			</select>
+			<p class="description"><?php esc_html_e( 'Disposición visual de los botones de afiliado. Solo aplica al Layout Card.', 'wp-affiliatemanager' ); ?></p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'showcase.image_*' — origen de la imagen del Showcase.
+	 *
+	 * @since  1.6.0
+	 * @return void
+	 */
+	public function render_field_showcase_image(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$sc      = $options['appearance']['showcase'] ?? array();
+		$source  = $sc['image_source'] ?? 'featured';
+		$url     = $sc['image_url'] ?? '';
+		$field   = self::OPTION_NAME . '[appearance][showcase]';
+		?>
+		<div data-wpam-layout-only="showcase">
+			<select name="<?php echo esc_attr( $field . '[image_source]' ); ?>">
+				<option value="featured" <?php selected( $source, 'featured' ); ?>><?php esc_html_e( 'Featured Image', 'wp-affiliatemanager' ); ?></option>
+				<option value="custom" <?php selected( $source, 'custom' ); ?>><?php esc_html_e( 'Imagen personalizada', 'wp-affiliatemanager' ); ?></option>
+			</select>
+			<p>
+				<input
+					type="url"
+					name="<?php echo esc_attr( $field . '[image_url]' ); ?>"
+					value="<?php echo esc_attr( $url ); ?>"
+					class="large-text"
+					placeholder="https://example.com/imagen.jpg"
+				/>
+			</p>
+			<p class="description"><?php esc_html_e( 'La URL personalizada solo se usa cuando el origen es "Imagen personalizada". Si no hay Featured Image, el Showcase se muestra sin imagen.', 'wp-affiliatemanager' ); ?></p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'showcase.title_*' — origen del título del Showcase.
+	 *
+	 * @since  1.6.0
+	 * @return void
+	 */
+	public function render_field_showcase_title(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$sc      = $options['appearance']['showcase'] ?? array();
+		$source  = $sc['title_source'] ?? 'post';
+		$text    = $sc['title_text'] ?? '';
+		$field   = self::OPTION_NAME . '[appearance][showcase]';
+		?>
+		<div data-wpam-layout-only="showcase">
+			<select name="<?php echo esc_attr( $field . '[title_source]' ); ?>">
+				<option value="post" <?php selected( $source, 'post' ); ?>><?php esc_html_e( 'Título del post', 'wp-affiliatemanager' ); ?></option>
+				<option value="custom" <?php selected( $source, 'custom' ); ?>><?php esc_html_e( 'Título personalizado', 'wp-affiliatemanager' ); ?></option>
+				<option value="hide" <?php selected( $source, 'hide' ); ?>><?php esc_html_e( 'Ocultar', 'wp-affiliatemanager' ); ?></option>
+			</select>
+			<p>
+				<input
+					type="text"
+					name="<?php echo esc_attr( $field . '[title_text]' ); ?>"
+					value="<?php echo esc_attr( $text ); ?>"
+					class="regular-text"
+					placeholder="<?php esc_attr_e( 'Título personalizado', 'wp-affiliatemanager' ); ?>"
+				/>
+			</p>
+			<p class="description"><?php esc_html_e( 'El texto personalizado solo se usa cuando el origen es "Título personalizado".', 'wp-affiliatemanager' ); ?></p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'showcase.desc_*' — origen de la descripción del Showcase.
+	 *
+	 * Sigue el mismo principio que 'show_related_post_excerpt' (ver ese campo
+	 * más arriba en este archivo): solo se usa el excerpt manual (post_excerpt),
+	 * nunca contenido automático. Ver Layout_Showcase::resolve_description().
+	 *
+	 * @since  1.6.0
+	 * @return void
+	 */
+	public function render_field_showcase_description(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$sc      = $options['appearance']['showcase'] ?? array();
+		$source  = $sc['desc_source'] ?? 'excerpt';
+		$text    = $sc['desc_text'] ?? '';
+		$field   = self::OPTION_NAME . '[appearance][showcase]';
+		?>
+		<div data-wpam-layout-only="showcase">
+			<select name="<?php echo esc_attr( $field . '[desc_source]' ); ?>">
+				<option value="excerpt" <?php selected( $source, 'excerpt' ); ?>><?php esc_html_e( 'Excerpt', 'wp-affiliatemanager' ); ?></option>
+				<option value="custom" <?php selected( $source, 'custom' ); ?>><?php esc_html_e( 'Texto personalizado', 'wp-affiliatemanager' ); ?></option>
+				<option value="hide" <?php selected( $source, 'hide' ); ?>><?php esc_html_e( 'Ocultar', 'wp-affiliatemanager' ); ?></option>
+			</select>
+			<p>
+				<textarea
+					name="<?php echo esc_attr( $field . '[desc_text]' ); ?>"
+					rows="3"
+					class="large-text"
+					placeholder="<?php esc_attr_e( 'Texto personalizado', 'wp-affiliatemanager' ); ?>"
+				><?php echo esc_textarea( $text ); ?></textarea>
+			</p>
+			<p class="description"><?php esc_html_e( 'Solo se usa el excerpt manual (campo Excerpt del post). El contenido nunca se recorta automáticamente.', 'wp-affiliatemanager' ); ?></p>
+		</div>
 		<?php
 	}
 
@@ -1162,31 +1393,6 @@ class Settings {
 			</option>
 		</select>
 		<p class="description"><?php esc_html_e( 'Solo afecta el orden visual en el frontend. No modifica el orden guardado en el editor.', 'wp-affiliatemanager' ); ?></p>
-		<?php
-	}
-
-	/**
-	 * Renderiza el campo 'button_style'.
-	 *
-	 * @since  1.0.0
-	 * @return void
-	 */
-	public function render_field_button_style(): void {
-		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
-		$value   = $options['appearance']['button_style'] ?? 'minimal';
-		?>
-		<select name="<?php echo esc_attr( self::OPTION_NAME . '[appearance][button_style]' ); ?>">
-			<option value="minimal" <?php selected( $value, 'minimal' ); ?>>
-				<?php esc_html_e( 'Minimal', 'wp-affiliatemanager' ); ?>
-			</option>
-			<option value="card" <?php selected( $value, 'card' ); ?>>
-				<?php esc_html_e( 'Card', 'wp-affiliatemanager' ); ?>
-			</option>
-			<option value="banner" <?php selected( $value, 'banner' ); ?>>
-				<?php esc_html_e( 'Banner', 'wp-affiliatemanager' ); ?>
-			</option>
-		</select>
-		<p class="description"><?php esc_html_e( 'Estilo visual del bloque de afiliado en el frontend.', 'wp-affiliatemanager' ); ?></p>
 		<?php
 	}
 
@@ -1319,6 +1525,22 @@ class Settings {
 		$sanitized['content_slots'] = $sanitized_slots;
 
 		// Appearance.
+		if ( isset( $input['appearance']['layout'] ) ) {
+			$sanitized['appearance']['layout'] = in_array(
+				$input['appearance']['layout'],
+				Layout_Registry::get_ids(),
+				true
+			) ? $input['appearance']['layout'] : Layout_Registry::DEFAULT_LAYOUT;
+		}
+
+		// section_heading — compartido por todos los layouts.
+		$sanitized['appearance']['section_heading']['enabled'] = ! empty( $input['appearance']['section_heading']['enabled'] );
+		$sanitized['appearance']['section_heading']['text']    = sanitize_text_field( $input['appearance']['section_heading']['text'] ?? '' );
+
+		$allowed_heading_tags = array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div' );
+		$heading_tag           = sanitize_text_field( $input['appearance']['section_heading']['tag'] ?? 'h2' );
+		$sanitized['appearance']['section_heading']['tag'] = in_array( $heading_tag, $allowed_heading_tags, true ) ? $heading_tag : 'h2';
+
 		if ( isset( $input['appearance']['link_style'] ) ) {
 			$sanitized['appearance']['link_style'] = in_array(
 				$input['appearance']['link_style'],
@@ -1327,13 +1549,20 @@ class Settings {
 			) ? $input['appearance']['link_style'] : 'vertical';
 		}
 
-		if ( isset( $input['appearance']['button_style'] ) ) {
-			$sanitized['appearance']['button_style'] = in_array(
-				$input['appearance']['button_style'],
-				array( 'minimal', 'card', 'banner' ),
-				true
-			) ? $input['appearance']['button_style'] : 'minimal';
-		}
+		// showcase.* — opciones exclusivas del Layout Showcase.
+		$showcase_input = $input['appearance']['showcase'] ?? array();
+
+		$image_source = sanitize_text_field( $showcase_input['image_source'] ?? 'featured' );
+		$sanitized['appearance']['showcase']['image_source'] = in_array( $image_source, array( 'featured', 'custom' ), true ) ? $image_source : 'featured';
+		$sanitized['appearance']['showcase']['image_url']    = esc_url_raw( $showcase_input['image_url'] ?? '' );
+
+		$title_source = sanitize_text_field( $showcase_input['title_source'] ?? 'post' );
+		$sanitized['appearance']['showcase']['title_source'] = in_array( $title_source, array( 'post', 'custom', 'hide' ), true ) ? $title_source : 'post';
+		$sanitized['appearance']['showcase']['title_text']   = sanitize_text_field( $showcase_input['title_text'] ?? '' );
+
+		$desc_source = sanitize_text_field( $showcase_input['desc_source'] ?? 'excerpt' );
+		$sanitized['appearance']['showcase']['desc_source'] = in_array( $desc_source, array( 'excerpt', 'custom', 'hide' ), true ) ? $desc_source : 'excerpt';
+		$sanitized['appearance']['showcase']['desc_text']   = sanitize_textarea_field( $showcase_input['desc_text'] ?? '' );
 
 		// display_content.
 		if ( isset( $input['appearance']['display_content'] ) ) {
@@ -1411,13 +1640,25 @@ class Settings {
 				),
 			),
 			'appearance' => array(
+				'layout'          => Layout_Registry::DEFAULT_LAYOUT,
+				'section_heading' => array(
+					'enabled' => false,
+					'text'    => '',
+					'tag'     => 'h2',
+				),
 				'link_style'      => 'vertical',
-				'template'        => 'default',
-				'button_style'    => 'minimal',
 				'display_content' => 'show_logo_and_name',
 				'cta_text'        => 'Ver oferta',
 				'cta_hidden'      => false,
 				'frontend_order'  => 'preserve_post_order',
+				'showcase'        => array(
+					'image_source' => 'featured',
+					'image_url'    => '',
+					'title_source' => 'post',
+					'title_text'   => '',
+					'desc_source'  => 'excerpt',
+					'desc_text'    => '',
+				),
 			),
 		);
 	}

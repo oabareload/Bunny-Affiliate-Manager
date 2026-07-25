@@ -32,6 +32,18 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Título de sección — compartido por TODOS los layouts (Card, Showcase, futuros).
+   Renderizado por Render_Engine::get_html(), antes de delegar al Layout activo.
+   Ver Settings: appearance.section_heading (enabled / text / tag). v1.6.0.
+   --------------------------------------------------------------------------- */
+/*
+
+.wpam-section-heading {
+}
+
+*/
+
+/* ---------------------------------------------------------------------------
    Wrapper externo
    --------------------------------------------------------------------------- */
 .wpam-links-wrapper {

@@ -236,6 +236,12 @@ class Repository {
 		}
 		update_post_meta( $post_id, Meta::KEY_RELATED_POST_ID, $related_post_id );
 
+		// Default URL (fallback): debe ser una URL válida o estar vacía.
+		$raw_default_url = trim( (string) ( $data['default_url'] ?? '' ) );
+		if ( '' === $raw_default_url || false !== filter_var( $raw_default_url, FILTER_VALIDATE_URL ) ) {
+			update_post_meta( $post_id, Meta::KEY_DEFAULT_URL, esc_url_raw( $raw_default_url ) );
+		}
+
 		return $post_id;
 	}
 
@@ -299,6 +305,7 @@ class Repository {
 			'use_global_disclaimer' => '' === $use_global_disclaimer ? true : '1' === $use_global_disclaimer,
 			'custom_disclaimer'     => get_post_meta( $post->ID, Meta::KEY_CUSTOM_DISCLAIMER, true ) ?: '',
 			'related_post_id'       => absint( get_post_meta( $post->ID, Meta::KEY_RELATED_POST_ID, true ) ),
+			'default_url' => get_post_meta( $post->ID, Meta::KEY_DEFAULT_URL, true ) ?: '',
 			'edit_url'    => get_edit_post_link( $post->ID, 'raw' ),
 			'created_at'  => $post->post_date,
 		);

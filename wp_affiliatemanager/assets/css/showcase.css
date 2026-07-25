@@ -1,0 +1,148 @@
+/**
+ * Bunny Affiliate Manager — Showcase Layout CSS
+ *
+ * Bloque CSS dedicado y aislado para el Layout Showcase (v1.6.0).
+ * No reutiliza ni depende de .wpam-link-item / .wpam-links-wrapper
+ * (esas son del Layout Card) más allá de las variables de color
+ * compartidas definidas en frontend.css (--wpam-color-*), que ambas
+ * hojas cargan siempre juntas.
+ *
+ * Estructura:
+ *   .wpam-showcase                 → card grande contenedora
+ *     .wpam-showcase-body          → fila imagen + texto (desktop) / columna (mobile)
+ *       .wpam-showcase-media       → imagen
+ *       .wpam-showcase-content     → título + descripción
+ *     .wpam-showcase-buttons       → fila de botones (reutiliza .wpam-link-item de frontend.css)
+ *
+ * @package WP_AffiliateManager
+ * @since   1.6.0
+ */
+
+.wpam-showcase {
+	margin: 2rem 0;
+	background: var(--wpam-color-bg, #ffffff);
+	border: 1px solid var(--wpam-color-border, #e2e8f0);
+	border-radius: var(--wpam-radius, 8px);
+	overflow: hidden;
+	font-family: inherit;
+	font-size: var(--wpam-font-size, 0.9rem);
+	color: var(--wpam-color-text, #1a1a1a);
+}
+
+/* ---------------------------------------------------------------------------
+   Cuerpo: imagen + contenido
+   --------------------------------------------------------------------------- */
+.wpam-showcase-body {
+	display: flex;
+	flex-direction: row;
+	align-items: stretch;
+}
+
+.wpam-showcase-media {
+	flex: 0 0 40%;
+	max-width: 40%;
+	height: 300px;
+	background-color: #f1f5f9;
+	overflow: hidden;
+}
+
+.wpam-showcase-media img {
+	width: 100%;
+	height: 300px;
+	object-fit: cover;
+	display: block;
+}
+
+.wpam-showcase-content {
+	flex: 1 1 auto;
+	padding: 20px 24px;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 8px;
+	min-width: 0;
+	height: 300px;
+}
+
+.wpam-showcase-title {
+	margin: 0;
+	font-size: 1.25rem;
+	font-weight: 700;
+	line-height: 1.3;
+	color: var(--wpam-color-text, #1a1a1a);
+}
+
+.wpam-showcase-description {
+	margin: 0;
+	font-size: 0.92rem;
+	line-height: 1.6;
+	color: var(--wpam-color-subtext, #64748b);
+	/* Recorte a 7 líneas para evitar que un excerpt largo desborde la card. */
+	display: -webkit-box;
+	-webkit-line-clamp: 7;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+/* Solo imagen, sin texto (título/descripción ambos ocultos): la imagen ocupa toda la fila. */
+.wpam-showcase-body:has(.wpam-showcase-media):not(:has(.wpam-showcase-content)) .wpam-showcase-media {
+	flex-basis: 100%;
+	max-width: 100%;
+}
+
+/* Solo texto, sin imagen: el contenido ocupa toda la fila. */
+.wpam-showcase-body:not(:has(.wpam-showcase-media)) .wpam-showcase-content {
+	flex-basis: 100%;
+}
+
+/* ---------------------------------------------------------------------------
+   Fila de botones — reutiliza .wpam-link-item de frontend.css sin duplicar CSS
+   --------------------------------------------------------------------------- */
+.wpam-showcase-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--wpam-gap, 10px);
+	padding: 16px 24px 20px;
+	border-top: 1px solid var(--wpam-color-border, #e2e8f0);
+}
+
+.wpam-showcase-buttons .wpam-link-item {
+	flex: 1 1 180px;
+	min-width: 150px;
+}
+
+/* ---------------------------------------------------------------------------
+   Responsive — mobile: imagen arriba, texto debajo, botones al final
+   --------------------------------------------------------------------------- */
+@media ( max-width: 640px ) {
+	.wpam-showcase-body {
+		flex-direction: column;
+	}
+
+	.wpam-showcase-media,
+	.wpam-showcase-body:has(.wpam-showcase-media):not(:has(.wpam-showcase-content)) .wpam-showcase-media {
+		flex-basis: auto;
+		max-width: 100%;
+		height: 220px;
+	}
+
+	.wpam-showcase-media img {
+		height: 220px;
+	}
+
+	.wpam-showcase-content {
+		padding: 18px 18px 4px;
+		height: auto;
+	}
+
+	.wpam-showcase-buttons {
+		flex-direction: column;
+		padding: 14px 18px 18px;
+	}
+
+	.wpam-showcase-buttons .wpam-link-item {
+		flex-basis: auto;
+		min-width: 0;
+	}
+}
+

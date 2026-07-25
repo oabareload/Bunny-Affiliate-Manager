@@ -44,6 +44,20 @@ class Redirect_Manager {
 	/** Prefijo del slug de la rewrite rule. */
 	const SLUG = 'go';
 
+	/**
+	 * Prefijo de la rewrite rule para links de fallback (Default URL).
+	 * Ruta corta, sin estado: /goa/{post_id}/{affiliate_id}/
+	 *
+	 * @since 1.5.0
+	 */
+	const SLUG_DEFAULT = 'goa';
+
+	/** @since 1.5.0 Query var para el post_id en la ruta /goa/. */
+	const QUERY_VAR_DEFAULT_POST = 'wpam_goa_post';
+
+	/** @since 1.5.0 Query var para el affiliate_id en la ruta /goa/. */
+	const QUERY_VAR_DEFAULT_AFFILIATE = 'wpam_goa_affiliate';
+
 	// -------------------------------------------------------------------------
 	// Registro de rewrite rule y query var
 	// -------------------------------------------------------------------------
@@ -61,6 +75,17 @@ class Redirect_Manager {
 			'index.php?' . self::QUERY_VAR . '=$matches[1]',
 			'top'
 		);
+
+		// v1.5.0: ruta corta y sin estado para links de fallback (Default URL).
+		// No usa el mapa de tokens: post_id y affiliate_id van en claro porque
+		// resolve_default() valida en vivo contra Post_Links::get_links(), no
+		// hay información sensible que ocultar (mismos hosts que allow_redirect_hosts()
+		// ya permite para los links explícitos).
+		add_rewrite_rule(
+			'^' . self::SLUG_DEFAULT . '/([0-9]+)/([0-9]+)/?$',
+			'index.php?' . self::QUERY_VAR_DEFAULT_POST . '=$matches[1]&' . self::QUERY_VAR_DEFAULT_AFFILIATE . '=$matches[2]',
+			'top'
+		);
 	}
 
 	/**
@@ -73,6 +98,8 @@ class Redirect_Manager {
 	 */
 	public function add_query_var( array $vars ): array {
 		$vars[] = self::QUERY_VAR;
+		$vars[] = self::QUERY_VAR_DEFAULT_POST;
+		$vars[] = self::QUERY_VAR_DEFAULT_AFFILIATE;
 		return $vars;
 	}
 
@@ -97,9 +124,12 @@ class Redirect_Manager {
 	 * @return void
 	 */
 	public function handle(): void {
-		$token = get_query_var( self::QUERY_VAR, '' );
+		$token            = get_query_var( self::QUERY_VAR, '' );
+		$goa_post_id      = absint( get_query_var( self::QUERY_VAR_DEFAULT_POST, 0 ) );
+		$goa_affiliate_id = absint( get_query_var( self::QUERY_VAR_DEFAULT_AFFILIATE, 0 ) );
+		$is_goa           = ( $goa_post_id > 0 && $goa_affiliate_id > 0 );
 
-		if ( '' === $token ) {
+		if ( '' === $token && ! $is_goa ) {
 			return; // No es nuestra petición.
 		}
 
@@ -107,9 +137,13 @@ class Redirect_Manager {
 		$options        = get_option( WPAM_OPTION_KEY, array() );
 		$exclude_admins = ! empty( $options['general']['exclude_admins_from_analytics'] );
 
-		// Resolver el token en todos los casos (el redirect siempre debe ocurrir).
+		// Resolver el destino en todos los casos (el redirect siempre debe ocurrir).
+		// Ruta /goa/{post_id}/{affiliate_id}/: sin mapa, resuelve en vivo contra
+		// Post_Links::get_links() (mismo punto único de resolución que Render_Engine).
 		try {
-			$destination = $this->resolve( $token );
+			$destination = $is_goa
+				? $this->resolve_default( $goa_post_id, $goa_affiliate_id )
+				: $this->resolve( $token );
 		} catch ( \Throwable $e ) {
 			$destination = null;
 		}
@@ -283,6 +317,68 @@ class Redirect_Manager {
 			'post_id'      => $post_id,
 			'link_index'   => $link_index,
 			'affiliate_id' => (int) $link['provider_id'],
+			'url'          => $url,
+		);
+	}
+
+	/**
+	 * Resuelve un destino de fallback (Default URL) para la ruta /goa/{post_id}/{affiliate_id}/.
+	 *
+	 * A diferencia de resolve(), no usa el mapa de tokens: post_id y affiliate_id
+	 * vienen directamente en la URL. La validación de negocio (afiliado activo,
+	 * tiene default_url, y —sobre todo— el post no tiene ya un link específico
+	 * para ese afiliado, que siempre gana) se delega enteramente a
+	 * Post_Links::get_links() con 'include_defaults' => true: el mismo punto
+	 * único de resolución que usa Render_Engine. Cero lógica de negocio duplicada.
+	 *
+	 * Efecto colateral positivo: si entre el momento en que se renderizó la
+	 * página y el click se agregó un link específico para ese afiliado, esta
+	 * llamada ya lo prioriza automáticamente sin necesidad de invalidar nada.
+	 *
+	 * @since  1.5.0
+	 * @param  int $post_id      ID del post.
+	 * @param  int $affiliate_id ID del afiliado.
+	 * @return array|null Misma forma que resolve(), o null si no se puede resolver.
+	 */
+	private function resolve_default( int $post_id, int $affiliate_id ): ?array {
+		$post = get_post( $post_id );
+		if ( ! $post instanceof \WP_Post ) {
+			return null;
+		}
+
+		$handler = new Post_Links();
+		$links   = $handler->get_links( $post_id, array(
+			'active_only'      => true,
+			'include_defaults' => true,
+		) );
+
+		$link = null;
+		foreach ( $links as $l ) {
+			if ( (int) $l['provider_id'] === $affiliate_id ) {
+				$link = $l;
+				break;
+			}
+		}
+
+		if ( null === $link ) {
+			return null;
+		}
+
+		$url = $link['final_url'] ?? '';
+		if ( '' === $url ) {
+			return null;
+		}
+
+		// Validar esquema de la URL.
+		$scheme = strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) );
+		if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+			return null;
+		}
+
+		return array(
+			'post_id'      => $post_id,
+			'link_index'   => (int) $link['order'],
+			'affiliate_id' => $affiliate_id,
 			'url'          => $url,
 		);
 	}

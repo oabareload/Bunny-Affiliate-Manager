@@ -51,8 +51,15 @@ class Admin {
 	 * @return void
 	 */
 	public function init(): void {
-		// Placeholder para inicializaciones admin futuras.
-		// Ej: registrar meta boxes, validar nonces, etc.
+		// v1.5.0: si la versión guardada difiere de la actual, forzar un flush de
+		// rewrite rules una única vez. Necesario porque esta versión añade la
+		// rewrite rule /goa/{post_id}/{affiliate_id}/ (Redirect_Manager) y las
+		// instalaciones ya activas no la registran hasta que se hace flush.
+		$stored_version = get_option( 'wpam_version', '' );
+		if ( $stored_version !== WPAM_VERSION ) {
+			flush_rewrite_rules();
+			update_option( 'wpam_version', WPAM_VERSION );
+		}
 	}
 
 	/**

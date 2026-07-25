@@ -12,19 +12,20 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Domain Path: /languages
 - License: GPLv2 or later
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **1.4.0**
+- Current version: **1.6.0**
 
 ## Requirements
 
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v1.4.0)
+## Current scope (v1.6.0)
 
 ### Affiliates
 
 - Full affiliate CRUD (create, edit, delete, activate, deactivate) via inline admin UI — no page reload, no modal.
-- Per-affiliate fields: name, slug, URL parameter, value, logo (Media Library picker), brand color, domains (used for auto-detection and redirect host allow-listing), visible flag, disclaimer settings, related post.
+- Per-affiliate fields: name, slug, URL parameter, value, logo (Media Library picker), brand color, domains (used for auto-detection and redirect host allow-listing), **Default URL (fallback)**, visible flag, disclaimer settings, related post.
+- **Default URL (fallback):** an optional URL used automatically on any post that doesn't have a specific link for that affiliate. Priority is always post-specific link → Default URL → not shown. No extra toggle — setting the field is what enables the fallback.
 - Admin affiliate table with logo, status, parameter, value, domains, and flags columns.
 
 ### Post Affiliate Links
@@ -37,12 +38,21 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - **Final URLs are never stored in the database** — they're generated at runtime, so changing an affiliate's parameter propagates to every post automatically.
 - **Post Affiliates board:** dedicated admin screen to manage affiliate links across posts — visual rows with thumbnail, status, date, and affiliate chips. Inline editor (expand/collapse, no modal). Incremental loading (20 initial, +10 Load More). Search by title, filter by category and tag.
 
+### Rendering & Layouts
+
+- The affiliate links block supports two predefined **Layouts**, chosen once in **Settings → Appearance → Layout**: **Card** (the original layout — vertical or horizontal list of affiliate buttons) and **Showcase** (a single large card: image, title, description, and the same buttons row underneath — image left / text right on desktop, stacked on mobile).
+- Layouts are implemented behind a small `Layout_Interface` contract and a `Layout_Registry`, extensible via the `wpam_render_layouts` filter — adding a future layout doesn't require touching `Render_Engine`.
+- Button-display options (logo/name, CTA text, hide CTA, frontend order) are shared by both Layouts — configured once, not duplicated per Layout. Settings only shows the fields relevant to the currently selected Layout.
+- An optional **section heading** (enable/disable, text, HTML tag H1–H6 or `div`, default H2) is shared across every Layout and rendered once, above the block, regardless of which Layout is active.
+- Showcase's image/title/description can each be sourced independently: Featured Image or a custom URL; the post title, custom text, or hidden; the post's manual excerpt, custom text, or hidden. Like the interstitial's related-post excerpt, **only the manual `post_excerpt` field is ever used — content is never auto-trimmed.**
+
 ### Redirect & Click Tracking
 
 - Every affiliate link is served through a trackable, non-guessable endpoint: `/go/{token}`, where `{token}` is a deterministic 8-character HMAC hash (`post_id` + `link_index` + site secret) — same link always produces the same token, but it can't be reverse-engineered externally.
 - The token map (`token → post_id + link_index`) is rebuilt automatically whenever a post is saved, and can be rebuilt manually from **Settings → Maintenance**.
+- **Fallback (Default URL) links use a separate, stateless route: `/goa/{post_id}/{affiliate_id}/`.** It doesn't use the token map at all — it resolves live, on each click, against the same canonical link-resolution method the frontend uses (`Post_Links::get_links()`), so a post-specific link added after the page was rendered/cached is honored automatically, and there's no map to keep in sync when an affiliate's Default URL changes.
 - On each redirect: the click is recorded (post, affiliate, destination URL, timestamp) before the visitor is sent onward. Recording failure never blocks the redirect.
-- Optional **interstitial page**: a branded countdown page shown before the final redirect (configurable delay, or `0` to redirect instantly). Includes a **"Report broken link"** button (see Broken Link Reporting below).
+- Optional **interstitial page**: a branded countdown page shown before the final redirect (configurable delay, or `0` to redirect instantly). Includes a **"Report broken link"** button on `/go/` links (see Broken Link Reporting below); not shown on `/goa/` fallback links, which don't have a reportable token.
 - `allowed_redirect_hosts` is populated dynamically from every active affiliate's configured domains, so `wp_safe_redirect()` never blocks a legitimate destination.
 - Admins can be excluded from click analytics via **Settings → General → Exclude admins from analytics**.
 
@@ -118,6 +128,7 @@ Bunny-Affiliate-Manager/
 │   │   │   ├── post-affiliates.css
 │   │   │   ├── post-links.css
 │   │   │   ├── settings.css
+│   │   │   ├── showcase.css                  — Showcase Layout only (v1.6.0)
 │   │   │   └── top-posts-widget.css
 │   │   ├── js/
 │   │   │   ├── admin.js
@@ -126,6 +137,7 @@ Bunny-Affiliate-Manager/
 │   │   │   ├── frontend.js
 │   │   │   ├── post-affiliates.js
 │   │   │   ├── post-links.js
+│   │   │   ├── settings.js                   — Layout field toggling (v1.6.0)
 │   │   │   └── views-beacon.js
 │   │   └── images/
 │   ├── includes/
@@ -151,7 +163,14 @@ Bunny-Affiliate-Manager/
 │   │   ├── frontend/
 │   │   │   ├── class-frontend.php
 │   │   │   ├── class-frontend-assets.php
-│   │   │   ├── class-render-engine.php
+│   │   │   ├── class-render-engine.php       — orchestrator only since v1.6.0
+│   │   │   ├── layouts/                      — Layout system (v1.6.0)
+│   │   │   │   ├── interface-layout.php
+│   │   │   │   ├── class-layout-registry.php
+│   │   │   │   ├── class-layout-card.php
+│   │   │   │   └── class-layout-showcase.php
+│   │   │   ├── components/                   — shared building blocks (v1.6.0)
+│   │   │   │   └── class-button-row.php
 │   │   │   ├── class-top-posts-query.php     — Top Clicked Posts data source
 │   │   │   ├── class-top-posts-renderer.php
 │   │   │   ├── class-shortcode-top-posts.php — [wpam_top_posts]
@@ -174,7 +193,8 @@ Bunny-Affiliate-Manager/
 │   │   │       ├── affiliate-card.php
 │   │   │       ├── link-item.php
 │   │   │       ├── links-wrapper.php
-│   │   │       └── recently-viewed.php
+│   │   │       ├── recently-viewed.php
+│   │   │       └── showcase-block.php        — Showcase Layout markup (v1.6.0)
 │   │   ├── views/
 │   │   │   ├── class-views.php               — eligibility + AJAX orchestration
 │   │   │   ├── class-view-tracker.php        — atomic upsert
@@ -199,6 +219,7 @@ Bunny-Affiliate-Manager/
 - Singleton pattern applied only where a single shared instance is strictly appropriate.
 - WordPress Settings API, Meta Boxes, and `WP_Query` are preferred over custom solutions. AJAX is used only where it provides genuine UX value; server rendering is the default.
 - **Single source of truth per concern**: each data domain (clicks, views, score) has exactly one Query class (`Top_Posts_Query`, `Views_Query`, `Score_Query`) that owns its SQL and its object cache. Admin screens and the public API consume these classes directly — they never query the database themselves.
+- **Layouts as predefined, extensible building blocks (v1.6.0)**: `Render_Engine` never renders layout-specific markup itself. It resolves links, resolves the active Layout via `Layout_Registry`, delegates rendering, then prepends the shared section heading. Each Layout (`Layout_Card`, `Layout_Showcase`) implements a small `Layout_Interface` contract and owns only its own markup/options; a shared `Button_Row` component renders the affiliate buttons for both, so button logic is never duplicated. New Layouts register in `Layout_Registry` or via the `wpam_render_layouts` filter — `Render_Engine` itself never needs to change. Deliberately not a page builder: Layouts are fixed, predefined structures, not composable blocks.
 - **Render vs. data separation**: `Analytics_Renderer` and `Top_Posts_Renderer` produce HTML exclusively from data already fetched by a Query class (plus safe WordPress helper calls like `get_post()`, `get_edit_post_link()`); they never run SQL.
 - Affiliate URLs are generated at runtime via `wpam_generate_affiliate_url()` — final URLs are never stored in the database.
 - The Render Engine uses an in-memory cache per `post_id + style` to avoid duplicate renders within the same request.
@@ -234,8 +255,9 @@ Configured in **Settings → Render mode**:
 
 Drop files in `/wp-content/themes/YOUR-THEME/wpam/` to override any template:
 
-- `link-item.php` — individual link row.
-- `links-wrapper.php` — outer wrapper with style class and data attributes.
+- `link-item.php` — individual link row (shared by both Layouts).
+- `links-wrapper.php` — Card Layout's outer wrapper with style class and data attributes.
+- `showcase-block.php` — Showcase Layout's markup (image, title, description, buttons).
 - `affiliate-card.php` — legacy card template.
 - `recently-viewed.php` — Recently Viewed block wrapper.
 
@@ -265,12 +287,15 @@ wpam_is_affiliate_active( int $id ): bool
 
 ```php
 wpam_get_post_links( int $post_id, bool $active_only = false ): array
+wpam_get_resolved_post_links( int $post_id, bool $active_only = true ): array
 wpam_get_post_link( int $post_id, int $index ): ?array
 wpam_post_has_links( int $post_id, bool $active_only = false ): bool
 wpam_get_post_links_count( int $post_id, bool $active_only = false ): int
 wpam_post_link_is_orphan( int $post_id, int $index ): bool
 wpam_normalize_link_item( array $item ): array
 ```
+
+`wpam_get_post_links()` returns only links stored explicitly in `_wpam_links` — used by the "Affiliate Links" meta box and the Post Affiliates board. `wpam_get_resolved_post_links()` additionally merges in fallback links generated from each active affiliate's Default URL (see Affiliates section above) for any affiliate the post doesn't already have a specific link for; `Render_Engine` uses this one to paint the frontend. Every link item carries a `'_wpam_is_default'` key indicating whether it's an explicit or a synthetic fallback entry.
 
 **Render Engine**
 
@@ -331,6 +356,9 @@ Yes. Copy the relevant template into `/wp-content/themes/YOUR-THEME/wpam/` and e
 
 **Can I control the brand color per affiliate?**
 Yes. Set the **Brand Color** field in each affiliate's settings. The CSS variable `--wpam-brand-color` is injected inline on each link item, controlling the button color and left border accent.
+
+**How do I switch between Card and Showcase?**
+**Settings → Appearance → Layout.** Only the fields relevant to the selected Layout are shown. Button-display options (logo/name, CTA, order) apply to both and aren't duplicated.
 
 ## Localization
 
