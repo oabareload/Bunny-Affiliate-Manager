@@ -5,6 +5,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.0] — Bunny Score admin integration fixes
+
+### Fixed
+
+- **Duplicate menu registration removed.** `Bunny_Score_Admin` was registering a second `wpam-bunny-score` submenu directly via `add_action('admin_menu', ..., 99)`, competing with the correct one in `Admin_Menu` (which wraps the screen with the plugin's common header/nav via `render_admin_header()`/`render_admin_footer()`). Because it ran on a later priority, it silently won and rendered the screen unwrapped — no Bunny header, no nav, no plugin chrome. `Bunny_Score_Admin` now only registers the `admin_post`/`wp_ajax` calculation handlers; `Admin_Menu` remains the single source of truth for the plugin's admin menu.
+- **`Bunny_Score_Screen::render()` restyled to reuse existing admin UI**: dropped its own `<div class="wrap">`/`<h1>` (redundant with the wrapper `Admin_Menu` already provides) and the inline `style="..."` attributes scattered through the markup, in favor of the plugin's existing `wpam-section-heading` and `wpam-settings-card` classes — same visual language as Dashboard, Analytics and Settings.
+- **Native WordPress tag selector replaces the fixed `<select multiple>` per group.** Each enabled Bunny Score group now renders the standard `tagsdiv` markup (the same one WordPress core uses for flat taxonomies in the post editor), powered by the core-registered `tags-box` + `tags-suggest` scripts — autocomplete by name (REST-backed, requires the taxonomy to be `show_in_rest`), Enter/comma to add, multiple selection, visual removable pills. No new JS file was needed; `tagBox.init()` wires itself automatically.
+
+### Changed
+
+- `Bunny_Score_Admin::handle_calculation()` now reads `selected_term_names[{group}]` (comma-separated term **names**, as produced by `tagBox`) instead of `selected_terms[{group}][]` (term IDs from the old `<select>`). A new private `resolve_selected_terms()` resolves each name to its `term_id` via `get_term_by('name', ...)` against the group's real taxonomy (or `post_tag` fallback, same rule `Bunny_Score_Screen` already used). `Bunny_Score_Manager::calculate()` still receives the exact same `[group => [['term_id' => int, 'taxonomy' => string], ...]]` shape — zero changes to the calculation engine.
+- `Admin_Assets::enqueue_scripts()` now enqueues the core `tags-box` and `tags-suggest` script handles on the Bunny Score screen only.
+
+### Notes
+
+- Formula, `Bunny_Score_Manager::calculate()`, `Bunny_Score_Factors`, and `Score_Query` are untouched — this release is admin-integration and UX only, as scoped.
+- Correction to an earlier note in this same release: the native tag selector does **not** depend on the REST API / `show_in_rest`. It uses the same mechanism as the classic post editor — `admin-ajax.php?action=ajax-tag-search`, gated by the taxonomy's `assign_terms` capability. If a custom taxonomy's capabilities aren't mapped to something the current admin user holds, live suggestions will silently return nothing (typing + comma/Enter to add by exact name still works). Verify in Local if a group's autocomplete looks empty.
+- **v1.7.0 hotfix (same release, before tag):** the "Add factor" button on Settings and on the Bunny Score screen never worked — the click handler was delegated on `.wpam-bunny-factors-table` (the `<table>` element), but the button lived *outside* the table as a sibling, so the click never bubbled through the bound element. Fixed by wrapping table + button + description in `.wpam-bunny-factors-wrap` and delegating on that wrapper instead (`class-settings.php`, `bunny-score-settings.js`).
+- **v1.7.0 hotfix:** `Bunny_Score_Screen::render()` was restyled again using the actually-defined CSS classes (`wpam-analytics-card` / `wpam-analytics-card-title`, matching Dashboard/Analytics/Maintenance cards). The previous pass in this same release used `wpam-section-heading` / `wpam-settings-card`, which do not exist in any stylesheet — confirmed by reading `admin.css`, `settings.css`, and `bunny-admin.css` directly. A small, scoped CSS addition (`.wpam-bunny-score-error`, `.wpam-bunny-score-group`, `.wpam-bunny-factors-wrap`) was added to `admin.css` for the pieces with no existing equivalent.
+- **v1.7.0 hotfix:** the native tag selector didn't react to typing, Enter, or the "Add" button at all. Root cause: `tagBox.init()` — the call that wires up the tagsdiv widget — is normally made by `wp-admin/js/post.js` on document ready, and that script only loads on the post-edit screen. Nothing was calling it on the Bunny Score screen. Fixed with a `wp_add_inline_script()` on the `tags-box` handle (scoped to the Bunny Score hook only) that makes the same call `post.js` makes.
+- **v1.7.0 hotfix:** `.wpam-bunny-factors-table` had no styling of its own — it relied on rules scoped to `.wpam-settings-page` (the Settings screen only), so it looked unstyled on the Bunny Score screen. Added self-contained styling for the table, its rows, and its inputs so it looks consistent regardless of which screen renders it.
+- **v1.7.0 hotfix:** the factor "ID" field is now a hidden input, auto-generated from the Label (client-side slug on input/blur, mirroring `sanitize_key()`). Existing factors keep their original id untouched even if their label is edited later (`data-id-locked="1"` on server-rendered rows), so nothing that already references a factor id breaks. Server-side `sanitize_bunny_score_factors()` also got a defense-in-depth fallback: previously a blank id silently **dropped the entire factor** on save with no warning; now it derives an id from the label if the client didn't supply one, and de-duplicates colliding ids instead of one overwriting another.
+
+---
+
+## [1.6.3] — Bunny Score admin + settings integration
+
+### Added
+
+- **Bunny Score admin screen** accessible from the plugin submenu, allowing administrators to select taxonomy terms and calculate a Bunny Score using historical post performance.
+- **Bunny Score settings** persisted in `WPAM_OPTION_KEY` with defaults, including enabled taxonomy groups, minimum posts per tag, and configurable manual factors.
+- **Calculation engine** implemented in `Bunny_Score_Manager`, reusing `Score_Query::get_scores_for_post_ids()` for historical post scoring and applying manual factor adjustments.
+- **Admin AJAX flow and client-side rendering** for Bunny Score results, with localized labels and a results panel in the admin UI.
+- No new database tables or cron jobs were introduced.
+
+### Fixed
+
+- Sanitization and default handling for Bunny Score settings were added to `Settings::sanitize_options()` to ensure config integrity and safe saving.
+
 ## [1.6.0] — Layout system (Card / Showcase) + Default URL fixes
 
 ### Added

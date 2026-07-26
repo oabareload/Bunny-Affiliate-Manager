@@ -80,6 +80,12 @@ require_once WPAM_PLUGIN_PATH . 'includes/views/class-recently-viewed.php';
 require_once WPAM_PLUGIN_PATH . 'includes/analytics/class-score-query.php';
 require_once WPAM_PLUGIN_PATH . 'includes/admin/class-analytics-screen.php';
 
+// --- v2.0.0+: Bunny Score feature ---
+require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-factors.php';
+require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-manager.php';
+require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-admin.php';
+require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-screen.php';
+
 /**
  * Class Plugin
  *
@@ -188,6 +194,10 @@ final class Plugin {
 		// Settings.
 		$settings = new Settings\Settings();
 		$this->loader->add_action( 'admin_init', $settings, 'register_settings' );
+
+		// Bunny Score.
+		$bunny_score_admin = new \WP_AffiliateManager\Bunny_Score\Bunny_Score_Admin();
+		$this->loader->add_action( 'admin_init', $bunny_score_admin, 'register' );
 
 		// FASE 2 — Affiliates screen.
 		$affiliates_screen = new Admin\Affiliates_Screen();

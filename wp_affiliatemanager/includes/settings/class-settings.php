@@ -163,6 +163,10 @@ class Settings {
 			self::PAGE_SLUG
 		);
 
+		// Bunny Score moved to its own admin screen. Settings remain stored in options
+		// but the interactive UI for calculation and factor inputs lives in
+		// `Bunny_Score_Screen` (admin page). Do not register a settings section here.
+
 		add_settings_field(
 			'wpam_field_rv_enabled',
 			__( 'Enable Recently Viewed', 'wp-affiliatemanager' ),
@@ -447,6 +451,154 @@ class Settings {
 	}
 
 	/**
+	 * Renderiza la descripción de la sección Bunny Score.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function render_section_bunny_score(): void {
+		echo '<p>' . esc_html__( 'Configura los grupos de etiquetas y los factores manuales que se usan para el cálculo del Bunny Score.', 'wp-affiliatemanager' ) . '</p>';
+	}
+
+	/**
+	 * Renderiza los checkboxes de grupos habilitados para Bunny Score.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function render_field_bunny_score_enabled_groups(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$groups  = $options['bunny_score']['enabled_groups'] ?? array();
+		$labels  = array(
+			'serie'      => __( 'Serie', 'wp-affiliatemanager' ),
+			'personaje'  => __( 'Personaje', 'wp-affiliatemanager' ),
+			'fabricante' => __( 'Fabricante', 'wp-affiliatemanager' ),
+			'escala'     => __( 'Escala', 'wp-affiliatemanager' ),
+			'ilustrador' => __( 'Ilustrador', 'wp-affiliatemanager' ),
+			'linea'      => __( 'Línea', 'wp-affiliatemanager' ),
+		);
+		foreach ( $labels as $key => $label ) {
+			$value = ! empty( $groups[ $key ] );
+			?>
+		<label style="display:inline-block; margin-right:1.5rem;">
+			<input
+				type="checkbox"
+				name="<?php echo esc_attr( self::OPTION_NAME . '[bunny_score][enabled_groups][' . esc_attr( $key ) . ']' ); ?>"
+				value="1"
+				<?php checked( $value ); ?>
+			/>
+			<?php echo esc_html( $label ); ?>
+		</label>
+		<?php
+		}
+		?><p class="description"><?php esc_html_e( 'Selecciona qué grupos de etiquetas participan en el cálculo histórico.', 'wp-affiliatemanager' ); ?></p><?php
+	}
+
+	/**
+	 * Renderiza el campo mínimo de publicaciones por etiqueta.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function render_field_bunny_score_min_posts(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = absint( $options['bunny_score']['min_posts_per_tag'] ?? 3 );
+		?>
+		<input
+			type="number"
+			name="<?php echo esc_attr( self::OPTION_NAME . '[bunny_score][min_posts_per_tag]' ); ?>"
+			value="<?php echo esc_attr( (string) $value ); ?>"
+			min="1"
+			step="1"
+			style="width:80px;"
+		/>
+		<p class="description"><?php esc_html_e( 'Número mínimo de publicaciones que debe tener una etiqueta para participar en el cálculo.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza la tabla de factores configurables.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function render_field_bunny_score_factors(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$factors = $options['bunny_score']['factors'] ?? array();
+		?>
+		<div class="wpam-bunny-factors-wrap">
+		<table class="form-table wpam-bunny-factors-table">
+			<thead>
+				<tr>
+					<th><?php esc_html_e( 'Etiqueta', 'wp-affiliatemanager' ); ?></th>
+					<th><?php esc_html_e( 'Tipo', 'wp-affiliatemanager' ); ?></th>
+					<th><?php esc_html_e( 'Activo', 'wp-affiliatemanager' ); ?></th>
+					<th><?php esc_html_e( 'Optional', 'wp-affiliatemanager' ); ?></th>
+					<th><?php esc_html_e( 'Max %', 'wp-affiliatemanager' ); ?></th>
+					<th><?php esc_html_e( 'Escala / Labels', 'wp-affiliatemanager' ); ?></th>
+					<th></th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php if ( empty( $factors ) ) : ?>
+					<tr class="wpam-no-factors-row">
+						<td colspan="7"><em><?php esc_html_e( 'No hay factores configurados todavía.', 'wp-affiliatemanager' ); ?></em></td>
+					</tr>
+				<?php endif; ?>
+				<?php foreach ( $factors as $index => $factor ) : ?>
+					<tr class="wpam-bunny-factor-row" data-id-locked="1">
+						<td>
+							<input type="hidden" class="wpam-factor-id" name="<?php echo esc_attr( self::OPTION_NAME . '[bunny_score][factors][' . esc_attr( $index ) . '][id]' ); ?>" value="<?php echo esc_attr( $factor['id'] ?? '' ); ?>" />
+							<input type="text" name="<?php echo esc_attr( self::OPTION_NAME . '[bunny_score][factors][' . esc_attr( $index ) . '][label]' ); ?>" value="<?php echo esc_attr( $factor['label'] ?? '' ); ?>" class="regular-text wpam-factor-label-input" />
+						</td>
+						<td>
+							<select name="<?php echo esc_attr( self::OPTION_NAME . '[bunny_score][factors][' . esc_attr( $index ) . '][type]' ); ?>" class="wpam-factor-type">
+								<option value="boolean" <?php selected( $factor['type'] ?? 'boolean', 'boolean' ); ?>><?php esc_html_e( 'Boolean', 'wp-affiliatemanager' ); ?></option>
+								<option value="numeric" <?php selected( $factor['type'] ?? 'boolean', 'numeric' ); ?>><?php esc_html_e( 'Numeric', 'wp-affiliatemanager' ); ?></option>
+								<option value="label" <?php selected( $factor['type'] ?? 'boolean', 'label' ); ?>><?php esc_html_e( 'Label', 'wp-affiliatemanager' ); ?></option>
+							</select>
+						</td>
+						<td>
+							<label>
+								<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME . '[bunny_score][factors][' . esc_attr( $index ) . '][enabled]' ); ?>" value="1" <?php checked( ! empty( $factor['enabled'] ) ); ?> />
+							</label>
+						</td>
+						<td>
+							<label>
+								<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME . '[bunny_score][factors][' . esc_attr( $index ) . '][optional]' ); ?>" value="1" <?php checked( ! empty( $factor['optional'] ) ); ?> />
+							</label>
+						</td>
+						<td>
+							<input type="number" min="0" step="0.1" name="<?php echo esc_attr( self::OPTION_NAME . '[bunny_score][factors][' . esc_attr( $index ) . '][max_percent]' ); ?>" value="<?php echo esc_attr( $factor['max_percent'] ?? '0' ); ?>" style="width:80px;" />
+						</td>
+						<td>
+							<div class="wpam-factor-numeric" style="display:<?php echo esc_attr( ( $factor['type'] ?? 'boolean' ) === 'numeric' ? 'block' : 'none' ); ?>;">
+								<input type="text" name="<?php echo esc_attr( self::OPTION_NAME . '[bunny_score][factors][' . esc_attr( $index ) . '][scale_min]' ); ?>" value="<?php echo esc_attr( $factor['scale_min'] ?? '' ); ?>" style="width:70px;" placeholder="Min" />
+								<input type="text" name="<?php echo esc_attr( self::OPTION_NAME . '[bunny_score][factors][' . esc_attr( $index ) . '][scale_max]' ); ?>" value="<?php echo esc_attr( $factor['scale_max'] ?? '' ); ?>" style="width:70px; margin-left:.5rem;" placeholder="Max" />
+							</div>
+							<div class="wpam-factor-label" style="display:<?php echo esc_attr( ( $factor['type'] ?? 'boolean' ) === 'label' ? 'block' : 'none' ); ?>;">
+								<textarea name="<?php echo esc_attr( self::OPTION_NAME . '[bunny_score][factors][' . esc_attr( $index ) . '][labels_json]' ); ?>" class="large-text" placeholder="{\"key\": 10}"><?php echo esc_textarea( is_array( $factor['labels'] ) ? wp_json_encode( $factor['labels'] ) : '' ); ?></textarea>
+								<p class="description"><?php esc_html_e( 'Introduce un objeto JSON con pares etiqueta:porcentaje, por ejemplo: {"A":10,"B":5}', 'wp-affiliatemanager' ); ?></p>
+							</div>
+						</td>
+						<td><button type="button" class="button wpam-remove-factor"><?php esc_html_e( 'Remove', 'wp-affiliatemanager' ); ?></button></td>
+					</tr>
+				<?php endforeach; ?>
+			</tbody>
+		</table>
+		<p><button type="button" class="button wpam-add-factor"><?php esc_html_e( 'Add factor', 'wp-affiliatemanager' ); ?></button></p>
+		<p class="description"><?php esc_html_e( 'Edita los factores manuales aquí. Cada fila representa un factor configurable. Para factores de tipo "Label" introduce un JSON con los pares etiqueta=>porcentaje.', 'wp-affiliatemanager' ); ?></p>
+		</div>
+		<?php
+	}
+
+	/**
+ 	 * Renderiza el campo enable_interstitial.
+ 	 *
+ 	 * @since  0.2.0-alpha2
+ 	 * @return void
+ 	 */
+ 	/**
 	 * Renderiza el campo enable_interstitial.
 	 *
 	 * @since  0.2.0-alpha2
@@ -1589,7 +1741,110 @@ class Settings {
 			) ? $input['appearance']['frontend_order'] : 'preserve_post_order';
 		}
 
+		if ( isset( $input['bunny_score'] ) && is_array( $input['bunny_score'] ) ) {
+			$sanitized['bunny_score'] = array(
+				'enabled_groups'   => self::sanitize_enabled_groups( $input['bunny_score']['enabled_groups'] ?? array() ),
+				'min_posts_per_tag' => isset( $input['bunny_score']['min_posts_per_tag'] ) ? absint( $input['bunny_score']['min_posts_per_tag'] ) : 1,
+				'factors'          => $this->sanitize_bunny_score_factors( $input['bunny_score']['factors'] ?? array() ),
+			);
+		} else {
+			$defaults = $this->get_defaults();
+			$sanitized['bunny_score'] = $defaults['bunny_score'];
+		}
+
 		return $sanitized;
+	}
+
+	/**
+	 * Sanitiza los grupos habilitados para Bunny Score.
+	 *
+	 * @param array $groups
+	 * @return array
+	 */
+	private static function sanitize_enabled_groups( array $groups ): array {
+		$allowed_groups = array( 'serie', 'personaje', 'fabricante', 'escala', 'ilustrador', 'linea' );
+		$sanitized = array();
+
+		foreach ( $allowed_groups as $group ) {
+			$sanitized[ $group ] = ! empty( $groups[ $group ] );
+		}
+
+		return $sanitized;
+	}
+
+	/**
+	 * Sanitiza la configuración de factores para Bunny Score.
+	 *
+	 * @param array $factors
+	 * @return array
+	 */
+	private function sanitize_bunny_score_factors( array $factors ): array {
+		$sanitized = array();
+		$used_ids = array();
+
+		foreach ( $factors as $factor ) {
+			if ( ! is_array( $factor ) ) {
+				continue;
+			}
+
+			$id = sanitize_key( $factor['id'] ?? '' );
+
+			// v1.7.0: the ID field is now hidden and auto-generated client-side from
+			// the label. This is a defense-in-depth fallback for when JS didn't run
+			// (fails silently before) or the id ended up empty for any other reason
+			// — derive it from the label instead of silently dropping the factor.
+			if ( '' === $id ) {
+				$id = sanitize_key( sanitize_title( $factor['label'] ?? '' ) );
+			}
+			if ( '' === $id ) {
+				continue;
+			}
+
+			// Guard against id collisions (e.g. two factors ending up with the same
+			// generated slug) instead of silently overwriting one with the other.
+			$base_id = $id;
+			$suffix = 2;
+			while ( isset( $used_ids[ $id ] ) ) {
+				$id = $base_id . '_' . $suffix;
+				++$suffix;
+			}
+			$used_ids[ $id ] = true;
+
+			$type = in_array( $factor['type'] ?? 'boolean', array( 'boolean', 'numeric', 'label' ), true )
+				? $factor['type']
+				: 'boolean';
+
+			// Normalize labels: accept either an array `labels` or a JSON string `labels_json`.
+			$labels = array();
+			if ( isset( $factor['labels_json'] ) && '' !== trim( (string) $factor['labels_json'] ) ) {
+				$decoded = json_decode( wp_unslash( $factor['labels_json'] ), true );
+				if ( is_array( $decoded ) ) {
+					// Ensure numeric percentages
+					foreach ( $decoded as $k => $v ) {
+						$labels[ sanitize_text_field( $k ) ] = max( 0.0, floatval( $v ) );
+					}
+				}
+			} elseif ( is_array( $factor['labels'] ) ) {
+				foreach ( $factor['labels'] as $k => $v ) {
+					$labels[ sanitize_text_field( $k ) ] = max( 0.0, floatval( $v ) );
+				}
+			}
+
+			$sanitized[ $id ] = array(
+				'id'          => $id,
+				'label'       => sanitize_text_field( $factor['label'] ?? '' ),
+				'type'        => $type,
+				'enabled'     => ! empty( $factor['enabled'] ),
+				'optional'    => ! empty( $factor['optional'] ),
+				'max_percent' => max( 0.0, floatval( $factor['max_percent'] ?? 0 ) ),
+				'scale_min'   => isset( $factor['scale_min'] ) ? floatval( $factor['scale_min'] ) : 0.0,
+				'scale_max'   => isset( $factor['scale_max'] ) ? floatval( $factor['scale_max'] ) : 100.0,
+				'precision'   => absint( $factor['precision'] ?? 2 ),
+				'labels'      => $labels,
+			);
+		}
+
+		return array_values( $sanitized );
 	}
 
 	/**
@@ -1619,15 +1874,17 @@ class Settings {
 				'count'       => 5,
 				'title'       => 'Recently Viewed',
 			),
-			'redirect' => array(
-				'enable_interstitial'          => true,
-				'redirect_delay'               => 5,
-				'disclaimer_text'              => 'Los precios, disponibilidad y contenido son responsabilidad del sitio externo.',
-				'interstitial_title'           => 'Estás saliendo de BunnyChase',
-				'interstitial_countdown_text'  => 'Redirigiendo en {seconds}s',
-				'interstitial_button_text'     => 'Continuar',
-				'show_related_post_excerpt'    => false,
-				'interstitial_width'           => '460',
+			'bunny_score' => array(
+				'enabled_groups'   => array(
+					'serie'      => true,
+					'personaje'  => true,
+					'fabricante' => true,
+					'escala'     => true,
+					'ilustrador' => true,
+					'linea'      => true,
+				),
+				'min_posts_per_tag' => 3,
+				'factors'          => array(),
 			),
 			'content_slots' => array(
 				0 => array(

@@ -95,6 +95,37 @@ class Admin_Menu {
 			'wpam-settings',
 			array( $this, 'render_settings_page' )
 		);
+
+		add_submenu_page(
+			self::PARENT_SLUG,
+			__( 'Bunny Score — Bunny Affiliate Manager', 'wp-affiliatemanager' ),
+			__( 'Bunny Score', 'wp-affiliatemanager' ),
+			self::CAPABILITY,
+			'wpam-bunny-score',
+			array( $this, 'render_bunny_score_page' )
+		);
+
+	}
+
+	/**
+	 * Render the Bunny Score admin page wrapped with the common header/footer.
+	 *
+	 * @return void
+	 */
+	public function render_bunny_score_page(): void {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'No tienes permisos para acceder a esta página.', 'wp-affiliatemanager' ) );
+		}
+
+		$this->render_admin_header( __( 'Bunny Score', 'wp-affiliatemanager' ) );
+
+		if ( class_exists( '\WP_AffiliateManager\\Bunny_Score\\Bunny_Score_Screen' ) ) {
+			\WP_AffiliateManager\Bunny_Score\Bunny_Score_Screen::render();
+		} else {
+			echo '<div class="bunny-page-content"><p>Screen class missing.</p></div>';
+		}
+
+		$this->render_admin_footer();
 	}
 
 	// -------------------------------------------------------------------------
@@ -298,6 +329,7 @@ class Admin_Menu {
 
 	private function render_admin_header( string $page_title ): void {
 		?>
+			<div class="wpam-admin-wrap bunny-wrap">
 			<div class="bunny-header">
 				<div class="bunny-header-inner">
 					<span class="bunny-logo">🐰</span>
@@ -324,6 +356,7 @@ class Admin_Menu {
 			'wpam-post-affiliates' => __( 'Post Affiliates', 'wp-affiliatemanager' ),
 			'wpam-broken-reports'  => __( 'Broken Reports', 'wp-affiliatemanager' ),
 			'wpam-settings'        => __( 'Settings', 'wp-affiliatemanager' ),
+			'wpam-bunny-score'     => __( 'Bunny Score', 'wp-affiliatemanager' ),
 		);
 
 		foreach ( $nav_items as $slug => $label ) {

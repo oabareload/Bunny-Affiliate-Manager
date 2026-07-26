@@ -28,6 +28,7 @@ class Admin_Assets {
 		'bunny-affiliates_page_wpam-post-affiliates',
 		'bunny-affiliates_page_wpam-broken-reports',
 		'bunny-affiliates_page_wpam-settings',
+		'bunny-affiliates_page_wpam-bunny-score',
 	);
 
 	public function __construct( string $version ) {
@@ -108,13 +109,25 @@ class Admin_Assets {
 					'pluginUrl' => WPAM_PLUGIN_URL,
 					'version'   => $this->version,
 					'i18n'      => array(
-						'confirm_delete' => __( 'Delete this affiliate permanently?', 'wp-affiliatemanager' ),
-						'error_generic'  => __( 'An error occurred. Please try again.', 'wp-affiliatemanager' ),
-						'saving'         => __( 'Saving...', 'wp-affiliatemanager' ),
-						'saved'          => __( 'Saved!', 'wp-affiliatemanager' ),
-						'active'         => __( 'Active', 'wp-affiliatemanager' ),
-						'inactive'       => __( 'Inactive', 'wp-affiliatemanager' ),
-						'cancel'         => __( 'Cancel', 'wp-affiliatemanager' ),
+						'confirm_delete'   => __( 'Delete this affiliate permanently?', 'wp-affiliatemanager' ),
+						'error_generic'    => __( 'An error occurred. Please try again.', 'wp-affiliatemanager' ),
+						'saving'           => __( 'Saving...', 'wp-affiliatemanager' ),
+						'saved'            => __( 'Saved!', 'wp-affiliatemanager' ),
+						'active'           => __( 'Active', 'wp-affiliatemanager' ),
+						'inactive'         => __( 'Inactive', 'wp-affiliatemanager' ),
+						'cancel'           => __( 'Cancel', 'wp-affiliatemanager' ),
+						'loading'          => __( 'Loading...', 'wp-affiliatemanager' ),
+						'not_available'    => __( 'Not available', 'wp-affiliatemanager' ),
+						'total_posts'      => __( 'Posts scored:', 'wp-affiliatemanager' ),
+						'total_percent_add' => __( 'Total bonus:', 'wp-affiliatemanager' ),
+						'final_bunny_score' => __( 'Bunny Score:', 'wp-affiliatemanager' ),
+						'factors'          => __( 'Factors', 'wp-affiliatemanager' ),
+						'terms'            => __( 'Term break-down', 'wp-affiliatemanager' ),
+						'skipped'          => __( 'Skipped:', 'wp-affiliatemanager' ),
+						'not_applicable'   => __( 'Not applicable', 'wp-affiliatemanager' ),
+						'global_avg'       => __( 'Historical average:', 'wp-affiliatemanager' ),
+						'range_label'      => __( 'Range', 'wp-affiliatemanager' ),
+						'factor_label_placeholder' => __( 'Nombre del factor', 'wp-affiliatemanager' ),
 					),
 				)
 			);
@@ -156,6 +169,36 @@ class Admin_Assets {
 					array(),
 					$this->version,
 					true
+				);
+			}
+
+			// Enqueue Bunny Score settings helper on Settings and Bunny Score pages.
+			if ( in_array( $hook_suffix, array( 'bunny-affiliates_page_wpam-settings', 'bunny-affiliates_page_wpam-bunny-score' ), true ) ) {
+				wp_enqueue_script(
+					'wpam-bunny-score-settings',
+					WPAM_PLUGIN_URL . 'assets/js/bunny-score-settings.js',
+					array( 'jquery' ),
+					$this->version,
+					true
+				);
+			}
+
+			// v1.7.0: native WP tag selector (tagsdiv + tagBox + tags-suggest autocomplete)
+			// on the Bunny Score screen — same core scripts the post editor uses for
+			// non-hierarchical taxonomies. Core-registered handles, no new asset files.
+			if ( 'bunny-affiliates_page_wpam-bunny-score' === $hook_suffix ) {
+				wp_enqueue_script( 'tags-box' );
+				wp_enqueue_script( 'tags-suggest' );
+
+				// `tagBox.init()` is normally called by wp-admin/js/post.js on document
+				// ready, but post.js is only enqueued on the post-edit screen. Outside
+				// that context nothing calls it, so the tagsdiv widgets (Enter/comma
+				// to add, the "Add" button, and the autocomplete suggestions) never
+				// activate. We call it ourselves here — same call post.js makes.
+				wp_add_inline_script(
+					'tags-box',
+					'jQuery(function($){ if (typeof window.tagBox !== "undefined") { window.tagBox.init(); } });',
+					'after'
 				);
 			}
 

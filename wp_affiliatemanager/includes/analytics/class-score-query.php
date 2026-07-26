@@ -167,6 +167,101 @@ class Score_Query {
 		return $posts;
 	}
 
+	/**
+	 * Retorna un mapa post_id => score para un conjunto dado de post IDs.
+	 *
+	 * Reutiliza la misma lógica de agregación (vistas + clicks) que el resto
+	 * de la clase para mantener una única fuente de verdad del cálculo.
+	 *
+	 * @since 1.6.0
+	 * @param int[] $post_ids
+	 * @param string $range today|week|month|total
+	 * @return array<int,int> Mapa post_id => score
+	 */
+	public static function get_scores_for_post_ids( array $post_ids, string $range = 'total' ): array {
+		global $wpdb;
+
+		if ( empty( $post_ids ) ) {
+			return array();
+		}
+
+		$views_table  = Views_Table::table_name();
+		$clicks_table = Clicks_Table::table_name();
+
+		$placeholders = implode( ',', array_fill( 0, count( $post_ids ), '%d' ) );
+
+		$views_where  = '';
+		$clicks_where = '';
+
+		if ( 'total' !== $range ) {
+			$since_datetime = Top_Posts_Query::range_to_since( $range );
+			$since_period   = gmdate( 'Ymd', strtotime( $since_datetime ) );
+			$views_where    = $wpdb->prepare( ' WHERE period >= %s', $since_period );
+			$clicks_where   = $wpdb->prepare( ' WHERE ts >= %s', $since_datetime );
+		}
+
+		// Añadir la restricción por post_id al WHERE correspondiente.
+		if ( '' === $views_where ) {
+			$views_where_post = ' WHERE post_id IN (' . $placeholders . ')';
+		} else {
+			$views_where_post = $views_where . ' AND post_id IN (' . $placeholders . ')';
+		}
+
+		if ( '' === $clicks_where ) {
+			$clicks_where_post = ' WHERE post_id IN (' . $placeholders . ')';
+		} else {
+			$clicks_where_post = $clicks_where . ' AND post_id IN (' . $placeholders . ')';
+		}
+
+		// Preparar los argumentos para $wpdb->prepare en el orden correcto.
+		$args = array();
+		$args[] = self::DEFAULT_FACTOR_VIEWS;
+		$args[] = $views_table;
+
+		if ( 'total' !== $range ) {
+			$args[] = $since_period;
+		}
+
+		foreach ( $post_ids as $id ) {
+			$args[] = (int) $id;
+		}
+
+		$args[] = self::DEFAULT_FACTOR_CLICKS;
+		$args[] = $clicks_table;
+
+		if ( 'total' !== $range ) {
+			$args[] = $since_datetime;
+		}
+
+		foreach ( $post_ids as $id ) {
+			$args[] = (int) $id;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT post_id, SUM(contrib) AS score FROM (
+					SELECT post_id, SUM(count) * %d AS contrib FROM %i{$views_where_post} GROUP BY post_id
+					UNION ALL
+					SELECT post_id, COUNT(*) * %d AS contrib FROM %i{$clicks_where_post} GROUP BY post_id
+				) AS combined GROUP BY post_id",
+				$args
+			),
+			ARRAY_A
+		);
+
+		if ( ! is_array( $rows ) ) {
+			return array();
+		}
+
+		$score_map = array();
+		foreach ( $rows as $row ) {
+			$score_map[ (int) $row['post_id'] ] = (int) $row['score'];
+		}
+
+		return $score_map;
+	}
+
 	// -------------------------------------------------------------------------
 	// Dashboard / Analytics stat cards
 	// -------------------------------------------------------------------------
