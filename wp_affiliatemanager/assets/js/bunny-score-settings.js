@@ -138,33 +138,133 @@
 			}
 
 			var payload = response.data;
-			var html = '<div class="wpam-bunny-score-summary">';
-		html += '<p><strong>' + ( ( data.i18n && data.i18n.site_global_avg ) ? data.i18n.site_global_avg : 'Promedio Global:' ) + '</strong> ' + ( payload.site && payload.site.avg !== null ? payload.site.avg.toFixed( 2 ) : ( ( data.i18n && data.i18n.not_available ) ? data.i18n.not_available : 'Not available' ) ) + '</p>';
-		html += '<p><strong>' + ( ( data.i18n && data.i18n.selected_tags_avg ) ? data.i18n.selected_tags_avg : 'Promedio de los tags seleccionados:' ) + '</strong> ' + ( payload.historical.selected_tags_avg !== null ? payload.historical.selected_tags_avg.toFixed( 2 ) : ( ( data.i18n && data.i18n.not_available ) ? data.i18n.not_available : 'Not available' ) ) + '</p>';
-		html += '<p><strong>' + ( ( data.i18n && data.i18n.total_posts ) ? data.i18n.total_posts : 'Posts scored:' ) + '</strong> ' + ( payload.historical.total_posts || 0 ) + '</p>';
-		html += '<p><strong>' + ( ( data.i18n && data.i18n.total_percent_add ) ? data.i18n.total_percent_add : 'Total bonus:' ) + '</strong> ' + ( payload.factors.total_percent_add !== null ? payload.factors.total_percent_add.toFixed( 2 ) + '%' : '0.00%' ) + '</p>';
-		html += '<p><strong>' + ( ( data.i18n && data.i18n.final_bunny_score ) ? data.i18n.final_bunny_score : 'Bunny Score obtenido:' ) + '</strong> ' + ( payload.final.bunny_score !== null ? payload.final.bunny_score.toFixed( 2 ) : ( ( data.i18n && data.i18n.not_available ) ? data.i18n.not_available : 'Not available' ) ) + '</p>';
-		html += '<p><strong>' + ( ( data.i18n && data.i18n.diff_vs_global ) ? data.i18n.diff_vs_global : 'Diferencia vs. promedio global:' ) + '</strong> ' + ( payload.final.diff_vs_global !== null ? ( payload.final.diff_vs_global >= 0 ? '+' : '' ) + payload.final.diff_vs_global.toFixed( 2 ) : ( ( data.i18n && data.i18n.not_available ) ? data.i18n.not_available : 'Not available' ) ) + '</p>';
+			var collectionScore = payload.historical.collection_score !== null ? payload.historical.collection_score : payload.historical.selected_tags_avg;
+			var siteAverage = payload.site && payload.site.avg !== null ? payload.site.avg.toFixed( 2 ) : ( data.i18n && data.i18n.not_available ? data.i18n.not_available : 'Not available' );
+			var bunnyScore = payload.final.bunny_score !== null ? payload.final.bunny_score.toFixed( 2 ) : ( data.i18n && data.i18n.not_available ? data.i18n.not_available : 'Not available' );
+			var diffToSite = payload.final.diff_vs_global;
+			var diffIcon = '🟡';
+			var diffText = ( data.i18n && data.i18n.not_available ) ? data.i18n.not_available : 'N/A';
+			var diffClass = 'wpam-top-pct';
+			if ( diffToSite !== null ) {
+				if ( diffToSite > 0 ) {
+					diffIcon = '🟢';
+					diffText = '+' + diffToSite.toFixed( 2 );
+				} else if ( diffToSite < 0 ) {
+					diffIcon = '🔴';
+					diffText = diffToSite.toFixed( 2 );
+				} else {
+					diffIcon = '🟡';
+					diffText = diffToSite.toFixed( 2 );
+				}
+			}
 
-		if ( payload.factors.per_factor && Object.keys( payload.factors.per_factor ).length ) {
-			html += '<h3>' + ( ( data.i18n && data.i18n.factors ) ? data.i18n.factors : 'Factors' ) + '</h3><ul>';
-			Object.keys( payload.factors.per_factor ).forEach( function ( key ) {
-				var factor = payload.factors.per_factor[ key ];
-				html += '<li><strong>' + ( factor.config.label || key ) + ':</strong> ' + ( factor.percent !== null ? factor.percent.toFixed( 2 ) + '%' : ( ( data.i18n && data.i18n.not_applicable ) ? data.i18n.not_applicable : 'N/A' ) ) + '</li>';
-			} );
-			html += '</ul>';
-		}
+			var html = '<div class="wpam-bunny-score-report">';
 
-		if ( payload.historical.per_tag && payload.historical.per_tag.length ) {
-			html += '<h3>' + ( ( data.i18n && data.i18n.terms ) ? data.i18n.terms : 'Term break-down' ) + '</h3><ul>';
-			payload.historical.per_tag.forEach( function ( term ) {
-				html += '<li>' + ( term.name || ( '#' + term.term_id ) ) + ': ' + ( term.count || 0 ) + ' posts, ' + ( term.valid ? ( term.avg_score !== null ? term.avg_score.toFixed( 2 ) : ( ( data.i18n && data.i18n.not_available ) ? data.i18n.not_available : 'Not available' ) ) : ( ( data.i18n && data.i18n.skipped ) ? data.i18n.skipped : 'Skipped' ) ) + '</li>';
-			} );
-			html += '</ul>';
-		}
+			html += '<section class="wpam-analytics-card">';
+			html += '<h4 class="wpam-analytics-card-title">🐰 ' + ( data.i18n && data.i18n.final_bunny_score ? data.i18n.final_bunny_score : 'Bunny Score obtenido' ) + '</h4>';
+			html += '<div class="wpam-stat-value">' + bunnyScore + '</div>';
+			html += '<div class="wpam-top-list" style="margin-top:18px; gap:12px; display:grid;">';
+			html += '<div><strong>🌎 ' + ( data.i18n && data.i18n.site_global_avg ? data.i18n.site_global_avg : 'Promedio del sitio' ) + '</strong><br>' + siteAverage + '</div>';
+			html += '<div><strong>📊 ' + ( data.i18n && data.i18n.diff_vs_global ? data.i18n.diff_vs_global : 'Diferencia vs sitio' ) + '</strong><br><span class="' + diffClass + '">' + diffIcon + ' ' + diffText + '</span></div>';
+			html += '</div>';
+			html += '</section>';
 
-		html += '</div>';
-		$result.html( html );
+			html += '<section class="wpam-analytics-card">';
+			html += '<h4 class="wpam-analytics-card-title">📈 Modelos de cálculo</h4>';
+			html += '<div class="wpam-quick-access-grid">';
+			html += '<div class="wpam-quick-access-card">';
+			html += '<span class="wpam-quick-access-icon">📦</span>';
+			html += '<div class="wpam-quick-access-label">Collection Score</div>';
+			html += '<div class="wpam-stat-value">' + ( collectionScore !== null ? collectionScore.toFixed( 2 ) : ( data.i18n && data.i18n.not_available ? data.i18n.not_available : 'N/A' ) ) + '</div>';
+			html += '<div class="wpam-top-pct">vs global ' + ( payload.final.diff_collection_vs_global !== null ? ( payload.final.diff_collection_vs_global >= 0 ? '+' : '' ) + payload.final.diff_collection_vs_global.toFixed( 2 ) : ( data.i18n && data.i18n.not_available ? data.i18n.not_available : 'N/A' ) ) + '</div>';
+			html += '</div>';
+			html += '<div class="wpam-quick-access-card">';
+			html += '<span class="wpam-quick-access-icon">⚖️</span>';
+			html += '<div class="wpam-quick-access-label">Weighted Tag Score</div>';
+			html += '<div class="wpam-stat-value">' + ( payload.historical.weighted_tag_score !== null ? payload.historical.weighted_tag_score.toFixed( 2 ) : ( data.i18n && data.i18n.not_available ? data.i18n.not_available : 'N/A' ) ) + '</div>';
+			html += '<div class="wpam-top-pct">vs global ' + ( payload.final.diff_weighted_vs_global !== null ? ( payload.final.diff_weighted_vs_global >= 0 ? '+' : '' ) + payload.final.diff_weighted_vs_global.toFixed( 2 ) : ( data.i18n && data.i18n.not_available ? data.i18n.not_available : 'N/A' ) ) + '</div>';
+			html += '</div>';
+			html += '<div class="wpam-quick-access-card">';
+			html += '<span class="wpam-quick-access-icon">🧮</span>';
+			html += '<div class="wpam-quick-access-label">Log Weighted Tag Score</div>';
+			html += '<div class="wpam-stat-value">' + ( payload.historical.log_weighted_tag_score !== null ? payload.historical.log_weighted_tag_score.toFixed( 2 ) : ( data.i18n && data.i18n.not_available ? data.i18n.not_available : 'N/A' ) ) + '</div>';
+			html += '<div class="wpam-top-pct">vs global ' + ( payload.final.diff_log_vs_global !== null ? ( payload.final.diff_log_vs_global >= 0 ? '+' : '' ) + payload.final.diff_log_vs_global.toFixed( 2 ) : ( data.i18n && data.i18n.not_available ? data.i18n.not_available : 'N/A' ) ) + '</div>';
+			html += '</div>';
+			html += '</div>';
+			html += '</section>';
+
+			html += '<section class="wpam-analytics-card">';
+			html += '<h4 class="wpam-analytics-card-title">📝 Datos utilizados</h4>';
+			html += '<div class="wpam-quick-access-grid">';
+			html += '<div class="wpam-quick-access-card">';
+			html += '<span class="wpam-quick-access-icon">📝</span>';
+			html += '<div class="wpam-quick-access-label">Publicaciones analizadas</div>';
+			html += '<div class="wpam-stat-value">' + ( payload.historical.total_posts || 0 ) + '</div>';
+			html += '<div class="wpam-top-pct">' + ( payload.historical.total_posts === 1 ? '1 post histórico' : ( payload.historical.total_posts || 0 ) + ' posts históricos' ) + '</div>';
+			html += '</div>';
+			html += '</div>';
+			html += '</section>';
+
+			html += '<section class="wpam-analytics-card">';
+			html += '<h4 class="wpam-analytics-card-title">🎯 Factores manuales</h4>';
+			if ( payload.factors.per_factor && Object.keys( payload.factors.per_factor ).length ) {
+				html += '<ul class="wpam-top-list">';
+				Object.keys( payload.factors.per_factor ).forEach( function ( key ) {
+					var factor = payload.factors.per_factor[ key ];
+					var status = 'No aplicado';
+					if ( factor.percent !== null && typeof factor.percent !== 'undefined' ) {
+						status = factor.percent === 0 ? 'No aplicado' : ( factor.percent > 0 ? '+' : '' ) + factor.percent.toFixed( 2 ) + '%';
+					}
+					html += '<li class="wpam-top-item">';
+					html += '<div class="wpam-top-item-lead">';
+					html += '<span class="wpam-top-thumb-placeholder">⚪</span>';
+					html += '<div>'; 
+					html += '<strong>' + ( factor.config && factor.config.label ? factor.config.label : key ) + '</strong><br>';
+					html += '<span class="wpam-top-pct">' + status + '</span>';
+					html += '</div>';
+					html += '</div>';
+					html += '</li>';
+				} );
+				html += '</ul>';
+			} else {
+				html += '<p class="wpam-analytics-empty">' + ( data.i18n && data.i18n.no_manual_factors ? data.i18n.no_manual_factors : 'No hay factores manuales aplicados.' ) + '</p>';
+			}
+			html += '</section>';
+
+			html += '<section class="wpam-analytics-card">';
+			html += '<h4 class="wpam-analytics-card-title">🏷️ Rendimiento por TAG</h4>';
+			if ( payload.historical.per_tag && payload.historical.per_tag.length ) {
+				html += '<table class="widefat fixed striped">';
+				html += '<thead><tr>';
+				html += '<th>TAG</th>';
+				html += '<th>Posts</th>';
+				html += '<th>Score promedio</th>';
+				html += '<th>Peso sqrt</th>';
+				html += '<th>Peso log</th>';
+				html += '<th>Aporte</th>';
+				html += '</tr></thead><tbody>';
+				payload.historical.per_tag.forEach( function ( term ) {
+					var avgScore = term.avg_score !== null ? term.avg_score.toFixed( 2 ) : '—';
+					var weightSqrt = term.weight_sqrt !== null ? term.weight_sqrt.toFixed( 2 ) : '—';
+					var weightLog = term.weight_log !== null ? term.weight_log.toFixed( 2 ) : '—';
+					var contribution = term.contribution_log !== null ? term.contribution_log.toFixed( 2 ) : '—';
+					html += '<tr>';
+					html += '<td><strong>' + ( term.name || ( '#' + term.term_id ) ) + '</strong></td>';
+					html += '<td>' + ( term.count || 0 ) + '</td>';
+					html += '<td>' + avgScore + '</td>';
+					html += '<td>' + weightSqrt + '</td>';
+					html += '<td>' + weightLog + '</td>';
+					html += '<td>' + contribution + '</td>';
+					html += '</tr>';
+				} );
+				html += '</tbody></table>';
+			} else {
+				html += '<p class="wpam-analytics-empty">' + ( data.i18n && data.i18n.no_tag_data ? data.i18n.no_tag_data : 'No hay datos por tag disponibles.' ) + '</p>';
+			}
+			html += '</section>';
+
+			html += '</div>';
+			$result.html( html );
 		}, 'json' ).fail( function () {
 			$button.prop( 'disabled', false );
 			$result.empty();

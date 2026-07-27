@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.2] — Bunny Score: log-based tag weighting, collection score preserved
+
+### Changed
+
+- **Bunny Score now uses a log-based tag weighting variant for the live Weighted Tag Score calculation.** The previous normalized weighting method is still preserved internally for comparison, but the production calculation now uses `log(count + 1)`-based weights to reduce the dominance of very large tag sets while still rewarding higher-volume tags.
+- **Version bumped to 1.7.2.**
+
 ## [1.7.1] — Bunny Score: Settings partial-save fix, tag groups removed, global average
 
 ### Fixed

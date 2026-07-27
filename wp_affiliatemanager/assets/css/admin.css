@@ -647,6 +647,28 @@
 	margin-top: 20px;
 }
 
+.wpam-bunny-score-report {
+	display: grid;
+	gap: 20px;
+}
+
+.wpam-bunny-score-report .wpam-analytics-card {
+	padding: 20px 22px;
+}
+
+.wpam-bunny-score-report .wpam-quick-access-card {
+	text-align: left;
+	align-items: flex-start;
+}
+
+.wpam-bunny-score-report .wpam-stat-value {
+	margin-top: 8px;
+}
+
+.wpam-bunny-score-report .widefat {
+	margin-top: 16px;
+}
+
 .wpam-maintenance-card {
 	display: flex;
 	flex-direction: column;

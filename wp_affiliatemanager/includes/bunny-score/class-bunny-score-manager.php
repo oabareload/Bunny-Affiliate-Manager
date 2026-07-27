@@ -107,11 +107,17 @@ class Bunny_Score_Manager {
         // independientemente de si hay tags seleccionados, para poder mostrar el
         // punto de referencia aunque el cálculo por tags no arroje resultado.
         $site_global = Score_Query::get_global_average( $range );
+        $site_tag_extremes = self::get_site_tag_count_extremes( 'post_tag' );
+        $site_min_count = $site_tag_extremes['min'];
+        $site_max_count = $site_tag_extremes['max'];
 
         if ( empty( $all_post_ids ) ) {
             return array(
                 'historical' => array(
+                    'collection_score' => null,
                     'selected_tags_avg' => null,
+                    'weighted_tag_score' => null,
+                    'log_weighted_tag_score' => null,
                     'total_posts' => 0,
                     'per_tag' => $per_tag,
                 ),
@@ -123,6 +129,9 @@ class Bunny_Score_Manager {
                 'final' => array(
                     'bunny_score' => null,
                     'diff_vs_global' => null,
+                    'diff_collection_vs_global' => null,
+                    'diff_weighted_vs_global' => null,
+                    'diff_log_vs_global' => null,
                 ),
                 'meta' => array( 'warning' => 'no_posts' ),
             );
@@ -134,7 +143,10 @@ class Bunny_Score_Manager {
         if ( empty( $score_map ) ) {
             return array(
                 'historical' => array(
+                    'collection_score' => null,
                     'selected_tags_avg' => null,
+                    'weighted_tag_score' => null,
+                    'log_weighted_tag_score' => null,
                     'total_posts' => 0,
                     'per_tag' => $per_tag,
                 ),
@@ -146,6 +158,9 @@ class Bunny_Score_Manager {
                 'final' => array(
                     'bunny_score' => null,
                     'diff_vs_global' => null,
+                    'diff_collection_vs_global' => null,
+                    'diff_weighted_vs_global' => null,
+                    'diff_log_vs_global' => null,
                 ),
                 'meta' => array( 'warning' => 'no_scores' ),
             );
@@ -155,9 +170,14 @@ class Bunny_Score_Manager {
         $scores = array_values( $score_map );
         $selected_tags_avg = array_sum( $scores ) / count( $scores );
 
-        // Calcular promedio por tag (informativo).
+        // Calcular promedio por tag (informativo) y preparar el cálculo ponderado.
+        $tag_counts = array();
         foreach ( $per_tag as &$term ) {
             if ( empty( $term['post_ids'] ) || ! $term['valid'] ) {
+                $term['weight_sqrt'] = null;
+                $term['weight_log'] = null;
+                $term['contribution_sqrt'] = null;
+                $term['contribution_log'] = null;
                 continue;
             }
 
@@ -172,8 +192,39 @@ class Bunny_Score_Manager {
             if ( ! empty( $valid_scores ) ) {
                 $term['avg_score'] = array_sum( $valid_scores ) / count( $valid_scores );
             }
+
+            $tag_counts[] = $term['count'];
         }
         unset( $term );
+
+        $selected_min_count = ! empty( $tag_counts ) ? min( $tag_counts ) : 0;
+        $selected_max_count = ! empty( $tag_counts ) ? max( $tag_counts ) : 0;
+        $min_count = $site_min_count > 0 ? $site_min_count : $selected_min_count;
+        $max_count = $site_max_count > 0 ? $site_max_count : $selected_max_count;
+        $weighted_sum = 0.0;
+        $log_weighted_sum = 0.0;
+        $weight_total = 0.0;
+        $log_weight_total = 0.0;
+
+        foreach ( $per_tag as &$term ) {
+            if ( empty( $term['post_ids'] ) || ! $term['valid'] || null === $term['avg_score'] ) {
+                continue;
+            }
+
+            $term['weight_sqrt'] = self::calculate_tag_weight( $term['count'], $min_count, $max_count, 'sqrt' );
+            $term['weight_log'] = self::calculate_tag_weight( $term['count'], $min_count, $max_count, 'log' );
+            $term['contribution_sqrt'] = $term['avg_score'] * $term['weight_sqrt'];
+            $term['contribution_log'] = $term['avg_score'] * $term['weight_log'];
+
+            $weighted_sum += $term['contribution_sqrt'];
+            $log_weighted_sum += $term['contribution_log'];
+            $weight_total += $term['weight_sqrt'];
+            $log_weight_total += $term['weight_log'];
+        }
+        unset( $term );
+
+        $weighted_tag_score = $weight_total > 0 ? $weighted_sum / $weight_total : null;
+        $log_weighted_tag_score = $log_weight_total > 0 ? $log_weighted_sum / $log_weight_total : null;
 
         // Aplicar factores.
         $per_factor = array();
@@ -209,10 +260,16 @@ class Bunny_Score_Manager {
 
         // Diferencia contra el promedio global del sitio (positivo = por encima del comportamiento histórico general).
         $diff_vs_global = null !== $site_global['avg'] ? ( $final_bunny - $site_global['avg'] ) : null;
+        $diff_collection_vs_global = null !== $site_global['avg'] ? ( $selected_tags_avg - $site_global['avg'] ) : null;
+        $diff_weighted_vs_global = null !== $site_global['avg'] && null !== $weighted_tag_score ? ( $weighted_tag_score - $site_global['avg'] ) : null;
+        $diff_log_vs_global = null !== $site_global['avg'] && null !== $log_weighted_tag_score ? ( $log_weighted_tag_score - $site_global['avg'] ) : null;
 
         return array(
             'historical' => array(
+                'collection_score' => $selected_tags_avg,
                 'selected_tags_avg' => $selected_tags_avg,
+                'weighted_tag_score' => $weighted_tag_score,
+                'log_weighted_tag_score' => $log_weighted_tag_score,
                 'total_posts' => count( $scores ),
                 'per_tag' => $per_tag,
             ),
@@ -224,10 +281,76 @@ class Bunny_Score_Manager {
             'final' => array(
                 'bunny_score' => $final_bunny,
                 'diff_vs_global' => $diff_vs_global,
+                'diff_collection_vs_global' => $diff_collection_vs_global,
+                'diff_weighted_vs_global' => $diff_weighted_vs_global,
+                'diff_log_vs_global' => $diff_log_vs_global,
             ),
             'meta' => array(
                 'scored_posts_count' => count( $score_map ),
             ),
+        );
+    }
+
+    /**
+     * Calcula el peso de un tag basado en la cantidad de posts.
+     *
+     * @param int    $count      Número de posts válidos del tag.
+     * @param int    $min_count  Mínimo count entre los tags válidos.
+     * @param int    $max_count  Máximo count entre los tags válidos.
+     * @param string $method     Método de cálculo: 'sqrt'|'log'.
+     * @return float
+     */
+    private static function calculate_tag_weight( int $count, int $min_count, int $max_count, string $method ): float {
+        if ( $count <= 0 ) {
+            return 0.0;
+        }
+
+        switch ( $method ) {
+            case 'normalized':
+                if ( $min_count === $max_count ) {
+                    return 1.0;
+                }
+                $min = max( 1, $min_count );
+                $normalized = ( $count - $min ) / ( $max_count - $min );
+                return 0.5 + 0.5 * $normalized;
+            case 'log':
+                return log($count + 1);
+            case 'sqrt':
+            default:
+                return sqrt( $count );
+        }
+    }
+
+    /**
+     * Obtiene el conteo mínimo y máximo de posts entre todas las etiquetas del sitio.
+     *
+     * @param string $taxonomy Taxonomía a analizar.
+     * @return array{min:int,max:int}
+     */
+    private static function get_site_tag_count_extremes( string $taxonomy ): array {
+        global $wpdb;
+
+        $taxonomy = sanitize_key( $taxonomy );
+        $term_taxonomy = $wpdb->term_taxonomy;
+
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT MIN(count) AS min_count, MAX(count) AS max_count FROM {$term_taxonomy} WHERE taxonomy = %s",
+                $taxonomy
+            ),
+            ARRAY_A
+        );
+
+        if ( ! is_array( $row ) || $row['min_count'] === null || $row['max_count'] === null ) {
+            return array(
+                'min' => 0,
+                'max' => 0,
+            );
+        }
+
+        return array(
+            'min' => (int) $row['min_count'],
+            'max' => (int) $row['max_count'],
         );
     }
 }
