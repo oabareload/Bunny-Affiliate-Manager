@@ -85,48 +85,37 @@ class Bunny_Score_Admin {
     }
 
     /**
-     * Resuelve los términos seleccionados por el selector nativo de tags
-     * (`selected_term_names[{group}]`, CSV de nombres gestionado por `tagBox`)
-     * a pares `term_id` + `taxonomy`, resolviendo cada nombre contra la
-     * taxonomía real del grupo (o `post_tag` si la taxonomía no existe en el
-     * sitio, igual que hace `Bunny_Score_Screen::render()`).
+     * Resuelve los tags seleccionados por el selector nativo de WordPress
+     * (`selected_term_names`, CSV de nombres gestionado por `tagBox`, siempre
+     * sobre la taxonomía `post_tag` desde que se eliminó el concepto de
+     * grupos en v1.8.0) a una lista plana de términos resueltos.
+     *
+     * Devuelve también el nombre de cada término (ya disponible aquí desde
+     * `get_term_by()`) para que `Bunny_Score_Manager` no tenga que volver a
+     * consultarlo al construir el desglose por tag.
      *
      * @since  1.7.0
-     * @return array<string, array<int, array{term_id:int, taxonomy:string}>>
+     * @since  1.8.0 Aplanado: ya no hay grupos, solo `post_tag`.
+     * @return array<int, array{term_id:int, taxonomy:string, name:string}>
      */
     private static function resolve_selected_terms(): array {
-        $raw_names = isset( $_POST['selected_term_names'] ) ? wp_unslash( $_POST['selected_term_names'] ) : array();
-        $raw_group_tax = isset( $_POST['selected_term_group'] ) ? wp_unslash( $_POST['selected_term_group'] ) : array();
+        $names_csv = isset( $_POST['selected_term_names'] ) ? wp_unslash( $_POST['selected_term_names'] ) : '';
+        $names_csv = is_string( $names_csv ) ? $names_csv : '';
 
-        $selected = array();
-
-        if ( ! is_array( $raw_names ) ) {
-            return $selected;
+        $names = array_filter( array_map( 'trim', explode( ',', $names_csv ) ) );
+        if ( empty( $names ) ) {
+            return array();
         }
 
-        foreach ( $raw_names as $group => $names_csv ) {
-            $group = sanitize_key( (string) $group );
-            $names_csv = is_string( $names_csv ) ? $names_csv : '';
-
-            $taxonomy = isset( $raw_group_tax[ $group ] ) ? sanitize_key( (string) $raw_group_tax[ $group ] ) : $group;
-            if ( ! taxonomy_exists( $taxonomy ) ) {
-                $taxonomy = 'post_tag';
-            }
-
-            $names = array_filter( array_map( 'trim', explode( ',', $names_csv ) ) );
-            if ( empty( $names ) ) {
-                continue;
-            }
-
-            $selected[ $group ] = array();
-            foreach ( $names as $name ) {
-                $term = get_term_by( 'name', sanitize_text_field( $name ), $taxonomy );
-                if ( $term && ! is_wp_error( $term ) ) {
-                    $selected[ $group ][] = array(
-                        'term_id'  => (int) $term->term_id,
-                        'taxonomy' => $taxonomy,
-                    );
-                }
+        $selected = array();
+        foreach ( $names as $name ) {
+            $term = get_term_by( 'name', sanitize_text_field( $name ), 'post_tag' );
+            if ( $term && ! is_wp_error( $term ) ) {
+                $selected[] = array(
+                    'term_id'  => (int) $term->term_id,
+                    'taxonomy' => 'post_tag',
+                    'name'     => $term->name,
+                );
             }
         }
 

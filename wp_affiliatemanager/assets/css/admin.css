@@ -1058,21 +1058,6 @@ body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--views .wpam-sta
 	border-left: 3px solid var(--wpam-danger);
 }
 
-.wpam-bunny-score-group {
-	margin-bottom: 22px;
-}
-
-.wpam-bunny-score-group:last-child {
-	margin-bottom: 0;
-}
-
-.wpam-bunny-score-group h4 {
-	font-size: 13px;
-	font-weight: 700;
-	color: var(--wpam-gray-900);
-	margin: 0 0 8px;
-}
-
 .wpam-bunny-factors-wrap {
 	margin-top: 4px;
 }

@@ -139,10 +139,12 @@
 
 			var payload = response.data;
 			var html = '<div class="wpam-bunny-score-summary">';
-		html += '<p><strong>' + ( ( data.i18n && data.i18n.global_avg ) ? data.i18n.global_avg : 'Historical average:' ) + '</strong> ' + ( payload.historical.global_avg !== null ? payload.historical.global_avg.toFixed( 2 ) : ( ( data.i18n && data.i18n.not_available ) ? data.i18n.not_available : 'Not available' ) ) + '</p>';
+		html += '<p><strong>' + ( ( data.i18n && data.i18n.site_global_avg ) ? data.i18n.site_global_avg : 'Promedio Global:' ) + '</strong> ' + ( payload.site && payload.site.avg !== null ? payload.site.avg.toFixed( 2 ) : ( ( data.i18n && data.i18n.not_available ) ? data.i18n.not_available : 'Not available' ) ) + '</p>';
+		html += '<p><strong>' + ( ( data.i18n && data.i18n.selected_tags_avg ) ? data.i18n.selected_tags_avg : 'Promedio de los tags seleccionados:' ) + '</strong> ' + ( payload.historical.selected_tags_avg !== null ? payload.historical.selected_tags_avg.toFixed( 2 ) : ( ( data.i18n && data.i18n.not_available ) ? data.i18n.not_available : 'Not available' ) ) + '</p>';
 		html += '<p><strong>' + ( ( data.i18n && data.i18n.total_posts ) ? data.i18n.total_posts : 'Posts scored:' ) + '</strong> ' + ( payload.historical.total_posts || 0 ) + '</p>';
 		html += '<p><strong>' + ( ( data.i18n && data.i18n.total_percent_add ) ? data.i18n.total_percent_add : 'Total bonus:' ) + '</strong> ' + ( payload.factors.total_percent_add !== null ? payload.factors.total_percent_add.toFixed( 2 ) + '%' : '0.00%' ) + '</p>';
-		html += '<p><strong>' + ( ( data.i18n && data.i18n.final_bunny_score ) ? data.i18n.final_bunny_score : 'Bunny Score:' ) + '</strong> ' + ( payload.final.bunny_score !== null ? payload.final.bunny_score.toFixed( 2 ) : ( ( data.i18n && data.i18n.not_available ) ? data.i18n.not_available : 'Not available' ) ) + '</p>';
+		html += '<p><strong>' + ( ( data.i18n && data.i18n.final_bunny_score ) ? data.i18n.final_bunny_score : 'Bunny Score obtenido:' ) + '</strong> ' + ( payload.final.bunny_score !== null ? payload.final.bunny_score.toFixed( 2 ) : ( ( data.i18n && data.i18n.not_available ) ? data.i18n.not_available : 'Not available' ) ) + '</p>';
+		html += '<p><strong>' + ( ( data.i18n && data.i18n.diff_vs_global ) ? data.i18n.diff_vs_global : 'Diferencia vs. promedio global:' ) + '</strong> ' + ( payload.final.diff_vs_global !== null ? ( payload.final.diff_vs_global >= 0 ? '+' : '' ) + payload.final.diff_vs_global.toFixed( 2 ) : ( ( data.i18n && data.i18n.not_available ) ? data.i18n.not_available : 'Not available' ) ) + '</p>';
 
 		if ( payload.factors.per_factor && Object.keys( payload.factors.per_factor ).length ) {
 			html += '<h3>' + ( ( data.i18n && data.i18n.factors ) ? data.i18n.factors : 'Factors' ) + '</h3><ul>';
@@ -153,10 +155,10 @@
 			html += '</ul>';
 		}
 
-		if ( payload.historical.per_term && payload.historical.per_term.length ) {
+		if ( payload.historical.per_tag && payload.historical.per_tag.length ) {
 			html += '<h3>' + ( ( data.i18n && data.i18n.terms ) ? data.i18n.terms : 'Term break-down' ) + '</h3><ul>';
-			payload.historical.per_term.forEach( function ( term ) {
-				html += '<li>' + term.group + ': ' + ( term.count || 0 ) + ' posts, ' + ( term.valid ? ( term.avg_score !== null ? term.avg_score.toFixed( 2 ) : ( ( data.i18n && data.i18n.not_available ) ? data.i18n.not_available : 'Not available' ) ) : ( ( data.i18n && data.i18n.skipped ) ? data.i18n.skipped : 'Skipped' ) ) + '</li>';
+			payload.historical.per_tag.forEach( function ( term ) {
+				html += '<li>' + ( term.name || ( '#' + term.term_id ) ) + ': ' + ( term.count || 0 ) + ' posts, ' + ( term.valid ? ( term.avg_score !== null ? term.avg_score.toFixed( 2 ) : ( ( data.i18n && data.i18n.not_available ) ? data.i18n.not_available : 'Not available' ) ) : ( ( data.i18n && data.i18n.skipped ) ? data.i18n.skipped : 'Skipped' ) ) + '</li>';
 			} );
 			html += '</ul>';
 		}

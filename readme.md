@@ -12,14 +12,14 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Domain Path: /languages
 - License: GPLv2 or later
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **1.7.0**
+- Current version: **1.7.1**
 
 ## Requirements
 
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v1.7.0)
+## Current scope (v1.7.1)
 
 ### Affiliates
 
@@ -92,6 +92,15 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - **Settings** — plugin configuration (render mode, disclaimer, views, recently viewed, general options) plus **Maintenance** actions: rebuild the redirect token map, clear analytics, one-time Post Views Counter import.
 - **Broken Reports** — dedicated page listing every reported broken link, with per-report and clear-all actions.
 
+### Bunny Score
+
+- Dedicated admin screen (**Bunny Affiliates → Bunny Score**) that calculates a real-time score for an arbitrary set of tags, entirely on demand — no scheduled jobs, no persisted result, no new database table.
+- **Tag selection** uses the same native WordPress tag picker as the post editor (`tagsdiv` + `tags-box`/`tags-suggest`): autocomplete by name, Enter/comma to add, removable pills. Tags are plain `post_tag` terms — there is no grouping/categorization concept (an earlier "Serie/Personaje/Fabricante/Escala/Ilustrador/Línea" model was removed; every tag is treated identically).
+- **Calculation model:** the score is **not** an average of per-tag averages. All posts belonging to *any* of the selected tags are first merged into a single deduplicated set (union, not per-tag weighting), then the historical Views+Clicks score (`Score_Query`) of that whole set is averaged. A tag contributes to the final number in proportion to how many posts it has, not as an equal 1/N share. A configurable **minimum posts per tag** (Settings) silently excludes any tag that doesn't meet it — same rule as before, just without the group wrapper.
+- **Manual factors:** an admin-configurable table of extra boolean/numeric/label factors (e.g. "is a pre-order", "has a coupon"), each contributing a percentage bonus on top of the historical average. Factor IDs are auto-generated from their label (hidden field, client-side slug) so nothing needs to be typed manually. Left as-is / not part of the tag-selection refactor — factor semantics are still being defined.
+- **Result panel** shows four numbers side by side: the site-wide **Promedio Global** (via `Score_Query::get_global_average()` — one aggregated SQL query, same weights/tables as every other ranking), the **Promedio de los tags seleccionados** (the union-based average described above), the **Bunny Score obtenido** (historical average + factor bonuses), and the **Diferencia vs. promedio global**, so it's immediately visible whether a given set of tags is over- or under-performing the site's general behavior.
+- Settings for Bunny Score (minimum posts per tag, factors) are stored in the same plugin option as everything else, saved through a dedicated `<form>` on the Bunny Score screen that only ever partially updates its own `bunny_score` sub-array — it never touches or resets the rest of the plugin's Settings, and vice versa.
+
 ### Internal API (`WPAM_API`)
 
 Read-only API intended for consumption by companion plugins (e.g. Bunny Magazine). No direct SQL, no HTML output — pure data, sourced exclusively from the same cached Query classes used by the admin screens:
@@ -156,7 +165,12 @@ Bunny-Affiliate-Manager/
 │   │   │   ├── class-repository.php
 │   │   │   └── helpers-affiliates.php
 │   │   ├── analytics/
-│   │   │   └── class-score-query.php         — combined views+clicks score ranking
+│   │   │   └── class-score-query.php         — combined views+clicks score ranking + site-wide average
+│   │   ├── bunny-score/                      — real-time Bunny Score calculator (v1.6.3+, v1.7.0 refactor)
+│   │   │   ├── class-bunny-score-admin.php    — AJAX/admin-post calculation endpoint
+│   │   │   ├── class-bunny-score-screen.php   — admin screen (tags, factors, result panel)
+│   │   │   ├── class-bunny-score-manager.php  — calculation orchestrator (no persistence)
+│   │   │   └── class-bunny-score-factors.php  — manual factor percent computation
 │   │   ├── api/
 │   │   │   ├── class-api.php                 — REST status endpoint
 │   │   │   └── class-wpam-api.php            — public read-only API

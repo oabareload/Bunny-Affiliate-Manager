@@ -451,50 +451,6 @@ class Settings {
 	}
 
 	/**
-	 * Renderiza la descripción de la sección Bunny Score.
-	 *
-	 * @since 2.0.0
-	 * @return void
-	 */
-	public function render_section_bunny_score(): void {
-		echo '<p>' . esc_html__( 'Configura los grupos de etiquetas y los factores manuales que se usan para el cálculo del Bunny Score.', 'wp-affiliatemanager' ) . '</p>';
-	}
-
-	/**
-	 * Renderiza los checkboxes de grupos habilitados para Bunny Score.
-	 *
-	 * @since 2.0.0
-	 * @return void
-	 */
-	public function render_field_bunny_score_enabled_groups(): void {
-		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
-		$groups  = $options['bunny_score']['enabled_groups'] ?? array();
-		$labels  = array(
-			'serie'      => __( 'Serie', 'wp-affiliatemanager' ),
-			'personaje'  => __( 'Personaje', 'wp-affiliatemanager' ),
-			'fabricante' => __( 'Fabricante', 'wp-affiliatemanager' ),
-			'escala'     => __( 'Escala', 'wp-affiliatemanager' ),
-			'ilustrador' => __( 'Ilustrador', 'wp-affiliatemanager' ),
-			'linea'      => __( 'Línea', 'wp-affiliatemanager' ),
-		);
-		foreach ( $labels as $key => $label ) {
-			$value = ! empty( $groups[ $key ] );
-			?>
-		<label style="display:inline-block; margin-right:1.5rem;">
-			<input
-				type="checkbox"
-				name="<?php echo esc_attr( self::OPTION_NAME . '[bunny_score][enabled_groups][' . esc_attr( $key ) . ']' ); ?>"
-				value="1"
-				<?php checked( $value ); ?>
-			/>
-			<?php echo esc_html( $label ); ?>
-		</label>
-		<?php
-		}
-		?><p class="description"><?php esc_html_e( 'Selecciona qué grupos de etiquetas participan en el cálculo histórico.', 'wp-affiliatemanager' ); ?></p><?php
-	}
-
-	/**
 	 * Renderiza el campo mínimo de publicaciones por etiqueta.
 	 *
 	 * @since 2.0.0
@@ -1560,213 +1516,218 @@ class Settings {
 	 * @return array Datos sanitizados.
 	 */
 	public function sanitize_options( mixed $input ): array {
-		$defaults  = $this->get_defaults();
-		$sanitized = $defaults;
+		$defaults = $this->get_defaults();
+
+		// v1.7.0: partial-update fix. Bunny Score has its own <form> that posts
+		// to the same options.php / OPTION_GROUP / OPTION_NAME as the main
+		// Settings page, but each form only submits its own fields. Starting
+		// from $defaults meant any section absent from THIS particular $input
+		// (because a different form posted) got silently reset to its default
+		// — wiping Settings when Bunny Score saved, and vice versa. Starting
+		// from the currently-stored option instead, and only touching a section
+		// when its top-level key is actually present in $input, makes every
+		// section a true partial update regardless of which form posted.
+		$existing  = get_option( self::OPTION_NAME, array() );
+		$sanitized = is_array( $existing ) ? array_replace_recursive( $defaults, $existing ) : $defaults;
 
 		if ( ! is_array( $input ) ) {
-			return $defaults;
+			return $sanitized;
 		}
 
 		// General.
-		if ( isset( $input['general']['render_mode'] ) ) {
-			$sanitized['general']['render_mode'] = in_array(
-				$input['general']['render_mode'],
-				array( 'disabled', 'after_content', 'before_content', 'shortcode_only' ),
-				true
-			) ? $input['general']['render_mode'] : 'after_content';
-		}
-
-		if ( isset( $input['general']['display_mode'] ) ) {
-			$sanitized['general']['display_mode'] = in_array(
-				$input['general']['display_mode'],
-				array( 'automatic', 'manual' ),
-				true
-			) ? $input['general']['display_mode'] : 'automatic';
-		}
-
-		if ( isset( $input['general']['link_target'] ) ) {
-			$sanitized['general']['link_target'] = in_array(
-				$input['general']['link_target'],
-				array( '_blank', '_self' ),
-				true
-			) ? $input['general']['link_target'] : '_blank';
-		}
-
-		$sanitized['general']['nofollow'] = ! empty( $input['general']['nofollow'] );
-		$sanitized['general']['exclude_admins_from_analytics'] = ! empty( $input['general']['exclude_admins_from_analytics'] );
-
-		// Views Tracking — v1.2.0.
-		$sanitized['views']['count_admin_views']     = ! empty( $input['views']['count_admin_views'] );
-		$sanitized['views']['count_logged_in_users'] = ! empty( $input['views']['count_logged_in_users'] );
-		$sanitized['views']['count_bot_traffic']     = ! empty( $input['views']['count_bot_traffic'] );
-
-		// Recently Viewed Posts — v1.3.0.
-		$sanitized['recently_viewed']['enabled']     = ! empty( $input['recently_viewed']['enabled'] );
-		$sanitized['recently_viewed']['auto_insert'] = ! empty( $input['recently_viewed']['auto_insert'] );
-
-		$rv_count = absint( $input['recently_viewed']['count'] ?? 5 );
-		$sanitized['recently_viewed']['count'] = max( 1, min( 20, $rv_count ) );
-
-		$rv_title = sanitize_text_field( $input['recently_viewed']['title'] ?? '' );
-		$sanitized['recently_viewed']['title'] = '' !== $rv_title
-			? $rv_title
-			: __( 'Recently Viewed', 'wp-affiliatemanager' );
-
-		// Redirect / Interstitial — v0.2.0-alpha2.
-		$sanitized['redirect']['enable_interstitial'] = ! empty( $input['redirect']['enable_interstitial'] );
-		$sanitized['redirect']['show_related_post_excerpt'] = ! empty( $input['redirect']['show_related_post_excerpt'] );
-
-		// v0.2.0-alpha3.1: delay limitado a valores permitidos del select (0..60, múltiplos de 5).
-		$allowed_delays = array( 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 );
-		$delay          = absint( $input['redirect']['redirect_delay'] ?? 5 );
-		$delay          = min( $delay, 60 ); // clamp absoluto
-		$sanitized['redirect']['redirect_delay'] = in_array( $delay, $allowed_delays, true ) ? $delay : 5;
-
-		$disclaimer = wp_kses_post( $input['redirect']['disclaimer_text'] ?? '' );
-		$sanitized['redirect']['disclaimer_text'] = '' !== trim( $disclaimer )
-			? $disclaimer
-			: __( 'Los precios, disponibilidad y contenido son responsabilidad del sitio externo.', 'wp-affiliatemanager' );
-
-		// v0.2.0-alpha3: textos configurables del interstitial.
-		$title = sanitize_text_field( $input['redirect']['interstitial_title'] ?? '' );
-		$sanitized['redirect']['interstitial_title'] = '' !== $title
-			? $title
-			: __( 'Estás saliendo de BunnyChase', 'wp-affiliatemanager' );
-
-		$countdown_text = sanitize_text_field( $input['redirect']['interstitial_countdown_text'] ?? '' );
-		$sanitized['redirect']['interstitial_countdown_text'] = '' !== $countdown_text
-			? $countdown_text
-			: __( 'Redirigiendo en {seconds}s', 'wp-affiliatemanager' );
-
-		// v0.2.0-alpha3.2: texto del botón continuar.
-		$button_text = sanitize_text_field( $input['redirect']['interstitial_button_text'] ?? '' );
-		$sanitized['redirect']['interstitial_button_text'] = '' !== $button_text
-			? $button_text
-			: __( 'Continuar', 'wp-affiliatemanager' );
-
-		// v0.2.6: ancho del interstitial.
-		$allowed_widths = array( '460', '600', '800', '1000', 'full' );
-		$width_val      = sanitize_text_field( $input['redirect']['interstitial_width'] ?? '460' );
-		$sanitized['redirect']['interstitial_width'] = in_array( $width_val, $allowed_widths, true ) ? $width_val : '460';
-
-		// v0.2.6: content_slots — array indexado para soporte futuro de múltiples slots.
-		$allowed_slot_types     = array( 'none', 'custom_html', 'image_link' );
-		$allowed_slot_positions = array( 'before_disclaimer', 'after_disclaimer', 'before_related', 'after_related' );
-		$raw_slots              = $input['content_slots'] ?? array();
-		$sanitized_slots        = array();
-
-		foreach ( $raw_slots as $index => $raw_slot ) {
-			$index = absint( $index );
-			if ( ! is_array( $raw_slot ) ) {
-				continue;
+		if ( isset( $input['general'] ) && is_array( $input['general'] ) ) {
+			if ( isset( $input['general']['render_mode'] ) ) {
+				$sanitized['general']['render_mode'] = in_array(
+					$input['general']['render_mode'],
+					array( 'disabled', 'after_content', 'before_content', 'shortcode_only' ),
+					true
+				) ? $input['general']['render_mode'] : 'after_content';
 			}
 
-			$slot_type     = sanitize_text_field( $raw_slot['type'] ?? 'none' );
-			$slot_position = sanitize_text_field( $raw_slot['position'] ?? 'after_disclaimer' );
+			if ( isset( $input['general']['display_mode'] ) ) {
+				$sanitized['general']['display_mode'] = in_array(
+					$input['general']['display_mode'],
+					array( 'automatic', 'manual' ),
+					true
+				) ? $input['general']['display_mode'] : 'automatic';
+			}
 
-			$sanitized_slots[ $index ] = array(
-				'type'      => in_array( $slot_type, $allowed_slot_types, true ) ? $slot_type : 'none',
-				'position'  => in_array( $slot_position, $allowed_slot_positions, true ) ? $slot_position : 'after_disclaimer',
-				'html' 		=> current_user_can( 'unfiltered_html' ) ? ( $raw_slot['html'] ?? '' ) : wp_kses_post( $raw_slot['html'] ?? '' ),
-				'image_url' => esc_url_raw( $raw_slot['image_url'] ?? '' ),
-				'dest_url'  => esc_url_raw( $raw_slot['dest_url'] ?? '' ),
-				'alt_text'  => sanitize_text_field( $raw_slot['alt_text'] ?? '' ),
-			);
+			if ( isset( $input['general']['link_target'] ) ) {
+				$sanitized['general']['link_target'] = in_array(
+					$input['general']['link_target'],
+					array( '_blank', '_self' ),
+					true
+				) ? $input['general']['link_target'] : '_blank';
+			}
+
+			$sanitized['general']['nofollow'] = ! empty( $input['general']['nofollow'] );
+			$sanitized['general']['exclude_admins_from_analytics'] = ! empty( $input['general']['exclude_admins_from_analytics'] );
 		}
 
-		$sanitized['content_slots'] = $sanitized_slots;
+		// Views Tracking — v1.2.0.
+		if ( isset( $input['views'] ) && is_array( $input['views'] ) ) {
+			$sanitized['views']['count_admin_views']     = ! empty( $input['views']['count_admin_views'] );
+			$sanitized['views']['count_logged_in_users'] = ! empty( $input['views']['count_logged_in_users'] );
+			$sanitized['views']['count_bot_traffic']     = ! empty( $input['views']['count_bot_traffic'] );
+		}
+
+		// Recently Viewed Posts — v1.3.0.
+		if ( isset( $input['recently_viewed'] ) && is_array( $input['recently_viewed'] ) ) {
+			$sanitized['recently_viewed']['enabled']     = ! empty( $input['recently_viewed']['enabled'] );
+			$sanitized['recently_viewed']['auto_insert'] = ! empty( $input['recently_viewed']['auto_insert'] );
+
+			$rv_count = absint( $input['recently_viewed']['count'] ?? 5 );
+			$sanitized['recently_viewed']['count'] = max( 1, min( 20, $rv_count ) );
+
+			$rv_title = sanitize_text_field( $input['recently_viewed']['title'] ?? '' );
+			$sanitized['recently_viewed']['title'] = '' !== $rv_title
+				? $rv_title
+				: __( 'Recently Viewed', 'wp-affiliatemanager' );
+		}
+
+		// Redirect / Interstitial — v0.2.0-alpha2.
+		if ( isset( $input['redirect'] ) && is_array( $input['redirect'] ) ) {
+			$sanitized['redirect']['enable_interstitial'] = ! empty( $input['redirect']['enable_interstitial'] );
+			$sanitized['redirect']['show_related_post_excerpt'] = ! empty( $input['redirect']['show_related_post_excerpt'] );
+
+			// v0.2.0-alpha3.1: delay limitado a valores permitidos del select (0..60, múltiplos de 5).
+			$allowed_delays = array( 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60 );
+			$delay          = absint( $input['redirect']['redirect_delay'] ?? 5 );
+			$delay          = min( $delay, 60 ); // clamp absoluto
+			$sanitized['redirect']['redirect_delay'] = in_array( $delay, $allowed_delays, true ) ? $delay : 5;
+
+			$disclaimer = wp_kses_post( $input['redirect']['disclaimer_text'] ?? '' );
+			$sanitized['redirect']['disclaimer_text'] = '' !== trim( $disclaimer )
+				? $disclaimer
+				: __( 'Los precios, disponibilidad y contenido son responsabilidad del sitio externo.', 'wp-affiliatemanager' );
+
+			// v0.2.0-alpha3: textos configurables del interstitial.
+			$title = sanitize_text_field( $input['redirect']['interstitial_title'] ?? '' );
+			$sanitized['redirect']['interstitial_title'] = '' !== $title
+				? $title
+				: __( 'Estás saliendo de BunnyChase', 'wp-affiliatemanager' );
+
+			$countdown_text = sanitize_text_field( $input['redirect']['interstitial_countdown_text'] ?? '' );
+			$sanitized['redirect']['interstitial_countdown_text'] = '' !== $countdown_text
+				? $countdown_text
+				: __( 'Redirigiendo en {seconds}s', 'wp-affiliatemanager' );
+
+			// v0.2.0-alpha3.2: texto del botón continuar.
+			$button_text = sanitize_text_field( $input['redirect']['interstitial_button_text'] ?? '' );
+			$sanitized['redirect']['interstitial_button_text'] = '' !== $button_text
+				? $button_text
+				: __( 'Continuar', 'wp-affiliatemanager' );
+
+			// v0.2.6: ancho del interstitial.
+			$allowed_widths = array( '460', '600', '800', '1000', 'full' );
+			$width_val      = sanitize_text_field( $input['redirect']['interstitial_width'] ?? '460' );
+			$sanitized['redirect']['interstitial_width'] = in_array( $width_val, $allowed_widths, true ) ? $width_val : '460';
+		}
+
+		// v0.2.6: content_slots — array indexado para soporte futuro de múltiples slots.
+		if ( isset( $input['content_slots'] ) && is_array( $input['content_slots'] ) ) {
+			$allowed_slot_types     = array( 'none', 'custom_html', 'image_link' );
+			$allowed_slot_positions = array( 'before_disclaimer', 'after_disclaimer', 'before_related', 'after_related' );
+			$raw_slots              = $input['content_slots'];
+			$sanitized_slots        = array();
+
+			foreach ( $raw_slots as $index => $raw_slot ) {
+				$index = absint( $index );
+				if ( ! is_array( $raw_slot ) ) {
+					continue;
+				}
+
+				$slot_type     = sanitize_text_field( $raw_slot['type'] ?? 'none' );
+				$slot_position = sanitize_text_field( $raw_slot['position'] ?? 'after_disclaimer' );
+
+				$sanitized_slots[ $index ] = array(
+					'type'      => in_array( $slot_type, $allowed_slot_types, true ) ? $slot_type : 'none',
+					'position'  => in_array( $slot_position, $allowed_slot_positions, true ) ? $slot_position : 'after_disclaimer',
+					'html' 		=> current_user_can( 'unfiltered_html' ) ? ( $raw_slot['html'] ?? '' ) : wp_kses_post( $raw_slot['html'] ?? '' ),
+					'image_url' => esc_url_raw( $raw_slot['image_url'] ?? '' ),
+					'dest_url'  => esc_url_raw( $raw_slot['dest_url'] ?? '' ),
+					'alt_text'  => sanitize_text_field( $raw_slot['alt_text'] ?? '' ),
+				);
+			}
+
+			$sanitized['content_slots'] = $sanitized_slots;
+		}
 
 		// Appearance.
-		if ( isset( $input['appearance']['layout'] ) ) {
-			$sanitized['appearance']['layout'] = in_array(
-				$input['appearance']['layout'],
-				Layout_Registry::get_ids(),
-				true
-			) ? $input['appearance']['layout'] : Layout_Registry::DEFAULT_LAYOUT;
+		if ( isset( $input['appearance'] ) && is_array( $input['appearance'] ) ) {
+			if ( isset( $input['appearance']['layout'] ) ) {
+				$sanitized['appearance']['layout'] = in_array(
+					$input['appearance']['layout'],
+					Layout_Registry::get_ids(),
+					true
+				) ? $input['appearance']['layout'] : Layout_Registry::DEFAULT_LAYOUT;
+			}
+
+			// section_heading — compartido por todos los layouts.
+			$sanitized['appearance']['section_heading']['enabled'] = ! empty( $input['appearance']['section_heading']['enabled'] );
+			$sanitized['appearance']['section_heading']['text']    = sanitize_text_field( $input['appearance']['section_heading']['text'] ?? '' );
+
+			$allowed_heading_tags = array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div' );
+			$heading_tag           = sanitize_text_field( $input['appearance']['section_heading']['tag'] ?? 'h2' );
+			$sanitized['appearance']['section_heading']['tag'] = in_array( $heading_tag, $allowed_heading_tags, true ) ? $heading_tag : 'h2';
+
+			if ( isset( $input['appearance']['link_style'] ) ) {
+				$sanitized['appearance']['link_style'] = in_array(
+					$input['appearance']['link_style'],
+					array( 'vertical', 'horizontal' ),
+					true
+				) ? $input['appearance']['link_style'] : 'vertical';
+			}
+
+			// showcase.* — opciones exclusivas del Layout Showcase.
+			$showcase_input = $input['appearance']['showcase'] ?? array();
+
+			$image_source = sanitize_text_field( $showcase_input['image_source'] ?? 'featured' );
+			$sanitized['appearance']['showcase']['image_source'] = in_array( $image_source, array( 'featured', 'custom' ), true ) ? $image_source : 'featured';
+			$sanitized['appearance']['showcase']['image_url']    = esc_url_raw( $showcase_input['image_url'] ?? '' );
+
+			$title_source = sanitize_text_field( $showcase_input['title_source'] ?? 'post' );
+			$sanitized['appearance']['showcase']['title_source'] = in_array( $title_source, array( 'post', 'custom', 'hide' ), true ) ? $title_source : 'post';
+			$sanitized['appearance']['showcase']['title_text']   = sanitize_text_field( $showcase_input['title_text'] ?? '' );
+
+			$desc_source = sanitize_text_field( $showcase_input['desc_source'] ?? 'excerpt' );
+			$sanitized['appearance']['showcase']['desc_source'] = in_array( $desc_source, array( 'excerpt', 'custom', 'hide' ), true ) ? $desc_source : 'excerpt';
+			$sanitized['appearance']['showcase']['desc_text']   = sanitize_textarea_field( $showcase_input['desc_text'] ?? '' );
+
+			// display_content.
+			if ( isset( $input['appearance']['display_content'] ) ) {
+				$sanitized['appearance']['display_content'] = in_array(
+					$input['appearance']['display_content'],
+					array( 'show_logo_and_name', 'show_logo_only', 'show_name_only' ),
+					true
+				) ? $input['appearance']['display_content'] : 'show_logo_and_name';
+			}
+
+			// cta_text: texto libre, sanitizado como texto plano. Fallback a 'Ver oferta' si queda vacío.
+			$cta_text = sanitize_text_field( $input['appearance']['cta_text'] ?? '' );
+			$sanitized['appearance']['cta_text'] = '' !== $cta_text ? $cta_text : 'Ver oferta';
+
+			// cta_hidden.
+			$sanitized['appearance']['cta_hidden'] = ! empty( $input['appearance']['cta_hidden'] );
+
+			// frontend_order.
+			if ( isset( $input['appearance']['frontend_order'] ) ) {
+				$sanitized['appearance']['frontend_order'] = in_array(
+					$input['appearance']['frontend_order'],
+					array( 'preserve_post_order', 'alphabetical' ),
+					true
+				) ? $input['appearance']['frontend_order'] : 'preserve_post_order';
+			}
 		}
 
-		// section_heading — compartido por todos los layouts.
-		$sanitized['appearance']['section_heading']['enabled'] = ! empty( $input['appearance']['section_heading']['enabled'] );
-		$sanitized['appearance']['section_heading']['text']    = sanitize_text_field( $input['appearance']['section_heading']['text'] ?? '' );
-
-		$allowed_heading_tags = array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div' );
-		$heading_tag           = sanitize_text_field( $input['appearance']['section_heading']['tag'] ?? 'h2' );
-		$sanitized['appearance']['section_heading']['tag'] = in_array( $heading_tag, $allowed_heading_tags, true ) ? $heading_tag : 'h2';
-
-		if ( isset( $input['appearance']['link_style'] ) ) {
-			$sanitized['appearance']['link_style'] = in_array(
-				$input['appearance']['link_style'],
-				array( 'vertical', 'horizontal' ),
-				true
-			) ? $input['appearance']['link_style'] : 'vertical';
-		}
-
-		// showcase.* — opciones exclusivas del Layout Showcase.
-		$showcase_input = $input['appearance']['showcase'] ?? array();
-
-		$image_source = sanitize_text_field( $showcase_input['image_source'] ?? 'featured' );
-		$sanitized['appearance']['showcase']['image_source'] = in_array( $image_source, array( 'featured', 'custom' ), true ) ? $image_source : 'featured';
-		$sanitized['appearance']['showcase']['image_url']    = esc_url_raw( $showcase_input['image_url'] ?? '' );
-
-		$title_source = sanitize_text_field( $showcase_input['title_source'] ?? 'post' );
-		$sanitized['appearance']['showcase']['title_source'] = in_array( $title_source, array( 'post', 'custom', 'hide' ), true ) ? $title_source : 'post';
-		$sanitized['appearance']['showcase']['title_text']   = sanitize_text_field( $showcase_input['title_text'] ?? '' );
-
-		$desc_source = sanitize_text_field( $showcase_input['desc_source'] ?? 'excerpt' );
-		$sanitized['appearance']['showcase']['desc_source'] = in_array( $desc_source, array( 'excerpt', 'custom', 'hide' ), true ) ? $desc_source : 'excerpt';
-		$sanitized['appearance']['showcase']['desc_text']   = sanitize_textarea_field( $showcase_input['desc_text'] ?? '' );
-
-		// display_content.
-		if ( isset( $input['appearance']['display_content'] ) ) {
-			$sanitized['appearance']['display_content'] = in_array(
-				$input['appearance']['display_content'],
-				array( 'show_logo_and_name', 'show_logo_only', 'show_name_only' ),
-				true
-			) ? $input['appearance']['display_content'] : 'show_logo_and_name';
-		}
-
-		// cta_text: texto libre, sanitizado como texto plano. Fallback a 'Ver oferta' si queda vacío.
-		$cta_text = sanitize_text_field( $input['appearance']['cta_text'] ?? '' );
-		$sanitized['appearance']['cta_text'] = '' !== $cta_text ? $cta_text : 'Ver oferta';
-
-		// cta_hidden.
-		$sanitized['appearance']['cta_hidden'] = ! empty( $input['appearance']['cta_hidden'] );
-
-		// frontend_order.
-		if ( isset( $input['appearance']['frontend_order'] ) ) {
-			$sanitized['appearance']['frontend_order'] = in_array(
-				$input['appearance']['frontend_order'],
-				array( 'preserve_post_order', 'alphabetical' ),
-				true
-			) ? $input['appearance']['frontend_order'] : 'preserve_post_order';
-		}
-
+		// Bunny Score — solo se toca si el formulario que posteo realmente incluye
+		// campos de bunny_score (ver nota arriba: nunca reseteamos a defaults por
+		// ausencia, eso era exactamente el bug).
 		if ( isset( $input['bunny_score'] ) && is_array( $input['bunny_score'] ) ) {
 			$sanitized['bunny_score'] = array(
-				'enabled_groups'   => self::sanitize_enabled_groups( $input['bunny_score']['enabled_groups'] ?? array() ),
-				'min_posts_per_tag' => isset( $input['bunny_score']['min_posts_per_tag'] ) ? absint( $input['bunny_score']['min_posts_per_tag'] ) : 1,
-				'factors'          => $this->sanitize_bunny_score_factors( $input['bunny_score']['factors'] ?? array() ),
+				'min_posts_per_tag' => isset( $input['bunny_score']['min_posts_per_tag'] ) ? max( 1, absint( $input['bunny_score']['min_posts_per_tag'] ) ) : 1,
+				'factors'           => $this->sanitize_bunny_score_factors( $input['bunny_score']['factors'] ?? array() ),
 			);
-		} else {
-			$defaults = $this->get_defaults();
-			$sanitized['bunny_score'] = $defaults['bunny_score'];
-		}
-
-		return $sanitized;
-	}
-
-	/**
-	 * Sanitiza los grupos habilitados para Bunny Score.
-	 *
-	 * @param array $groups
-	 * @return array
-	 */
-	private static function sanitize_enabled_groups( array $groups ): array {
-		$allowed_groups = array( 'serie', 'personaje', 'fabricante', 'escala', 'ilustrador', 'linea' );
-		$sanitized = array();
-
-		foreach ( $allowed_groups as $group ) {
-			$sanitized[ $group ] = ! empty( $groups[ $group ] );
 		}
 
 		return $sanitized;
@@ -1875,14 +1836,6 @@ class Settings {
 				'title'       => 'Recently Viewed',
 			),
 			'bunny_score' => array(
-				'enabled_groups'   => array(
-					'serie'      => true,
-					'personaje'  => true,
-					'fabricante' => true,
-					'escala'     => true,
-					'ilustrador' => true,
-					'linea'      => true,
-				),
 				'min_posts_per_tag' => 3,
 				'factors'          => array(),
 			),

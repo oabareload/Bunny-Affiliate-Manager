@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.1] — Bunny Score: Settings partial-save fix, tag groups removed, global average
+
+### Fixed
+
+- **Settings partial-save bug.** `Settings::sanitize_options()` always rebuilt the entire option from `$defaults`, and Bunny Score posts to `options.php` through its own `<form>` under the same `OPTION_GROUP`/`OPTION_NAME` as the main Settings page — but each form only submits its own fields. Any section absent from a given submission (because a *different* form posted) was silently reset to default: saving Bunny Score wiped General/Redirect/Appearance/etc., and saving the main Settings page wiped Bunny Score (its `else` branch explicitly reset it to defaults). Fixed by starting `$sanitized` from the **currently stored option** (merged with defaults for any missing keys via `array_replace_recursive()`) instead of from defaults, and wrapping every top-level section in `isset( $input['section'] )` before touching it — the same pattern already used for `bunny_score`, now applied consistently and without the destructive `else`. Every section is now a true partial update regardless of which form posted.
+
+### Removed (tag groups concept — dead code eliminated)
+
+- **Bunny Score no longer distinguishes tag "groups" (Serie/Personaje/Fabricante/Escala/Ilustrador/Línea).** All of that was a fixed, non-extensible taxonomy-per-group model; now it's simply a flat list of `post_tag` tags, added via the same native WordPress selector as before. If a tag doesn't have enough posts, it's silently skipped from the calculation — exactly as before, just without the group wrapper.
+- Removed: `Settings::render_field_bunny_score_enabled_groups()`, `Settings::sanitize_enabled_groups()`, `Settings::render_section_bunny_score()` (confirmed dead — never registered via `add_settings_section()`), `bunny_score.enabled_groups` from `get_defaults()`.
+- `Bunny_Score_Screen::render()`: the per-group loop (checkbox-gated, one `tagsdiv` per enabled group) replaced with a single `tagsdiv` targeting `post_tag`.
+- `Bunny_Score_Admin::resolve_selected_terms()`: flattened. Reads one `selected_term_names` CSV field (was `selected_term_names[{group}]` + `selected_term_group[{group}]`) and returns a flat list of `{term_id, taxonomy, name}` — the resolved term's `name` is carried through so `Bunny_Score_Manager` never has to re-query it.
+- `Bunny_Score_Manager::calculate()`: first parameter is now a flat list of term entries instead of a group-keyed array. `per_term` (grouped) renamed `per_tag` (flat), each entry keeps `term_id`/`name`/`taxonomy`/`count`/`avg_score`/`valid` — same shape minus the group key.
+- `admin.css`: removed `.wpam-bunny-score-group` (no longer used — there's only one tag section now, not N group sections).
+
+### Added
+
+- **`Score_Query::get_global_average( string $range = 'total' ): array{avg: float|null, total_posts: int}`** — site-wide average Bunny score (AVG per post, not SUM), computed in a single aggregated SQL query reusing the exact same tables/weights (`DEFAULT_FACTOR_VIEWS`/`DEFAULT_FACTOR_CLICKS`) as the rest of `Score_Query`. No new tables, no cache, no cron — same on-demand-only philosophy as the rest of Bunny Score.
+- **Bunny Score result now shows both the selected-tags average AND the site-wide global average, plus the difference.** `Bunny_Score_Manager::calculate()` return shape gained a `site: {avg, total_posts}` block and `final.diff_vs_global` (= `final.bunny_score - site.avg`). `historical.global_avg` (which was actually already the selected-tags average, just mislabeled) is renamed `historical.selected_tags_avg` for clarity. The admin result panel (`bunny-score-settings.js`) now renders all four values: Promedio Global, Promedio de los tags seleccionados, Bunny Score obtenido, Diferencia contra el promedio global.
+
+### Notes
+
+- Factors (`Bunny_Score_Factors`, the factors table/UI, the calculation formula itself) were intentionally **not touched** in this refactor, as scoped.
+- No new SQL migrations, no new options beyond the existing `bunny_score` sub-array (which just lost `enabled_groups` and never had a replacement key added — one tag list, no config needed for it).
+- Performance: one additional query per calculation (`get_global_average()`), same N-per-tag `get_posts()` pattern as before for resolving tag membership — no regression, no new caching layer introduced.
+
+---
+
 ## [1.7.0] — Bunny Score admin integration fixes
 
 ### Fixed

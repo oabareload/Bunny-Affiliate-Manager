@@ -30,7 +30,6 @@ class Bunny_Score_Screen {
     public static function render(): void {
         $options = get_option( WPAM_OPTION_KEY, array() );
         $bunny_score = isset( $options['bunny_score'] ) && is_array( $options['bunny_score'] ) ? $options['bunny_score'] : array();
-        $enabled_groups = $bunny_score['enabled_groups'] ?? array();
         $factors = $bunny_score['factors'] ?? array();
         ?>
         <div class="bunny-page-content">
@@ -42,66 +41,47 @@ class Bunny_Score_Screen {
 
                 <div class="wpam-analytics-card wpam-analytics-card--full">
                     <h3 class="wpam-analytics-card-title">
-                        <?php esc_html_e( '1. Selección de etiquetas', 'wp-affiliatemanager' ); ?>
+                        <?php esc_html_e( '1. Tags', 'wp-affiliatemanager' ); ?>
                     </h3>
-                    <p class="description"><?php esc_html_e( 'Selecciona las etiquetas por grupo que quieres usar para calcular el Bunny Score. Escribe para buscar (autocompletado) o pulsa Enter/coma para añadir — igual que en el editor de entradas.', 'wp-affiliatemanager' ); ?></p>
+                    <p class="description"><?php esc_html_e( 'Agrega los tags que quieres usar para calcular el Bunny Score. Escribe para buscar (autocompletado) o pulsa Enter/coma para añadir — igual que en el editor de entradas. Si un tag no tiene suficientes publicaciones, se ignora automáticamente.', 'wp-affiliatemanager' ); ?></p>
 
-                    <?php if ( empty( $enabled_groups ) ) : ?>
-                        <p class="wpam-analytics-empty"><?php esc_html_e( 'No hay grupos habilitados para Bunny Score. Actívalos más abajo, en "Manage Bunny Score Settings".', 'wp-affiliatemanager' ); ?></p>
-                    <?php else : ?>
-                        <?php foreach ( $enabled_groups as $group => $enabled ) : ?>
-                            <?php if ( empty( $enabled ) ) { continue; } ?>
-                            <?php
-                            $taxonomy = taxonomy_exists( $group ) ? $group : 'post_tag';
-                            $field_id = sanitize_html_class( $group );
-                            ?>
-                            <div class="wpam-bunny-score-group">
-                                <h4><?php echo esc_html( ucfirst( $group ) ); ?></h4>
-                                <?php if ( 'post_tag' === $taxonomy && ! taxonomy_exists( $group ) ) : ?>
-                                    <p class="description"><?php esc_html_e( 'Este grupo no existe como taxonomía en este sitio. Usando etiquetas estándar (post_tag) para seleccionar términos.', 'wp-affiliatemanager' ); ?></p>
-                                <?php endif; ?>
-
-                                <div class="tagsdiv" id="tagsdiv-<?php echo esc_attr( $field_id ); ?>">
-                                    <div class="jaxtag">
-                                        <div class="nojs-tags hide-if-js">
-                                            <p><?php esc_html_e( 'Add or remove terms', 'wp-affiliatemanager' ); ?></p>
-                                            <textarea
-                                                name="selected_term_names[<?php echo esc_attr( $group ); ?>]"
-                                                rows="3"
-                                                cols="20"
-                                                class="the-tags"
-                                                id="tax-input-<?php echo esc_attr( $field_id ); ?>"
-                                                aria-describedby="new-tag-<?php echo esc_attr( $field_id ); ?>-desc"
-                                            ></textarea>
-                                        </div>
-                                        <div class="ajaxtag hide-if-no-js">
-                                            <label class="screen-reader-text" for="new-tag-<?php echo esc_attr( $field_id ); ?>">
-                                                <?php echo esc_html( ucfirst( $group ) ); ?>
-                                            </label>
-                                            <p>
-                                                <input
-                                                    type="text"
-                                                    id="new-tag-<?php echo esc_attr( $field_id ); ?>"
-                                                    name="newtag[<?php echo esc_attr( $field_id ); ?>]"
-                                                    class="newtag form-input-tip"
-                                                    size="16"
-                                                    autocomplete="off"
-                                                    aria-describedby="new-tag-<?php echo esc_attr( $field_id ); ?>-desc"
-                                                    data-wp-taxonomy="<?php echo esc_attr( $taxonomy ); ?>"
-                                                />
-                                                <input type="button" class="button tagadd" value="<?php esc_attr_e( 'Add', 'wp-affiliatemanager' ); ?>" />
-                                            </p>
-                                        </div>
-                                        <p class="howto" id="new-tag-<?php echo esc_attr( $field_id ); ?>-desc">
-                                            <?php esc_html_e( 'Separate with commas or the Enter key.', 'wp-affiliatemanager' ); ?>
-                                        </p>
-                                    </div>
-                                    <ul class="tagchecklist" role="list"></ul>
-                                </div>
-                                <input type="hidden" name="selected_term_group[<?php echo esc_attr( $group ); ?>]" value="<?php echo esc_attr( $taxonomy ); ?>" />
+                    <div class="tagsdiv" id="tagsdiv-wpam-bunny-score-tags">
+                        <div class="jaxtag">
+                            <div class="nojs-tags hide-if-js">
+                                <p><?php esc_html_e( 'Add or remove tags', 'wp-affiliatemanager' ); ?></p>
+                                <textarea
+                                    name="selected_term_names"
+                                    rows="3"
+                                    cols="20"
+                                    class="the-tags"
+                                    id="tax-input-wpam-bunny-score-tags"
+                                    aria-describedby="new-tag-wpam-bunny-score-tags-desc"
+                                ></textarea>
                             </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
+                            <div class="ajaxtag hide-if-no-js">
+                                <label class="screen-reader-text" for="new-tag-wpam-bunny-score-tags">
+                                    <?php esc_html_e( 'Tags', 'wp-affiliatemanager' ); ?>
+                                </label>
+                                <p>
+                                    <input
+                                        type="text"
+                                        id="new-tag-wpam-bunny-score-tags"
+                                        name="newtag[wpam-bunny-score-tags]"
+                                        class="newtag form-input-tip"
+                                        size="16"
+                                        autocomplete="off"
+                                        aria-describedby="new-tag-wpam-bunny-score-tags-desc"
+                                        data-wp-taxonomy="post_tag"
+                                    />
+                                    <input type="button" class="button tagadd" value="<?php esc_attr_e( 'Add', 'wp-affiliatemanager' ); ?>" />
+                                </p>
+                            </div>
+                            <p class="howto" id="new-tag-wpam-bunny-score-tags-desc">
+                                <?php esc_html_e( 'Separate with commas or the Enter key.', 'wp-affiliatemanager' ); ?>
+                            </p>
+                        </div>
+                        <ul class="tagchecklist" role="list"></ul>
+                    </div>
                 </div>
 
                 <div class="wpam-analytics-card wpam-analytics-card--full">
@@ -218,7 +198,7 @@ class Bunny_Score_Screen {
                 <h3 class="wpam-analytics-card-title">
                     <?php esc_html_e( 'Manage Bunny Score Settings', 'wp-affiliatemanager' ); ?>
                 </h3>
-                <p class="description"><?php esc_html_e( 'Configure enabled groups, minimum posts and factors for Bunny Score. These settings are stored in the plugin options.', 'wp-affiliatemanager' ); ?></p>
+                <p class="description"><?php esc_html_e( 'Configure minimum posts per tag and factors for Bunny Score. These settings are stored in the plugin options.', 'wp-affiliatemanager' ); ?></p>
 
                 <form method="post" action="options.php">
                     <?php
@@ -226,7 +206,6 @@ class Bunny_Score_Screen {
                     settings_fields( \WP_AffiliateManager\Settings\Settings::OPTION_GROUP );
                     // Instantiate Settings helper to reuse renderers.
                     $settings = new \WP_AffiliateManager\Settings\Settings();
-                    $settings->render_field_bunny_score_enabled_groups();
                     $settings->render_field_bunny_score_min_posts();
                     $settings->render_field_bunny_score_factors();
                     submit_button( __( 'Save Bunny Score Settings', 'wp-affiliatemanager' ) );
