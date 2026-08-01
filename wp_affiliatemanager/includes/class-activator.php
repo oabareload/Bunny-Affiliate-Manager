@@ -36,6 +36,7 @@ class Activator {
 
 		// Opciones por defecto.
 		self::set_default_options();
+		Bunny_Score\Bunny_Score_Settings::maybe_migrate();
 
 		// Guardar versión instalada.
 		update_option( 'wpam_version', WPAM_VERSION );
@@ -53,6 +54,18 @@ class Activator {
 
 		// v1.2.0: crear tabla SQL de vistas.
 		Views\Views_Table::create_table();
+
+		// v1.7.5: Bunny Score — programar la generación semanal de estadísticas
+		// históricas. IMPORTANTE: en la propia petición de activación, 'plugins_loaded'
+		// ya se disparó ANTES de que este plugin apareciera en active_plugins, así que
+		// Plugin::define_global_hooks() (donde normalmente vive este filtro) todavía
+		// no corrió en este request. Se registra aquí también, de forma defensiva,
+		// para que wp_schedule_event() encuentre el intervalo 'wpam_weekly' ya sea
+		// que se llame desde la activación o desde cualquier otro punto.
+		add_filter( 'cron_schedules', array( '\WP_AffiliateManager\Plugin', 'register_weekly_cron_schedule' ) ); // phpcs:ignore WordPress.WP.CronInterval.CronSchedulesInterval
+		if ( ! wp_next_scheduled( 'wpam_bunny_score_stats_weekly' ) ) {
+			wp_schedule_event( time(), 'wpam_weekly', 'wpam_bunny_score_stats_weekly' );
+		}
 
 		// Limpiar rewrite rules.
 		flush_rewrite_rules();

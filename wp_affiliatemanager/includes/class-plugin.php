@@ -81,8 +81,16 @@ require_once WPAM_PLUGIN_PATH . 'includes/analytics/class-score-query.php';
 require_once WPAM_PLUGIN_PATH . 'includes/admin/class-analytics-screen.php';
 
 // --- v2.0.0+: Bunny Score feature ---
+require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/factor-types/interface-factor-type.php';
+require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/factor-types/class-factor-type-boolean.php';
+require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/factor-types/class-factor-type-numeric.php';
+require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/factor-types/class-factor-type-label.php';
+require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/factor-types/class-factor-type-range-table.php';
+require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/factor-types/class-factor-type-registry.php';
+require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-settings.php';
 require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-factors.php';
 require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-manager.php';
+require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-stats-generator.php';
 require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-admin.php';
 require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-screen.php';
 
@@ -102,6 +110,8 @@ final class Plugin {
 	private function __construct() {
 		$this->version = WPAM_VERSION;
 		$this->loader  = new Loader();
+
+		Bunny_Score\Bunny_Score_Settings::maybe_migrate();
 
 		$this->define_global_hooks();
 		$this->define_admin_hooks();
@@ -166,6 +176,35 @@ final class Plugin {
 		$views = new Views\Views();
 		$this->loader->add_action( 'wp_ajax_wpam_track_view',        $views, 'ajax_track' );
 		$this->loader->add_action( 'wp_ajax_nopriv_wpam_track_view', $views, 'ajax_track' );
+
+		// v1.7.5: Bunny Score — generación semanal de estadísticas históricas vía
+		// WP-Cron. Registrado directamente con add_action()/add_filter() (no vía
+		// Loader) por el mismo motivo que el registro de Widget_Top_Posts arriba:
+		// el callback es un método estático de una clase sin instancia asociada,
+		// y el filtro de cron_schedules no tiene un "componente" natural al que
+		// atarlo en el patrón hook-por-objeto del Loader.
+		add_filter( 'cron_schedules', array( __CLASS__, 'register_weekly_cron_schedule' ) ); // phpcs:ignore WordPress.WP.CronInterval.CronSchedulesInterval
+		add_action( 'wpam_bunny_score_stats_weekly', array( '\WP_AffiliateManager\Bunny_Score\Bunny_Score_Stats_Generator', 'generate' ) );
+	}
+
+	/**
+	 * Registra el intervalo "semanal" en WP-Cron. WordPress core no trae uno
+	 * por defecto (solo hourly/twicedaily/daily), así que Bunny Score añade
+	 * el suyo propio bajo un nombre namespaced para no chocar con otros
+	 * plugins que también pudieran registrar 'weekly'.
+	 *
+	 * @since 1.7.5
+	 * @param array $schedules
+	 * @return array
+	 */
+	public static function register_weekly_cron_schedule( array $schedules ): array {
+		if ( ! isset( $schedules['wpam_weekly'] ) ) {
+			$schedules['wpam_weekly'] = array(
+				'interval' => WEEK_IN_SECONDS,
+				'display'  => __( 'Once Weekly (Bunny Affiliate Manager)', 'wp-affiliatemanager' ),
+			);
+		}
+		return $schedules;
 	}
 
 	/**
@@ -198,6 +237,13 @@ final class Plugin {
 		// Bunny Score.
 		$bunny_score_admin = new \WP_AffiliateManager\Bunny_Score\Bunny_Score_Admin();
 		$this->loader->add_action( 'admin_init', $bunny_score_admin, 'register' );
+
+		// v1.7.5: Bunny Score cron self-healing. Chequeo barísimo (un solo
+		// wp_next_scheduled(), sin queries) en un hook que ya corre en cada
+		// carga de admin. Si el evento desapareció por cualquier motivo
+		// (migración, restore de backup, limpieza externa de cron, etc.) se
+		// reprograma solo, sin depender de desactivar/reactivar el plugin.
+		$this->loader->add_action( 'admin_init', $this, 'maybe_reschedule_bunny_score_cron' );
 
 		// FASE 2 — Affiliates screen.
 		$affiliates_screen = new Admin\Affiliates_Screen();
@@ -278,6 +324,22 @@ final class Plugin {
 
 	public function get_version(): string { return $this->version; }
 	public function get_loader(): Loader  { return $this->loader; }
+
+	/**
+	 * Auto-recuperación del cron semanal de Bunny Score: si el evento no
+	 * existe (por el motivo que sea), se reprograma. `wp_next_scheduled()`
+	 * es una sola lectura contra la tabla de opciones del cron — costo
+	 * despreciable en cada carga de `admin_init`.
+	 *
+	 * @since 1.7.5
+	 * @return void
+	 */
+	public function maybe_reschedule_bunny_score_cron(): void {
+		if ( ! wp_next_scheduled( 'wpam_bunny_score_stats_weekly' ) ) {
+			wp_schedule_event( time(), 'wpam_weekly', 'wpam_bunny_score_stats_weekly' );
+		}
+	}
+
 	public function __clone()   {}
 	public function __wakeup()  {}
 }

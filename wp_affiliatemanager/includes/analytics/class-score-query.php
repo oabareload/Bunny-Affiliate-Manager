@@ -306,11 +306,11 @@ class Score_Query {
 	 * dado, reutilizando exactamente los mismos pesos y tablas que el resto de
 	 * la clase.
 	 *
-	 * Usado por Bunny Score (v1.8.0) para mostrar el "Promedio Global" junto
+	 * Usado por Bunny Score (v1.7.5) para mostrar el "Promedio Global" junto
 	 * al promedio de los tags seleccionados, sin traer todos los posts a PHP:
 	 * el AVG/COUNT se resuelve en una sola consulta SQL agregada.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.5
 	 * @param  string $range today|week|month|total
 	 * @return array{avg: float|null, total_posts: int}
 	 */
@@ -359,6 +359,52 @@ class Score_Query {
 			'avg'         => (float) $row['avg_score'],
 			'total_posts' => (int) $row['total_posts'],
 		);
+	}
+
+	/**
+	 * Retorna el score de TODOS los posts con actividad (sin filtros, sin
+	 * límite), como lista plana de valores — no un mapa post_id => score.
+	 *
+	 * Usado exclusivamente por `Bunny_Score_Stats_Generator::generate()` (cron
+	 * semanal) para construir la distribución histórica completa del sitio en
+	 * una sola query. Nunca se llama desde el cálculo en vivo de Bunny Score.
+	 *
+	 * @since  1.7.5
+	 * @param  string $range today|week|month|total
+	 * @return float[]
+	 */
+	public static function get_all_scores( string $range = 'total' ): array {
+		global $wpdb;
+
+		$views_table  = Views_Table::table_name();
+		$clicks_table = Clicks_Table::table_name();
+
+		$views_where  = '';
+		$clicks_where = '';
+
+		if ( 'total' !== $range ) {
+			$since_datetime = Top_Posts_Query::range_to_since( $range );
+			$since_period   = gmdate( 'Ymd', strtotime( $since_datetime ) );
+			$views_where    = $wpdb->prepare( ' WHERE period >= %s', $since_period );
+			$clicks_where   = $wpdb->prepare( ' WHERE ts >= %s', $since_datetime );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$scores = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT SUM(contrib) AS score FROM (
+					SELECT post_id, SUM(count) * %d AS contrib FROM %i{$views_where} GROUP BY post_id
+					UNION ALL
+					SELECT post_id, COUNT(*) * %d AS contrib FROM %i{$clicks_where} GROUP BY post_id
+				) AS combined GROUP BY post_id",
+				self::DEFAULT_FACTOR_VIEWS,
+				$views_table,
+				self::DEFAULT_FACTOR_CLICKS,
+				$clicks_table
+			)
+		);
+
+		return is_array( $scores ) ? array_map( 'floatval', $scores ) : array();
 	}
 
 	/**

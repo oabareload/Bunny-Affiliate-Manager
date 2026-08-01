@@ -5,6 +5,109 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.7] — TAG asociado vía autocomplete nativo (no texto libre) + preview en vivo + fixes críticos del algoritmo v2
+
+### Changed
+
+- **Reemplazado el input libre "TAG asociado" por el mismo backend de búsqueda que usa WordPress core en el editor de posts** (`action=ajax-tag-search`, la misma fuente de datos de `tags-suggest.js`), cableado con jQuery UI Autocomplete directamente (no `wpTagsSuggest()`, que está acoplado a la caja multi-tag CSV) para lograr selección ÚNICA resuelta a `term_id`. Mientras no hay selección se ve solo el autocomplete; al elegir un TAG se oculta el input y se muestra un chip con el nombre + botón ✕ para quitar la asociación (que vuelve a mostrar el autocomplete).
+- **Internamente se guarda únicamente `term_id`** (`factors[id][tag_id]`, antes `factors[id][tag]` con el nombre como texto). Ya no es posible asociar un TAG que aún no existe en el sitio — consecuencia esperada de que el autocomplete solo devuelve TAGs reales; la lógica de fallback a Score Global para TAGs que no existen se mantiene en el Manager por robustez, pero ya no es alcanzable desde esta UI.
+- **`Bunny_Score_Manager::calculate()`: deduplicación factor↔TAG ahora exclusivamente por `term_id`**, nunca por nombre/slug/texto normalizado (antes comparaba `strtolower(trim($name))`). Elimina cualquier ambigüedad de acentos/mayúsculas.
+- **Ajuste de consistencia**: el criterio de "el TAG existe en el histórico" para TAGs de factor ahora también respeta `min_posts_per_tag` (antes bastaba con >0 posts con score) — mismo criterio que ya aplicaba a los TAGs independientes, y el que usa el nuevo preview en vivo. Sin este ajuste, el preview y el cálculo real podrían divergir.
+- **Preview en vivo al seleccionar un TAG**: nuevo endpoint `wpam_get_tag_preview` (mismo nonce/permisos `wpam_inline_crud` que el resto del CRUD) muestra de inmediato número de publicaciones históricas, el Score Histórico si cumple `min_posts_per_tag`, o un aviso explícito de que se usará el Score Global en caso contrario — reutilizando exactamente la misma query (`Bunny_Score_Manager::get_post_ids_for_term()`, ahora pública) y el mismo criterio que el cálculo real, para que nunca puedan mostrar valores distintos.
+
+### Fixed (bugs reales detectados tras la implementación inicial de v2)
+
+- **Bug 1 — "Publicaciones analizadas" en 0 aunque el cálculo sí usó el Score Global.** El contador `$all_post_ids` solo se llenaba dentro del `if ($count >= $min_posts)` de cada TAG — cuando un factor caía al fallback de Global (TAG con pocos o cero posts), esos posts nunca se sumaban, mostrando "0 publicaciones" aunque el cálculo sí se había apoyado en el histórico global. **Ajustado tras revisión**: en vez de sumar posts parciales de TAGs insuficientes + el total del sitio, cuando cualquier factor cae al fallback, `historical.total_posts` reporta Únicamente `site.total_posts` (el respaldo histórico real del Global) — nunca una suma. Ej.: Global=229, Fabricante=1 (insuficiente), Franquicia=0 → el reporte dice 229, no 230 ni 229+1.
+- **Bug 2 (crítico) — un factor sin TAG asociado (o cuyo TAG no existe) quedaba completamente fuera del cálculo.** `Bunny_Score_Manager::calculate()` tenía literalmente `if ( ! $tag_id ) { continue; }` — la ausencia de `tag_id` sacaba al factor del `per_tag` por completo, contradiciendo la estrategia aprobada ("la inexistencia del TAG nunca debe impedir aplicar el factor, solo cambia la base"). Eliminado ese `continue`: ahora CUALQUIER factor cuyo `percent` resuelva (no-null, ya sea por "Tiene valor" o "Sin datos") genera siempre una fila en `per_tag` — con el TAG propio si hay uno asociado y califica, o sobre el Score Global si no. Participa normalmente en el promedio final.
+- **Bug 3 (JS, encontrado al investigar el Bug 2) — el reporte de "Factores manuales" mostraba "No aplicado" para un `percent` calculado en exactamente 0%.** `factor.percent === 0` se trataba igual que `factor.percent === null` ("No aplica"), ocultando que el factor sí había participado con un ajuste de 0.00%. Corregido: solo `percent === null` muestra "No aplica"; cualquier número, incluido 0, se muestra tal cual.
+- **Mejora de claridad en "Rendimiento por TAG"**: cuando una fila de factor usa el fallback a Score Global, ahora muestra el conteo real de posts que respaldan ese Global (no el conteo insuficiente del TAG propio) y una etiqueta "(Global)" en vez de "(factor)", dejando explícito que ese Score Histórico no proviene del TAG sino del promedio general del sitio. Nuevo campo `used_global` (bool) en cada fila de `per_tag`.
+
+### Notes
+
+- No se tocó ninguna de las 5 reglas del algoritmo v2 (asociación opcional, fallback a Global, TAG nunca dos veces, TAGs sin factor sin modificación, promedio final). Los bugs corregidos eran errores de implementación de esas mismas reglas, no cambios de diseño.
+
+---
+
+## [1.7.6] — Bunny Score v2: modelo único (fuente única de verdad)
+
+### Changed — BREAKING (algoritmo)
+
+- **Eliminados los 3 modelos de cálculo** (`collection_score`, `weighted_tag_score`, `log_weighted_tag_score`) y sus pesos `sqrt`/`log`. `Bunny_Score_Manager::calculate()` fue reescrito por completo: ahora existe un único modelo basado en TAGs.
+- **Cada factor externo puede asociarse opcionalmente a un TAG** (nuevo campo `factors[id][tag]` en el formulario de cálculo). Si el TAG existe y tiene actividad, el factor ajusta únicamente ese TAG; si el TAG aún no existe (o existe pero sin actividad registrada), se usa el Score Global como base — el efecto del factor nunca se pierde.
+- **Un TAG nunca se calcula dos veces.** Si un factor externo consume un nombre de TAG (ej. Fabricante → "Claynel") y ese mismo TAG también fue escrito manualmente en la lista de Tags, la versión del factor tiene prioridad — el TAG independiente se omite (comparación por nombre normalizado, sin distinguir mayúsculas).
+- **`per_tag` simplificado**: cada fila expone únicamente `name`, `count`, `historical_score`, `adjusted_score`, `source` (`factor`|`tag`). Eliminados `avg_score`, `weight_sqrt`, `weight_log`, `contribution_sqrt`, `contribution_log`, `valid`, `post_ids`, `term_id`, `taxonomy` del payload expuesto (uso interno solo donde hacía falta).
+- **Bunny Score Final = promedio de todos los Scores Ajustados.** Ningún cálculo paralelo.
+- **Tabla "Rendimiento por TAG" simplificada** a 4 columnas: TAG, Posts, Score Histórico, Score Ajustado (antes: Score promedio, Peso sqrt, Peso log, Aporte).
+- **Pantalla de resultados**: eliminada la sección "Modelos de cálculo" (Collection/Weighted/Log). En su lugar: Bunny Score, Score Global, Diferencia vs Score Global. "Posición histórica" y "Factores Externos" se mantienen sin cambios estructurales, solo con un único marcador/modelo en vez de 3.
+- `Bunny_Score_Admin::handle_calculation()`: `build_position_report()` ahora recibe un solo modelo (`bunny_score`) en vez de 3.
+
+### Fixed (retroactivo, no documentado hasta ahora)
+
+- **v1.7.5 — Bug de persistencia resuelto de raíz**: `register_setting()` engancha `sanitize_options()` al filtro `sanitize_option_wpam_settings`, que WordPress Core aplica dentro de CUALQUIER `update_option('wpam_settings', ...)`, no solo las que vienen de `options.php`. Esto rompía en silencio el guardado AJAX de factores y `min_posts_per_tag` (quedaban revertidos al valor anterior). Resuelto de forma definitiva extrayendo Bunny Score a una opción completamente independiente: **`Bunny_Score_Settings`** (`WPAM_BUNNY_SCORE_SETTINGS_KEY`), con su propio `schema_version`/`migration_version`, que nunca pasa por `sanitize_option_wpam_settings`. Migra automáticamente los datos legados desde `wpam_settings.bunny_score` la primera vez que se lee, y los elimina de `wpam_settings` tras migrar.
+- `Bunny_Score_Admin` y `Bunny_Score_Screen` actualizados para usar `Bunny_Score_Settings::get()`/`::update()` en vez de `get_option(WPAM_OPTION_KEY)` directo.
+
+### Notes
+
+- No se tocó el cron, la caché semanal, `Bunny_Score_Stats_Generator`, ni los estados Tiene valor/No aplica/Sin datos — fuera de alcance de este refactor, confirmado.
+- El objetivo de esta versión: el Bunny Score debe poder explicarse leínndo únicamente la tabla de TAGs. Cada TAG aporta exactamente un Score Ajustado; el Bunny Score Final es el promedio de esos valores. Sin cálculos ocultos ni modelos paralelos.
+
+---
+
+## [1.7.4] — Cron self-healing + Factores Externos (arquitectura extensible)
+
+### Fixed
+
+- **`schema_version` en la caché de Bunny Score.** `Bunny_Score_Stats_Generator` ahora guarda `schema_version` junto a `generated_at`. `get_stats()` invalida automáticamente (trata como "nunca generada") cualquier caché escrita con un `schema_version` distinto al actual.
+- **Auto-recuperación del cron semanal.** El evento `wpam_bunny_score_stats_weekly` solo se programaba en `Activator::activate()` — si desaparecía por cualquier motivo, solo volvía a existir desactivando/reactivando el plugin. `Plugin::maybe_reschedule_bunny_score_cron()`, colgado de `admin_init`, hace un `wp_next_scheduled()` barísimo en cada carga de admin y reprograma el evento si no existe.
+
+### Added — Factores Externos (arquitectura extensible, sin llamadas HTTP)
+
+Segunda fase de Bunny Score. Los factores dejan de estar hardcodeados por tipo y pasan a un sistema de tipos plug-in, espejo del patrón `Layout_Interface`/`Layout_Registry` ya usado en el frontend.
+
+- **`includes/bunny-score/factor-types/`** (nuevo): `Factor_Type_Interface`, `Factor_Type_Registry` (filtro `wpam_bunny_score_factor_types`), y 4 implementaciones: `Factor_Type_Boolean`/`Numeric`/`Label` (lógica movida **verbatim**, cero cambio de comportamiento) y `Factor_Type_Range_Table` (nuevo).
+- **`Bunny_Score_Factors::compute_percent()` reescrito como dispatcher de estado** — misma firma pública, sigue siendo el único punto de entrada que usa `Bunny_Score_Manager` (sin tocar ese archivo). Tres estados: `not_applicable` (null, no modifica el score), `no_data` (penalización configurable, nunca se confunde con "no aplica"), `has_value` (delega en `Factor_Type::value_to_percent_of_max()`).
+- **Tipo nuevo `range_table`:** tabla de rangos [min, max|sin límite] → % del ajuste máximo, configurable desde Settings, sin percentiles de sitios externos. Editor Add/Remove row vía JS.
+- **Campos comunes nuevos por factor:** `max_percent_negative`, `supports_not_applicable`, `no_data_penalty_ratio`, `source_label` (informativo, sin llamadas externas).
+- **4 factores iniciales configurables** (pura configuración, sin código específico): Popularidad de franquicia (`numeric`), Popularidad de personaje/ilustrador/fabricante (`range_table`).
+
+### Notes
+
+- Los 3 modelos de cálculo no se tocaron. La suma ya soportaba negativos, simplemente nunca antes ocurría.
+- Retrocompatible: factores ya configurados siguen funcionando idénticamente.
+
+---
+
+## [1.7.3] — Bunny Score: Posición histórica, percentiles, semáforo (v1.7.5 internamente)
+
+No se modificó el algoritmo de Bunny Score ni ninguno de los 3 modelos (Collection Score, Weighted Tag Score, Log Weighted Tag Score). Este release agrega únicamente contexto estadístico sobre esos scores ya calculados.
+
+### Added
+
+- **`Bunny_Score_Stats_Generator`** (`includes/bunny-score/class-bunny-score-stats-generator.php`) — dueño único de la distribución histórica del sitio:
+  - `generate()`: recorre TODOS los posts con actividad **una sola vez** (vía el nuevo `Score_Query::get_all_scores()`, una sola query agregada) y calcula total, promedio, mediana, desviación estándar poblacional, mín/máx, 15 percentiles (P1–P99, interpolación lineal estándar) y un histograma real.
+  - **Bins del histograma calculados automáticamente** con la regla de Freedman–Diaconis (usa el IQR, robusta ante sesgo), con fallback a la regla de Sturges cuando el IQR es 0. Acotado a [5, 60] bins por cordura de renderizado. Nunca una campana teórica — si el sitio tiene una distribución sesgada, el histograma se ve sesgado.
+  - **Percentil EXACTO, no aproximado.** Además de los 15 puntos de percentil, se guarda el array completo de scores ordenado. `get_position()` calcula el percentil real de cualquier score vía búsqueda binaria contra ese array (rank exacto / total), sin interpolar sobre los 15 puntos guardados.
+  - `get_semaphore( float $percentile )`: semáforo basado Únicamente en los cuartiles reales de la distribución (percentil < P25 🔴 Bajo, < P50 🟡 Medio, < P75 🟢 Bueno, ≥ P75 ⭐ Excelente) — no números fijos arbitrarios, ni heurísticas, un simple lookup de rango.
+  - `build_position_report( array $model_scores )`: arma el reporte de los 3 modelos de una sola vez, leyendo la caché (una `get_option()`) y sin volver a tocar la base de datos.
+- **`Score_Query::get_all_scores( string $range = 'total' ): float[]`** — nueva query (mismo patrón UNION ALL que el resto de la clase), usada exclusivamente por el generador semanal; el cálculo en vivo de Bunny Score nunca la llama.
+- **Opción de caché exclusiva `wpam_bunny_score_cache`** (constante `WPAM_BUNNY_SCORE_CACHE_KEY`), **separada** de `wpam_settings` — el generador la escribe entera (`update_option(..., false)`, sin autoload) sin pasar por el flujo de sanitización de Settings, evitando repetir el bug de escritura compartida corregido en 1.7.1. No es una tabla nueva, solo otra fila en `wp_options`.
+- **Cron semanal**: nuevo intervalo `wpam_weekly` registrado vía el filtro `cron_schedules` (WP core no trae uno por defecto), acción `wpam_bunny_score_stats_weekly` → `Bunny_Score_Stats_Generator::generate()`. Programado en `Activator::activate()` (con el filtro registrado defensivamente ahí mismo, porque en la propia petición de activación `plugins_loaded` ya se disparó antes de que el plugin apareciera activo). Des-programado en `Deactivator::clear_scheduled_events()` — rellena el placeholder que ya estaba ahí esperando esto desde 1.6.x.
+- **Botón "Regenerar estadísticas ahora"** dentro de la propia pantalla Bunny Score (no en Maintenance, a pedido explícito), con la fecha/hora de la última generación visible junto al botón. Mismo patrón `admin_post_wpam_*` + nonce + `manage_options` que el resto de acciones administrativas del plugin.
+- **Sección "Posición histórica"** en el panel de resultados: para cada uno de los 3 modelos muestra Score / Percentil / Z-Score / Diferencia vs. promedio global + semáforo, y una **gráfica SVG pura** (sin Chart.js, sin librerías — construida como string en `bunny-score-settings.js`, igual que el resto del panel) con las barras reales del histograma, líneas de mediana/promedio, y un marcador vertical por modelo en su posición exacta.
+
+### Changed
+
+- `Bunny_Score_Admin::handle_calculation()`: después de `Bunny_Score_Manager::calculate()` (sin tocarlo), agrega `$result['position']` vía `Bunny_Score_Stats_Generator::build_position_report()`. Cero queries adicionales en la ruta de cálculo en vivo — solo una lectura de opción y aritmética en memoria.
+- `Bunny_Score_Screen::render()`: nueva card "Distribución histórica del sitio" con el botón de regeneración y la fecha de última generación.
+
+### Notes
+
+- Los 3 modelos de cálculo (`Bunny_Score_Manager::calculate()`), los factores manuales (`Bunny_Score_Factors`) y toda la arquitectura de menu/settings existente quedan **intactos** — este release es puramente aditivo (contexto estadístico sobre scores ya calculados).
+- Performance: el trabajo pesado (ordenar N scores, calcular percentiles/histograma) ocurre **una vez por semana** en el cron, no en cada cálculo. Cada "Calcular Bunny Score" hace exactamente una `get_option()` extra + operaciones en memoria (búsqueda binaria O(log n), aritmética O(1)) — sin impacto medible sobre el tiempo de respuesta.
+- Nada de esto se ejecuta automáticamente en segundo plano más allá del propio cron semanal: no hay tablas nuevas, no hay resultados individuales persistidos, no hay cálculo por figura fuera del momento en que el administrador presiona "Calcular Bunny Score".
+
+---
+
 ## [1.7.2] — Bunny Score: log-based tag weighting, collection score preserved
 
 ### Changed

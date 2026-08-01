@@ -1084,6 +1084,202 @@ body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--views .wpam-sta
 	margin-top: 4px;
 }
 
+/* v1.7.5 — Bunny Score: gráfica SVG de distribución histórica real. */
+.wpam-bunny-score-chart {
+	width: 100%;
+	max-width: 680px;
+	margin-top: 12px;
+	border: 1px solid var(--wpam-gray-200);
+	border-radius: var(--wpam-radius);
+	padding: 12px;
+	background: #fff;
+}
+
+.wpam-bunny-score-chart-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 14px;
+	margin-top: 8px;
+	font-size: 12px;
+	color: var(--wpam-gray-400);
+}
+
+.wpam-bunny-score-chart-legend span {
+	display: inline-flex;
+	align-items: center;
+}
+
+/* v1.7.5 — Bunny Score: Factores Externos, editor de tabla de rangos. */
+.wpam-range-table-wrap {
+	margin-top: 6px;
+}
+
+.wpam-range-table {
+	border-collapse: collapse;
+	width: auto;
+}
+
+.wpam-range-table th,
+.wpam-range-table td {
+	padding: 4px 8px;
+	font-size: 12px;
+	border-bottom: 1px solid var(--wpam-gray-200);
+}
+
+.wpam-range-table th {
+	color: var(--wpam-gray-400);
+	font-weight: 600;
+	text-align: left;
+}
+
+.wpam-factor-fields {
+	min-width: 180px;
+}
+
+.wpam-bunny-factor-value-row .wpam-factor-value-cell input,
+.wpam-bunny-factor-value-row .wpam-factor-value-cell select {
+	transition: opacity var(--wpam-transition);
+}
+
+/* v1.7.5 — Bunny Score: Factores Externos, tabla resumen + modal CRUD. */
+.wpam-screen-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+	margin-bottom: 14px;
+}
+
+.wpam-row-actions {
+	display: flex;
+	gap: 6px;
+}
+
+.wpam-action-btn {
+	border: 1px solid var(--wpam-gray-200);
+	background: #fff;
+	border-radius: var(--wpam-radius-sm);
+	padding: 4px 8px;
+	cursor: pointer;
+	font-size: 13px;
+	line-height: 1;
+	transition: background var(--wpam-transition), border-color var(--wpam-transition);
+}
+
+.wpam-action-btn:hover {
+	background: var(--wpam-gray-100);
+}
+
+.wpam-action-btn--delete:hover {
+	border-color: var(--wpam-danger);
+}
+
+.wpam-table-empty {
+	color: var(--wpam-gray-400);
+	text-align: center;
+	padding: 24px 14px;
+	font-size: 13px;
+}
+
+.wpam-modal-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(17, 24, 39, 0.5);
+	z-index: 100000;
+	align-items: flex-start;
+	justify-content: center;
+	overflow-y: auto;
+	padding: 40px 16px;
+}
+
+.wpam-modal {
+	background: #fff;
+	border-radius: var(--wpam-radius);
+	width: 100%;
+	max-width: 640px;
+	box-shadow: 0 20px 40px rgba(17, 24, 39, 0.2);
+	max-height: calc(100vh - 80px);
+	display: flex;
+	flex-direction: column;
+}
+
+.wpam-modal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 16px 20px;
+	border-bottom: 1px solid var(--wpam-gray-200);
+}
+
+.wpam-modal-header h3 {
+	margin: 0;
+	font-size: 15px;
+}
+
+.wpam-modal-close {
+	background: none;
+	border: none;
+	font-size: 22px;
+	line-height: 1;
+	cursor: pointer;
+	color: var(--wpam-gray-400);
+	padding: 0 4px;
+}
+
+.wpam-modal-body {
+	padding: 20px;
+	overflow-y: auto;
+}
+
+.wpam-modal-grid {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 14px;
+	margin-bottom: 14px;
+}
+
+.wpam-modal-field label {
+	display: block;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--wpam-gray-400);
+	margin-bottom: 4px;
+}
+
+.wpam-modal-field--checkbox label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 500;
+	color: var(--wpam-gray-900);
+}
+
+.wpam-modal-field .wpam-input,
+.wpam-modal-field textarea.wpam-input {
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.wpam-modal-footer {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 10px;
+	padding: 14px 20px;
+	border-top: 1px solid var(--wpam-gray-200);
+}
+
+.wpam-modal-error {
+	margin-right: auto;
+	color: var(--wpam-danger);
+	font-size: 13px;
+}
+
+body.wpam-modal-open {
+	overflow: hidden;
+}
+
 /* Tabla de factores editable — estilo propio, independiente de `.wpam-settings-page`,
    para verse bien tanto en Settings como en la pantalla Bunny Score. */
 .wpam-bunny-factors-table {
@@ -1156,6 +1352,74 @@ body.bunny-affiliates_page_wpam-analytics .wpam-analytics-cards--views .wpam-sta
 	text-align: center;
 	padding: 24px 14px;
 	font-size: 13px;
+}
+
+/* v1.7.6 — Bunny Score: selector de TAG asociado (autocomplete nativo + chip). */
+.wpam-factor-tag-picker {
+	min-width: 220px;
+}
+
+.wpam-factor-tag-autocomplete-wrap .wpam-factor-tag-input {
+	width: 100%;
+	box-sizing: border-box;
+	border: 1px solid var(--wpam-gray-200);
+	border-radius: var(--wpam-radius-sm);
+	padding: 6px 10px;
+	font-size: 13px;
+}
+
+.wpam-factor-tag-autocomplete-wrap .wpam-factor-tag-input:focus {
+	outline: none;
+	border-color: var(--wpam-primary);
+	box-shadow: 0 0 0 3px var(--wpam-primary-light);
+}
+
+.wpam-factor-tag-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	background: var(--wpam-primary-light);
+	color: var(--wpam-primary-dark);
+	border-radius: 999px;
+	padding: 4px 8px 4px 12px;
+	font-size: 13px;
+	font-weight: 600;
+	max-width: 100%;
+}
+
+.wpam-factor-tag-chip-name {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.wpam-factor-tag-remove {
+	background: rgba(255,255,255,0.6);
+	border: none;
+	border-radius: 50%;
+	width: 18px;
+	height: 18px;
+	line-height: 1;
+	cursor: pointer;
+	font-size: 11px;
+	color: var(--wpam-primary-dark);
+	flex-shrink: 0;
+	transition: background var(--wpam-transition);
+}
+
+.wpam-factor-tag-remove:hover {
+	background: #fff;
+}
+
+.wpam-factor-tag-preview {
+	margin-top: 6px;
+}
+
+.wpam-factor-tag-preview .wpam-top-pct {
+	display: block;
+	text-align: left;
+	min-width: 0;
+	line-height: 1.5;
 }
 
 @media screen and (max-width: 782px) {

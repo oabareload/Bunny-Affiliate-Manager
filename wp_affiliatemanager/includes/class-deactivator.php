@@ -56,14 +56,12 @@ class Deactivator {
 	 * @return void
 	 */
 	private static function clear_scheduled_events(): void {
-		// Ejemplo de limpieza de cron:
-		// $timestamp = wp_next_scheduled( 'wpam_daily_cleanup' );
-		// if ( $timestamp ) {
-		// 	wp_unschedule_event( $timestamp, 'wpam_daily_cleanup' );
-		// }
-
-		// Por ahora no hay cron jobs registrados.
-		// Este método queda preparado para FASE de estadísticas/automatizaciones.
+		// v1.7.5: Bunny Score — evento semanal de generación de estadísticas históricas.
+		$timestamp = wp_next_scheduled( 'wpam_bunny_score_stats_weekly' );
+		if ( $timestamp ) {
+			wp_unschedule_event( $timestamp, 'wpam_bunny_score_stats_weekly' );
+		}
+		wp_clear_scheduled_hook( 'wpam_bunny_score_stats_weekly' );
 	}
 
 	/**

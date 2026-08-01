@@ -100,6 +100,7 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - **Manual factors:** an admin-configurable table of extra boolean/numeric/label factors (e.g. "is a pre-order", "has a coupon"), each contributing a percentage bonus on top of the historical average. Factor IDs are auto-generated from their label (hidden field, client-side slug) so nothing needs to be typed manually. Left as-is / not part of the tag-selection refactor — factor semantics are still being defined.
 - **Result panel** shows four numbers side by side: the site-wide **Promedio Global** (via `Score_Query::get_global_average()` — one aggregated SQL query, same weights/tables as every other ranking), the **Promedio de los tags seleccionados** (the union-based average described above), the **Bunny Score obtenido** (historical average + factor bonuses), and the **Diferencia vs. promedio global**, so it's immediately visible whether a given set of tags is over- or under-performing the site's general behavior.
 - Settings for Bunny Score (minimum posts per tag, factors) are stored in the same plugin option as everything else, saved through a dedicated `<form>` on the Bunny Score screen that only ever partially updates its own `bunny_score` sub-array — it never touches or resets the rest of the plugin's Settings, and vice versa.
+- **Posición histórica (v1.7.5):** a weekly WP-Cron job (`Bunny_Score_Stats_Generator`) walks every post's score **once** and stores total posts, average, median, standard deviation, min/max, 15 percentile points (P1–P99), and a real (non-theoretical) histogram in a dedicated cache option (`wpam_bunny_score_cache`, not autoloaded, not the same option as Settings). Bin count is computed automatically per the Freedman–Diaconis rule (falls back to Sturges when the data has no spread), so the histogram shape adapts to however skewed BunnyChase's real data is — it's never a theoretical bell curve. Every calculation then reads that cached distribution (a single `get_option()`, zero additional queries) and reports, for each of the three models: exact percentile (binary search against the stored sorted score array — not an approximation off the 15 stored percentile points), z-score, and difference vs. the global average, plus a simple traffic-light indicator (🔴/🟡/🟢/⭐) driven purely by where that percentile falls relative to the distribution's own real P25/P50/P75 — no fixed magic numbers, no heuristics. A lightweight pure-SVG chart (built as a JS string, no charting library) plots the real histogram with vertical markers for all three model scores. The screen also shows a "Regenerate now" button with the last-generated timestamp, for testing/on-demand refresh without waiting a week.
 
 ### Internal API (`WPAM_API`)
 
@@ -170,7 +171,8 @@ Bunny-Affiliate-Manager/
 │   │   │   ├── class-bunny-score-admin.php    — AJAX/admin-post calculation endpoint
 │   │   │   ├── class-bunny-score-screen.php   — admin screen (tags, factors, result panel)
 │   │   │   ├── class-bunny-score-manager.php  — calculation orchestrator (no persistence)
-│   │   │   └── class-bunny-score-factors.php  — manual factor percent computation
+│   │   │   ├── class-bunny-score-factors.php  — manual factor percent computation
+│   │   │   └── class-bunny-score-stats-generator.php — weekly historical distribution (WP-Cron)
 │   │   ├── api/
 │   │   │   ├── class-api.php                 — REST status endpoint
 │   │   │   └── class-wpam-api.php            — public read-only API

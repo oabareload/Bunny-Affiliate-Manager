@@ -108,6 +108,14 @@ class Admin_Assets {
 					'crudNonce' => wp_create_nonce( 'wpam_inline_crud' ),
 					'pluginUrl' => WPAM_PLUGIN_URL,
 					'version'   => $this->version,
+					// v1.7.5: tipos de factor disponibles, para que "Add factor" en
+					// Settings los liste sin hardcodearlos en JS — un tipo nuevo
+					// registrado vía el filtro wpam_bunny_score_factor_types aparece
+					// aquí automáticamente.
+					'factorTypes' => array_map(
+						static fn( $type ) => array( 'id' => $type->get_id(), 'label' => $type->get_label() ),
+						array_values( \WP_AffiliateManager\Bunny_Score\Factor_Types\Factor_Type_Registry::get_types() )
+					),
 					'i18n'      => array(
 						'confirm_delete'   => __( 'Delete this affiliate permanently?', 'wp-affiliatemanager' ),
 						'error_generic'    => __( 'An error occurred. Please try again.', 'wp-affiliatemanager' ),
@@ -135,6 +143,14 @@ class Admin_Assets {
 						'diff_vs_global'   => __( 'Diferencia vs. promedio global:', 'wp-affiliatemanager' ),
 						'range_label'      => __( 'Range', 'wp-affiliatemanager' ),
 						'factor_label_placeholder' => __( 'Nombre del factor', 'wp-affiliatemanager' ),
+						// v1.7.5: modal CRUD de Factores Externos.
+						'add_factor_title'  => __( 'Agregar factor', 'wp-affiliatemanager' ),
+						'edit_factor_title' => __( 'Editar factor', 'wp-affiliatemanager' ),
+						'factor_label_required' => __( 'El nombre del factor es obligatorio.', 'wp-affiliatemanager' ),
+						'confirm_delete_factor' => __( '¿Eliminar el factor "%s"? Esta acción no se puede deshacer.', 'wp-affiliatemanager' ),
+						'factor_created'    => __( 'Factor creado.', 'wp-affiliatemanager' ),
+						'factor_updated'    => __( 'Factor actualizado.', 'wp-affiliatemanager' ),
+						'factor_deleted'    => __( 'Factor eliminado.', 'wp-affiliatemanager' ),
 					),
 				)
 			);
@@ -184,7 +200,7 @@ class Admin_Assets {
 				wp_enqueue_script(
 					'wpam-bunny-score-settings',
 					WPAM_PLUGIN_URL . 'assets/js/bunny-score-settings.js',
-					array( 'jquery' ),
+					array( 'jquery', 'wpam-admin-scripts' ),
 					$this->version,
 					true
 				);
