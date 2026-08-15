@@ -119,7 +119,21 @@ class Analytics_Renderer {
 	 * @param  array[] $items
 	 * @return array[]
 	 */
-	private static function enrich_for_display( array $items ): array {
+	private static function enrich_for_display( array $items, string $resource_type = 'post' ): array {
+		if ( in_array( $resource_type, array( 'category', 'tag' ), true ) ) {
+			$taxonomy = 'category' === $resource_type ? 'category' : 'post_tag';
+
+			foreach ( $items as &$item ) {
+				$item['thumb_url'] = '';
+				$edit_link          = get_edit_term_link( $item['id'], $taxonomy );
+				$item['edit_url']   = is_string( $edit_link ) ? $edit_link : '';
+			}
+			unset( $item );
+
+			return $items;
+		}
+
+		// post / page — get_edit_post_link() funciona igual para ambos post_types.
 		foreach ( $items as &$item ) {
 			$thumb_id         = get_post_thumbnail_id( $item['id'] );
 			$item['thumb_url'] = $thumb_id ? (string) wp_get_attachment_image_url( $thumb_id, 'thumbnail' ) : '';
@@ -140,8 +154,8 @@ class Analytics_Renderer {
 	 * @param  string  $count_field 'click_count' | 'view_count' | 'score'.
 	 * @return void
 	 */
-	private static function render_top_list( array $items, string $count_field ): void {
-		$items = self::enrich_for_display( $items );
+	private static function render_top_list( array $items, string $count_field, string $resource_type = 'post' ): void {
+		$items = self::enrich_for_display( $items, $resource_type );
 		?>
 		<ul class="wpam-top-list">
 		<?php foreach ( $items as $item ) : ?>
@@ -194,16 +208,53 @@ class Analytics_Renderer {
 	 * @param  array[] $posts Ver Views_Query::get_cached().
 	 * @return void
 	 */
-	public static function render_top_viewed_posts_section( array $posts ): void {
+	public static function render_top_viewed_posts_section( array $posts, string $resource_type = 'post' ): void {
 		?>
 		<div class="wpam-analytics-card wpam-analytics-card--full">
 			<h3 class="wpam-analytics-card-title">
-				<span>👁️</span> <?php esc_html_e( 'Top Viewed Posts', 'wp-affiliatemanager' ); ?>
+				<span>👁️</span> <?php esc_html_e( 'Top Viewed', 'wp-affiliatemanager' ); ?>
 			</h3>
 			<?php if ( empty( $posts ) ) : ?>
 				<p class="wpam-analytics-empty"><?php esc_html_e( 'No views recorded yet.', 'wp-affiliatemanager' ); ?></p>
 			<?php else : ?>
-				<?php self::render_top_list( $posts, 'view_count' ); ?>
+				<?php self::render_top_list( $posts, 'view_count', $resource_type ); ?>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Renderiza una lista simple "label + count" — usada para Top Search Terms
+	 * y Top 404 URLs (v1.8.0). Sin thumbnail, sin edit_url: esos 2 tipos no
+	 * tienen una entidad de WordPress detrás, solo texto agregado.
+	 *
+	 * @since  1.8.0
+	 * @param  string $title Encabezado de la card (ya traducido).
+	 * @param  string $icon
+	 * @param  array[] $items Cada elemento: [ 'term'|'url' => string, 'count' => int ].
+	 * @param  string $label_key 'term' o 'url' — qué clave de $items contiene el texto a mostrar.
+	 * @return void
+	 */
+	public static function render_top_terms_section( string $title, string $icon, array $items, string $label_key ): void {
+		?>
+		<div class="wpam-analytics-card wpam-analytics-card--full">
+			<h3 class="wpam-analytics-card-title">
+				<span><?php echo esc_html( $icon ); ?></span> <?php echo esc_html( $title ); ?>
+			</h3>
+			<?php if ( empty( $items ) ) : ?>
+				<p class="wpam-analytics-empty"><?php esc_html_e( 'No views recorded yet.', 'wp-affiliatemanager' ); ?></p>
+			<?php else : ?>
+				<ul class="wpam-top-list">
+				<?php foreach ( $items as $item ) : ?>
+					<li class="wpam-top-item">
+						<div class="wpam-top-item-lead">
+							<span class="wpam-top-thumb-placeholder"><?php echo esc_html( $icon ); ?></span>
+							<span class="wpam-top-name"><?php echo esc_html( $item[ $label_key ] ); ?></span>
+						</div>
+						<span class="wpam-top-count"><?php echo esc_html( number_format_i18n( (int) $item['count'] ) ); ?></span>
+					</li>
+				<?php endforeach; ?>
+				</ul>
 			<?php endif; ?>
 		</div>
 		<?php

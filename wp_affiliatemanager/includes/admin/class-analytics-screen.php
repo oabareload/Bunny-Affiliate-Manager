@@ -19,6 +19,7 @@ namespace WP_AffiliateManager\Admin;
 
 use WP_AffiliateManager\Analytics\Score_Query;
 use WP_AffiliateManager\Frontend\Top_Posts_Query;
+use WP_AffiliateManager\Views\Resource_Resolver;
 use WP_AffiliateManager\Views\Views_Query;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -115,6 +116,15 @@ class Analytics_Screen {
 
 			<!-- ============================== Tab: Views ============================== -->
 			<div class="wpam-tab-panel" data-tab-panel="views" style="display:none;">
+				<div class="wpam-analytics-views-filter">
+					<label for="wpam-views-resource-type"><?php esc_html_e( 'Resource type:', 'wp-affiliatemanager' ); ?></label>
+					<select id="wpam-views-resource-type">
+						<?php foreach ( self::resource_type_labels() as $type => $label ) : ?>
+							<option value="<?php echo esc_attr( $type ); ?>" <?php selected( 'post', $type ); ?>><?php echo esc_html( $label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</div>
+
 				<div class="wpam-stats-grid wpam-analytics-cards--views">
 					<?php Analytics_Renderer::render_stat_card( __( 'Today', 'wp-affiliatemanager' ), number_format_i18n( $views_stats['today'] ), '👁️' ); ?>
 					<?php Analytics_Renderer::render_stat_card( __( 'Last 7 Days', 'wp-affiliatemanager' ), number_format_i18n( $views_stats['week'] ), '📅' ); ?>
@@ -123,14 +133,33 @@ class Analytics_Screen {
 				</div>
 
 				<div class="wpam-analytics-viewed-posts-col">
-					<?php Analytics_Renderer::render_top_viewed_posts_section( $top_viewed ); ?>
+					<?php Analytics_Renderer::render_top_viewed_posts_section( $top_viewed, 'post' ); ?>
 				</div>
 
+				<?php // Recent Views permanece exclusivamente Posts — fuera de alcance generalizar este listado en v1.8.0. ?>
 				<?php Analytics_Renderer::render_recent_views_section( $recent_views ); ?>
 			</div>
 
 		</div>
 		<?php
+	}
+
+	/**
+	 * Etiquetas visibles para el selector de resource_type del tab Views.
+	 *
+	 * @since  1.8.0
+	 * @return array<string,string>
+	 */
+	private static function resource_type_labels(): array {
+		return array(
+			'post'     => __( 'Posts', 'wp-affiliatemanager' ),
+			'page'     => __( 'Pages', 'wp-affiliatemanager' ),
+			'category' => __( 'Categories', 'wp-affiliatemanager' ),
+			'tag'      => __( 'Tags', 'wp-affiliatemanager' ),
+			'home'     => __( 'Home', 'wp-affiliatemanager' ),
+			'search'   => __( 'Search', 'wp-affiliatemanager' ),
+			'404'      => __( '404', 'wp-affiliatemanager' ),
+		);
 	}
 
 	// -------------------------------------------------------------------------
@@ -181,14 +210,41 @@ class Analytics_Screen {
 				break;
 
 			case 'views':
-				$viewed = Views_Query::get_cached( $range, 10 );
+				$resource_type = sanitize_key( wp_unslash( $_POST['resource_type'] ?? 'post' ) );
+				if ( ! in_array( $resource_type, Resource_Resolver::TYPES, true ) ) {
+					$resource_type = 'post';
+				}
 
 				ob_start();
-				Analytics_Renderer::render_top_viewed_posts_section( $viewed );
+
+				if ( in_array( $resource_type, array( 'post', 'page', 'category', 'tag' ), true ) ) {
+					$viewed = Views_Query::get_cached( $range, 10, array(), $resource_type );
+					$stats  = Views_Query::get_stats_cached( $resource_type );
+					Analytics_Renderer::render_top_viewed_posts_section( $viewed, $resource_type );
+				} elseif ( 'search' === $resource_type ) {
+					$terms = Views_Query::get_search_terms( $range, 10 );
+					$stats = Views_Query::get_search_terms_stats();
+					Analytics_Renderer::render_top_terms_section( __( 'Top Search Terms', 'wp-affiliatemanager' ), '🔍', $terms, 'term' );
+				} elseif ( '404' === $resource_type ) {
+					$urls  = Views_Query::get_404_urls( $range, 10 );
+					$stats = Views_Query::get_404_stats();
+					Analytics_Renderer::render_top_terms_section( __( 'Top 404 URLs', 'wp-affiliatemanager' ), '🚫', $urls, 'url' );
+				} else {
+					// home: sin identidad individual, un solo agregado — la card de
+					// stats ya lo resume, no hace falta ninguna lista debajo.
+					$stats = Views_Query::get_stats_cached( 'home' );
+				}
+
 				$viewed_html = ob_get_clean();
 
 				wp_send_json_success( array(
 					'viewed_posts_html' => $viewed_html,
+					'stats'             => array(
+						'today' => number_format_i18n( $stats['today'] ),
+						'week'  => number_format_i18n( $stats['week'] ),
+						'month' => number_format_i18n( $stats['month'] ),
+						'total' => number_format_i18n( $stats['total'] ),
+					),
 				) );
 				break;
 

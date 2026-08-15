@@ -5,15 +5,19 @@
  * jQuery). No lee ni escribe cookies — la deduplicación es responsabilidad
  * exclusiva del servidor (ver Views::ajax_track()).
  *
- * Solo se carga cuando Views::maybe_enqueue_beacon() decide encolarlo
- * (is_singular('post') + post publicado), así que no necesita comprobar
- * nada sobre la página actual.
+ * Solo se carga cuando Views::maybe_enqueue_beacon() decide encolarlo (el
+ * recurso actual resolvió a un tipo soportado y elegible), así que no
+ * necesita comprobar nada sobre la página actual.
  *
  * window.wpamViews se define vía wp_add_inline_script() antes de este
- * archivo: { ajaxUrl, action, postId, nonce }.
+ * archivo: { ajaxUrl, action, resourceType, resourceId, nonce, searchTerm?,
+ * requestedUrl? } — los 2 últimos solo presentes para resource_type
+ * 'search' / '404' respectivamente.
  *
  * @package WP_AffiliateManager
  * @since   1.2.0
+ * @since   1.8.0 Generalizado de postId a resourceType/resourceId + contexto
+ *               opcional de search/404.
  */
 
 ( function () {
@@ -24,11 +28,22 @@
 	}
 
 	var config = window.wpamViews;
-	var body   = new URLSearchParams( {
-		action:  config.action,
-		post_id: config.postId,
-		nonce:   config.nonce
-	} );
+	var params = {
+		action:        config.action,
+		resource_type: config.resourceType,
+		resource_id:   config.resourceId,
+		nonce:         config.nonce
+	};
+
+	if ( config.searchTerm ) {
+		params.search_term = config.searchTerm;
+	}
+
+	if ( config.requestedUrl ) {
+		params.requested_url = config.requestedUrl;
+	}
+
+	var body = new URLSearchParams( params );
 
 	fetch( config.ajaxUrl, {
 		method: 'POST',

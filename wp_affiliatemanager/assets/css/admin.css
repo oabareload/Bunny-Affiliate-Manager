@@ -1426,3 +1426,24 @@ body.wpam-modal-open {
 	.wpam-tabs { overflow-x: auto; }
 	.wpam-tab-item { padding: 10px 12px 12px; font-size: 12px; white-space: nowrap; }
 }
+
+/* ==========================================================================
+   Analytics — Views resource_type filter (v1.8.0)
+   ========================================================================== */
+
+.wpam-analytics-views-filter {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 16px;
+}
+
+.wpam-analytics-views-filter label {
+	font-weight: 600;
+	color: var(--wpam-gray-700);
+}
+
+.wpam-analytics-views-filter select {
+	border-radius: var(--wpam-radius-sm);
+	border: 1px solid var(--bunny-border-strong);
+}

@@ -67,7 +67,10 @@ require_once WPAM_PLUGIN_PATH . 'includes/frontend/class-widget-top-posts.php';
 require_once WPAM_PLUGIN_PATH . 'includes/api/class-wpam-api.php';
 
 // --- v1.2.0: Views system (Fase 1 — infraestructura) ---
+// v1.8.0: Resource_Resolver debe cargar ANTES que Views (Views::is_eligible()
+// lo referencia).
 require_once WPAM_PLUGIN_PATH . 'includes/views/class-views-table.php';
+require_once WPAM_PLUGIN_PATH . 'includes/views/class-resource-resolver.php';
 require_once WPAM_PLUGIN_PATH . 'includes/views/class-view-tracker.php';
 require_once WPAM_PLUGIN_PATH . 'includes/views/class-views.php';
 require_once WPAM_PLUGIN_PATH . 'includes/views/class-views-query.php';
@@ -245,6 +248,13 @@ final class Plugin {
 		// reprograma solo, sin depender de desactivar/reactivar el plugin.
 		$this->loader->add_action( 'admin_init', $this, 'maybe_reschedule_bunny_score_cron' );
 
+		// v1.8.0: upgrade de esquema de Views (resource_type + tablas auxiliares
+		// de search/404). Chequeo igual de barísimo que el de arriba (un solo
+		// get_option()) — dbDelta() solo se ejecuta realmente cuando la versión
+		// guardada en DB no coincide con WPAM_VERSION, es decir, una vez por
+		// actualización del plugin, no en cada carga de admin.
+		$this->loader->add_action( 'admin_init', $this, 'maybe_upgrade_views_schema' );
+
 		// FASE 2 — Affiliates screen.
 		$affiliates_screen = new Admin\Affiliates_Screen();
 		$this->loader->add_action( 'admin_init', $affiliates_screen, 'handle_actions' );
@@ -338,6 +348,32 @@ final class Plugin {
 		if ( ! wp_next_scheduled( 'wpam_bunny_score_stats_weekly' ) ) {
 			wp_schedule_event( time(), 'wpam_weekly', 'wpam_bunny_score_stats_weekly' );
 		}
+	}
+
+	/**
+	 * Migración de esquema de Views a v1.8.0 (resource_type + tablas
+	 * auxiliares de search/404) para sitios que actualizan desde una versión
+	 * anterior sin pasar por Activator::activate() (que solo corre al
+	 * activar/reactivar el plugin, no en un simple reemplazo de archivos).
+	 *
+	 * Migración de una sola vez, deliberadamente simple: compara la versión
+	 * guardada en DB contra WPAM_VERSION y, si difieren, vuelve a llamar a
+	 * Views_Table::create_table() (dbDelta() es idempotente y no destructivo—
+	 * ver la documentación de esa clase) y actualiza la versión guardada. No
+	 * es un sistema de migraciones genérico ni versionado por pasos: es un
+	 * chequeo puntual para esta evolución concreta del esquema.
+	 *
+	 * @since 1.8.0
+	 * @return void
+	 */
+	public function maybe_upgrade_views_schema(): void {
+		if ( get_option( 'wpam_version' ) === WPAM_VERSION ) {
+			return;
+		}
+
+		Views\Views_Table::create_table();
+
+		update_option( 'wpam_version', WPAM_VERSION );
 	}
 
 	public function __clone()   {}

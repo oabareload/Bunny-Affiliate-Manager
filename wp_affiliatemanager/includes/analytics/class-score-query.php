@@ -72,13 +72,17 @@ class Score_Query {
 
 		$sql_limit = ! empty( $filters ) ? min( 500, $limit * 10 ) : max( 1, min( 100, $limit ) );
 
-		$views_where  = '';
+		// resource_type = 'post' hardcoded (no parametrizado): Bunny Score y
+		// Analytics→Score deben consumir EXCLUSIVAMENTE Views de Posts (v1.8.0).
+		// Pages/Home/Search/404/Categories/Tags nunca deben poder afectar este
+		// cálculo, ahora que wpam_views también almacena esos otros tipos.
+		$views_where  = " WHERE resource_type = 'post'";
 		$clicks_where = '';
 
 		if ( 'total' !== $range ) {
 			$since_datetime = Top_Posts_Query::range_to_since( $range );
 			$since_period   = gmdate( 'Ymd', strtotime( $since_datetime ) );
-			$views_where    = $wpdb->prepare( ' WHERE period >= %s', $since_period );
+			$views_where   .= $wpdb->prepare( ' AND period >= %s', $since_period );
 			$clicks_where   = $wpdb->prepare( ' WHERE ts >= %s', $since_datetime );
 		}
 
@@ -190,22 +194,21 @@ class Score_Query {
 
 		$placeholders = implode( ',', array_fill( 0, count( $post_ids ), '%d' ) );
 
-		$views_where  = '';
+		// resource_type = 'post' hardcoded — ver nota en get(). Los scores por
+		// post_id individual (usado por Bunny Score) también deben ignorar
+		// cualquier vista que no sea de un Post.
+		$views_where  = " WHERE resource_type = 'post'";
 		$clicks_where = '';
 
 		if ( 'total' !== $range ) {
 			$since_datetime = Top_Posts_Query::range_to_since( $range );
 			$since_period   = gmdate( 'Ymd', strtotime( $since_datetime ) );
-			$views_where    = $wpdb->prepare( ' WHERE period >= %s', $since_period );
+			$views_where   .= $wpdb->prepare( ' AND period >= %s', $since_period );
 			$clicks_where   = $wpdb->prepare( ' WHERE ts >= %s', $since_datetime );
 		}
 
 		// Añadir la restricción por post_id al WHERE correspondiente.
-		if ( '' === $views_where ) {
-			$views_where_post = ' WHERE post_id IN (' . $placeholders . ')';
-		} else {
-			$views_where_post = $views_where . ' AND post_id IN (' . $placeholders . ')';
-		}
+		$views_where_post = $views_where . ' AND post_id IN (' . $placeholders . ')';
 
 		if ( '' === $clicks_where ) {
 			$clicks_where_post = ' WHERE post_id IN (' . $placeholders . ')';
@@ -320,13 +323,14 @@ class Score_Query {
 		$views_table  = Views_Table::table_name();
 		$clicks_table = Clicks_Table::table_name();
 
-		$views_where  = '';
+		// resource_type = 'post' hardcoded — ver nota en get().
+		$views_where  = " WHERE resource_type = 'post'";
 		$clicks_where = '';
 
 		if ( 'total' !== $range ) {
 			$since_datetime = Top_Posts_Query::range_to_since( $range );
 			$since_period   = gmdate( 'Ymd', strtotime( $since_datetime ) );
-			$views_where    = $wpdb->prepare( ' WHERE period >= %s', $since_period );
+			$views_where   .= $wpdb->prepare( ' AND period >= %s', $since_period );
 			$clicks_where   = $wpdb->prepare( ' WHERE ts >= %s', $since_datetime );
 		}
 
@@ -379,13 +383,14 @@ class Score_Query {
 		$views_table  = Views_Table::table_name();
 		$clicks_table = Clicks_Table::table_name();
 
-		$views_where  = '';
+		// resource_type = 'post' hardcoded — ver nota en get().
+		$views_where  = " WHERE resource_type = 'post'";
 		$clicks_where = '';
 
 		if ( 'total' !== $range ) {
 			$since_datetime = Top_Posts_Query::range_to_since( $range );
 			$since_period   = gmdate( 'Ymd', strtotime( $since_datetime ) );
-			$views_where    = $wpdb->prepare( ' WHERE period >= %s', $since_period );
+			$views_where   .= $wpdb->prepare( ' AND period >= %s', $since_period );
 			$clicks_where   = $wpdb->prepare( ' WHERE ts >= %s', $since_datetime );
 		}
 
@@ -420,13 +425,14 @@ class Score_Query {
 		$views_table  = Views_Table::table_name();
 		$clicks_table = Clicks_Table::table_name();
 
-		$views_where  = '';
+		// resource_type = 'post' hardcoded — ver nota en get().
+		$views_where  = " WHERE resource_type = 'post'";
 		$clicks_where = '';
 
 		if ( 'total' !== $range ) {
 			$since_datetime = Top_Posts_Query::range_to_since( $range );
 			$since_period   = gmdate( 'Ymd', strtotime( $since_datetime ) );
-			$views_where    = $wpdb->prepare( ' WHERE period >= %s', $since_period );
+			$views_where   .= $wpdb->prepare( ' AND period >= %s', $since_period );
 			$clicks_where   = $wpdb->prepare( ' WHERE ts >= %s', $since_datetime );
 		}
 

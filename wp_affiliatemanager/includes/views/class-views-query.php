@@ -15,6 +15,13 @@
  *
  * @package WP_AffiliateManager\Views
  * @since   1.2.0-alpha1
+ * @since   1.8.0 Añadido parámetro $resource_type (default 'post') a get(),
+ *               get_cached(), get_stats(), get_stats_cached() y get_recent().
+ *               El default 'post' preserva exactamente el comportamiento
+ *               previo — WPAM_API::get_top_viewed_posts() y todos los demás
+ *               consumidores existentes siguen funcionando sin cambios.
+ *               Añadidos get_search_terms() / get_404_urls() para las 2
+ *               tablas auxiliares de contexto agregado.
  */
 
 namespace WP_AffiliateManager\Views;
@@ -37,32 +44,34 @@ class Views_Query {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Retorna los posts con más vistas para el rango solicitado,
+	 * Retorna los recursos con más vistas para el rango solicitado,
 	 * opcionalmente filtrados por taxonomías, autores y post_type.
 	 *
-	 * Estructuralmente idéntico a Top_Posts_Query::get(): mismos parámetros,
-	 * mismo filtrado vía apply_filters_to_ids(), mismo formato de retorno
-	 * (view_count en vez de click_count).
+	 * Los filtros de taxonomía/autor/post_type (apply_filters_to_ids) solo
+	 * tienen sentido para resource_type='post' — para el resto de tipos se
+	 * ignoran automáticamente porque get_posts() con esos IDs simplemente
+	 * no devolvería resultados fuera de ese contexto; en la práctica
+	 * Analytics solo los pasa para 'post'.
 	 *
 	 * @since  1.2.0-alpha1
+	 * @since  1.8.0 Añadido $resource_type (default 'post').
 	 *
-	 * @param  string $range   today|week|month|total
-	 * @param  int    $limit   Número máximo de resultados. Default 10.
-	 * @param  array  $filters {
-	 *     Filtros opcionales. Ver Top_Posts_Query::get() para la estructura completa.
-	 * }
+	 * @param  string $range         today|week|month|total
+	 * @param  int    $limit         Número máximo de resultados. Default 10.
+	 * @param  array  $filters       Ver Top_Posts_Query::get() para la estructura completa.
+	 * @param  string $resource_type Uno de Resource_Resolver::TYPES. Default 'post'.
 	 * @return array[] Cada elemento: [ id, title, view_count, permalink ]
 	 */
-	public static function get( string $range = 'total', int $limit = 10, array $filters = array() ): array {
+	public static function get( string $range = 'total', int $limit = 10, array $filters = array(), string $resource_type = 'post' ): array {
 		global $wpdb;
 
 		$table     = Views_Table::table_name();
 		$sql_limit = ! empty( $filters ) ? min( 500, $limit * 10 ) : max( 1, min( 100, $limit ) );
 
-		$where = '';
+		$where = $wpdb->prepare( ' WHERE resource_type = %s', $resource_type );
 		if ( 'total' !== $range ) {
-			$since = self::range_to_period_since( $range );
-			$where = $wpdb->prepare( ' WHERE period >= %s', $since );
+			$since  = self::range_to_period_since( $range );
+			$where .= $wpdb->prepare( ' AND period >= %s', $since );
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
@@ -79,70 +88,117 @@ class Views_Query {
 			return array();
 		}
 
-		// Mapa post_id => view_count para no perder el conteo al filtrar.
+		// Mapa resource_id => view_count para no perder el conteo al filtrar.
 		$view_map = array();
 		foreach ( $rows as $row ) {
 			$view_map[ (int) $row['post_id'] ] = (int) $row['view_count'];
 		}
 
-		$post_ids = array_keys( $view_map );
+		$resource_ids = array_keys( $view_map );
 
-		if ( empty( $post_ids ) ) {
+		if ( empty( $resource_ids ) ) {
 			return array();
 		}
 
-		$post_ids = self::apply_filters_to_ids( $post_ids, $filters );
+		if ( 'post' === $resource_type ) {
+			$resource_ids = self::apply_filters_to_ids( $resource_ids, $filters );
+		}
 
-		if ( empty( $post_ids ) ) {
+		if ( empty( $resource_ids ) ) {
 			return array();
 		}
 
-		$post_ids = array_slice( $post_ids, 0, $limit );
+		$resource_ids = array_slice( $resource_ids, 0, $limit );
 
 		$result = array();
-		foreach ( $post_ids as $post_id ) {
-			$post = get_post( $post_id );
-			if ( ! $post instanceof \WP_Post ) {
+		foreach ( $resource_ids as $resource_id ) {
+			$item = self::resolve_display_item( $resource_type, $resource_id );
+
+			if ( null === $item ) {
 				continue;
 			}
 
-			$result[] = array(
-				'id'         => $post_id,
-				'title'      => $post->post_title ?: __( '(no title)', 'wp-affiliatemanager' ),
-				'view_count' => $view_map[ $post_id ],
-				'permalink'  => (string) get_permalink( $post_id ),
-			);
+			$item['view_count'] = $view_map[ $resource_id ];
+			$result[]            = $item;
 		}
 
 		return $result;
 	}
 
 	/**
-	 * Retorna los posts con más vistas, con caché de objeto.
+	 * Retorna los recursos con más vistas, con caché de objeto.
 	 *
 	 * Mismo TTL (300s) y mismo grupo de caché ('wpam') que
-	 * Top_Posts_Query::get_cached(), para que ambos módulos compartan
-	 * exactamente la misma filosofía de invalidación.
+	 * Top_Posts_Query::get_cached().
 	 *
 	 * @since  1.2.0-alpha1
+	 * @since  1.8.0 Añadido $resource_type (default 'post').
 	 *
 	 * @param  string $range
 	 * @param  int    $limit
 	 * @param  array  $filters
+	 * @param  string $resource_type
 	 * @return array[]
 	 */
-	public static function get_cached( string $range = 'total', int $limit = 10, array $filters = array() ): array {
-		$cache_key = self::build_cache_key( $range, $limit, $filters );
+	public static function get_cached( string $range = 'total', int $limit = 10, array $filters = array(), string $resource_type = 'post' ): array {
+		$cache_key = self::build_cache_key( $range, $limit, $filters, $resource_type );
 		$cached    = wp_cache_get( $cache_key, 'wpam' );
 
 		if ( false !== $cached ) {
 			return $cached;
 		}
 
-		$posts = self::get( $range, $limit, $filters );
+		$posts = self::get( $range, $limit, $filters, $resource_type );
 		wp_cache_set( $cache_key, $posts, 'wpam', 300 );
 
 		return $posts;
+	}
+
+	/**
+	 * Resuelve un [id, title, permalink] genérico según el resource_type,
+	 * sin SQL adicional — solo funciones nativas de WordPress.
+	 *
+	 * post/page: get_post(). category/tag: get_term(). home/search/404: no
+	 * tienen identidad individual, así que get()/get_cached() para esos 3
+	 * tipos no produce una lista "top" útil (siempre hay como mucho 1 fila,
+	 * resource_id=0) — Analytics los muestra solo vía get_stats(), no vía
+	 * esta lista.
+	 *
+	 * @since  1.8.0
+	 * @param  string $resource_type
+	 * @param  int    $resource_id
+	 * @return array{id:int,title:string,permalink:string}|null
+	 */
+	private static function resolve_display_item( string $resource_type, int $resource_id ): ?array {
+		switch ( $resource_type ) {
+			case 'post':
+			case 'page':
+				$post = get_post( $resource_id );
+				if ( ! $post instanceof \WP_Post ) {
+					return null;
+				}
+				return array(
+					'id'        => $resource_id,
+					'title'     => $post->post_title ?: __( '(no title)', 'wp-affiliatemanager' ),
+					'permalink' => (string) get_permalink( $resource_id ),
+				);
+
+			case 'category':
+			case 'tag':
+				$taxonomy = 'category' === $resource_type ? 'category' : 'post_tag';
+				$term     = get_term( $resource_id, $taxonomy );
+				if ( ! $term instanceof \WP_Term ) {
+					return null;
+				}
+				return array(
+					'id'        => $resource_id,
+					'title'     => $term->name,
+					'permalink' => (string) get_term_link( $term ),
+				);
+
+			default:
+				return null;
+		}
 	}
 
 	// -------------------------------------------------------------------------
@@ -151,19 +207,220 @@ class Views_Query {
 
 	/**
 	 * Retorna contadores de vistas agrupados por rango de tiempo, para las
-	 * tarjetas del Dashboard.
-	 *
-	 * Sin equivalente directo en Top_Posts_Query (Admin_Menu::get_click_stats()
-	 * vive fuera de esa clase, inline). Aquí sí se centraliza en la clase
-	 * porque necesita comparar directamente contra `period`, el mismo campo
-	 * que usa get().
+	 * tarjetas del Dashboard/Analytics.
 	 *
 	 * @since  1.2.0-alpha1
+	 * @since  1.8.0 Añadido $resource_type (default 'post').
+	 * @param  string $resource_type
 	 * @return array{ today: int, week: int, month: int, total: int }
 	 */
-	public static function get_stats(): array {
+	public static function get_stats( string $resource_type = 'post' ): array {
 		global $wpdb;
 		$table = Views_Table::table_name();
+
+		$today = self::range_to_period_since( 'today' );
+		$week  = self::range_to_period_since( 'week' );
+		$month = self::range_to_period_since( 'month' );
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$today_count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT SUM(count) FROM %i WHERE resource_type = %s AND period >= %s', $table, $resource_type, $today ) );
+		$week_count  = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT SUM(count) FROM %i WHERE resource_type = %s AND period >= %s', $table, $resource_type, $week ) );
+		$month_count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT SUM(count) FROM %i WHERE resource_type = %s AND period >= %s', $table, $resource_type, $month ) );
+		$total_count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT SUM(count) FROM %i WHERE resource_type = %s', $table, $resource_type ) );
+		// phpcs:enable
+
+		return array(
+			'today' => $today_count,
+			'week'  => $week_count,
+			'month' => $month_count,
+			'total' => $total_count,
+		);
+	}
+
+	/**
+	 * get_stats() con caché de objeto. Mismo TTL/grupo que el resto de la clase.
+	 *
+	 * @since  1.2.0-alpha1
+	 * @since  1.8.0 Añadido $resource_type (default 'post').
+	 * @param  string $resource_type
+	 * @return array{ today: int, week: int, month: int, total: int }
+	 */
+	public static function get_stats_cached( string $resource_type = 'post' ): array {
+		$cache_key = 'wpam_views_stats_' . $resource_type;
+		$cached    = wp_cache_get( $cache_key, 'wpam' );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$stats = self::get_stats( $resource_type );
+		wp_cache_set( $cache_key, $stats, 'wpam', 300 );
+
+		return $stats;
+	}
+
+	// -------------------------------------------------------------------------
+	// Recent Views
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Retorna las filas más recientes de wpam_views para un resource_type
+	 * dado, sin caché (dato "vivo").
+	 *
+	 * wpam_views es un agregado diario, no un log de eventos: no existe una
+	 * columna de timestamp exacto. "Reciente" se ordena por `period` (día) y
+	 * `id` como desempate dentro del mismo día. Cada fila representa el
+	 * conteo de UN día para UN recurso, no un evento individual.
+	 *
+	 * @since 1.2.0
+	 * @since 1.8.0 Añadido $resource_type (default 'post').
+	 * @param  int    $limit Número máximo de filas. Default 20.
+	 * @param  string $resource_type
+	 * @return array[] Cada elemento: [ post_id, period, count ] (crudo, sin enriquecer).
+	 */
+	public static function get_recent( int $limit = 20, string $resource_type = 'post' ): array {
+		global $wpdb;
+		$table = Views_Table::table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT post_id, period, count FROM %i WHERE resource_type = %s ORDER BY period DESC, id DESC LIMIT %d',
+				$table,
+				$resource_type,
+				$limit
+			),
+			ARRAY_A
+		);
+
+		return is_array( $rows ) ? $rows : array();
+	}
+
+	// -------------------------------------------------------------------------
+	// Search terms / 404 URLs — tablas auxiliares (v1.8.0)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Retorna los términos de búsqueda más frecuentes para el rango dado.
+	 *
+	 * Sin filtros de taxonomía/autor (no aplican: un término de búsqueda no
+	 * pertenece a ningún post). Listado simple, sin caché — volumen de datos
+	 * pequeño por diseño (agregado diario, términos normalizados).
+	 *
+	 * @since  1.8.0
+	 * @param  string $range today|week|month|total
+	 * @param  int    $limit
+	 * @return array[] Cada elemento: [ term, count ]
+	 */
+	public static function get_search_terms( string $range = 'total', int $limit = 10 ): array {
+		global $wpdb;
+		$table = Views_Table::search_terms_table_name();
+
+		$where = '';
+		if ( 'total' !== $range ) {
+			$since = self::range_to_period_since( $range );
+			$where = $wpdb->prepare( ' WHERE period >= %s', $since );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT term_normalized, SUM(count) AS total_count FROM %i{$where} GROUP BY term_normalized ORDER BY total_count DESC LIMIT %d",
+				$table,
+				max( 1, min( 100, $limit ) )
+			),
+			ARRAY_A
+		);
+
+		if ( ! is_array( $rows ) ) {
+			return array();
+		}
+
+		return array_map(
+			static function ( array $row ): array {
+				return array(
+					'term'  => $row['term_normalized'],
+					'count' => (int) $row['total_count'],
+				);
+			},
+			$rows
+		);
+	}
+
+	/**
+	 * Retorna las URLs 404 más frecuentes para el rango dado.
+	 *
+	 * @since  1.8.0
+	 * @param  string $range today|week|month|total
+	 * @param  int    $limit
+	 * @return array[] Cada elemento: [ url, count ]
+	 */
+	public static function get_404_urls( string $range = 'total', int $limit = 10 ): array {
+		global $wpdb;
+		$table = Views_Table::table_404_name();
+
+		$where = '';
+		if ( 'total' !== $range ) {
+			$since = self::range_to_period_since( $range );
+			$where = $wpdb->prepare( ' WHERE period >= %s', $since );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT url_normalized, SUM(count) AS total_count FROM %i{$where} GROUP BY url_normalized ORDER BY total_count DESC LIMIT %d",
+				$table,
+				max( 1, min( 100, $limit ) )
+			),
+			ARRAY_A
+		);
+
+		if ( ! is_array( $rows ) ) {
+			return array();
+		}
+
+		return array_map(
+			static function ( array $row ): array {
+				return array(
+					'url'   => $row['url_normalized'],
+					'count' => (int) $row['total_count'],
+				);
+			},
+			$rows
+		);
+	}
+
+	/**
+	 * Stats agregados (today/week/month/total) para términos de búsqueda.
+	 *
+	 * @since  1.8.0
+	 * @return array{ today: int, week: int, month: int, total: int }
+	 */
+	public static function get_search_terms_stats(): array {
+		return self::get_aux_table_stats( Views_Table::search_terms_table_name() );
+	}
+
+	/**
+	 * Stats agregados (today/week/month/total) para URLs 404.
+	 *
+	 * @since  1.8.0
+	 * @return array{ today: int, week: int, month: int, total: int }
+	 */
+	public static function get_404_stats(): array {
+		return self::get_aux_table_stats( Views_Table::table_404_name() );
+	}
+
+	/**
+	 * Lógica compartida de get_search_terms_stats() / get_404_stats(): ambas
+	 * tablas auxiliares tienen exactamente la misma forma (period, count),
+	 * solo cambia el nombre de tabla.
+	 *
+	 * @since  1.8.0
+	 * @param  string $table Nombre completo de tabla (con prefijo).
+	 * @return array{ today: int, week: int, month: int, total: int }
+	 */
+	private static function get_aux_table_stats( string $table ): array {
+		global $wpdb;
 
 		$today = self::range_to_period_since( 'today' );
 		$week  = self::range_to_period_since( 'week' );
@@ -182,58 +439,6 @@ class Views_Query {
 			'month' => $month_count,
 			'total' => $total_count,
 		);
-	}
-
-	/**
-	 * get_stats() con caché de objeto. Mismo TTL/grupo que el resto de la clase.
-	 *
-	 * @since  1.2.0-alpha1
-	 * @return array{ today: int, week: int, month: int, total: int }
-	 */
-	public static function get_stats_cached(): array {
-		$cached = wp_cache_get( 'wpam_views_stats', 'wpam' );
-
-		if ( false !== $cached ) {
-			return $cached;
-		}
-
-		$stats = self::get_stats();
-		wp_cache_set( 'wpam_views_stats', $stats, 'wpam', 300 );
-
-		return $stats;
-	}
-
-	// -------------------------------------------------------------------------
-	// Recent Views
-	// -------------------------------------------------------------------------
-
-	/**
-	 * Retorna las filas más recientes de wpam_views, sin caché (dato "vivo").
-	 *
-	 * wpam_views es un agregado diario, no un log de eventos: no existe una
-	 * columna de timestamp exacto. "Reciente" se ordena por `period` (día) y
-	 * `id` como desempate dentro del mismo día. Cada fila representa el
-	 * conteo de UN día para UN post, no un evento individual.
-	 *
-	 * @since 1.2.0
-	 * @param  int $limit Número máximo de filas. Default 20.
-	 * @return array[] Cada elemento: [ post_id, period, count ] (crudo, sin enriquecer).
-	 */
-	public static function get_recent( int $limit = 20 ): array {
-		global $wpdb;
-		$table = Views_Table::table_name();
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				'SELECT post_id, period, count FROM %i ORDER BY period DESC, id DESC LIMIT %d',
-				$table,
-				$limit
-			),
-			ARRAY_A
-		);
-
-		return is_array( $rows ) ? $rows : array();
 	}
 
 	// -------------------------------------------------------------------------
@@ -362,13 +567,16 @@ class Views_Query {
 	 * Top_Posts_Query ('wpam_top_posts_') dentro del mismo grupo 'wpam'.
 	 *
 	 * @since  1.2.0-alpha1
+	 * @since  1.8.0 Añadido $resource_type a la clave (evita colisión entre
+	 *               tipos, ej. 'post' vs 'category' con el mismo range/limit).
 	 * @param  string $range
 	 * @param  int    $limit
 	 * @param  array  $filters
+	 * @param  string $resource_type
 	 * @return string
 	 */
-	private static function build_cache_key( string $range, int $limit, array $filters ): string {
-		$base = 'wpam_top_viewed_posts_' . $range . '_' . $limit;
+	private static function build_cache_key( string $range, int $limit, array $filters, string $resource_type = 'post' ): string {
+		$base = 'wpam_top_viewed_posts_' . $resource_type . '_' . $range . '_' . $limit;
 
 		if ( empty( $filters ) ) {
 			return $base;

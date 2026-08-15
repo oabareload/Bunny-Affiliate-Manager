@@ -41,9 +41,28 @@
 			return; // Grupo no presente en esta pantalla.
 		}
 
+		// v1.8.0: selector opcional adicional (usado por Views para
+		// resource_type). Cuando cambia, se re-aplica el filtro con el mismo
+		// range activo pero extraData actualizado, y además refresca los 4
+		// números de las stat cards (antes de v1.8.0 esos números eran fijos
+		// para toda la vida del tab — con resource_type variable, cada tipo
+		// tiene sus propios totales).
+		var $extraSelect = config.extraSelector ? $( config.extraSelector ) : $();
+
 		$cards.each( function ( i ) {
 			$( this ).data( 'range', RANGES[ i ] ).css( 'cursor', 'pointer' );
 		} );
+
+		function updateStatCards( stats ) {
+			if ( ! stats ) { return; }
+			$cards.each( function () {
+				var $c     = $( this );
+				var range  = $c.data( 'range' );
+				if ( Object.prototype.hasOwnProperty.call( stats, range ) ) {
+					$c.find( '.wpam-stat-value' ).text( stats[ range ] );
+				}
+			} );
+		}
 
 		function applyFilter( range, save ) {
 			$cards.each( function () {
@@ -63,18 +82,24 @@
 				$cols[ col.dataKey ].html( '<p class="wpam-analytics-empty wpam-loading">' + wpamAnalytics.i18n.loading + '</p>' );
 			} );
 
+			var extraData = $.extend( {}, config.extraData || {} );
+			if ( $extraSelect.length ) {
+				extraData.resource_type = $extraSelect.val();
+			}
+
 			$.ajax( {
 				url:  wpamAnalytics.ajaxUrl,
 				type: 'POST',
 				data: $.extend(
 					{ action: config.ajaxAction, nonce: wpamAnalytics.nonce, range: range },
-					config.extraData || {}
+					extraData
 				),
 				success: function ( response ) {
 					if ( response.success ) {
 						config.columns.forEach( function ( col ) {
 							$cols[ col.dataKey ].html( response.data[ col.dataKey ] || '' );
 						} );
+						updateStatCards( response.data.stats );
 					} else {
 						config.columns.forEach( function ( col ) {
 							$cols[ col.dataKey ].html( '<p class="wpam-analytics-empty">' + wpamAnalytics.i18n.error + '</p>' );
@@ -92,6 +117,13 @@
 		$cards.on( 'click', function () {
 			applyFilter( $( this ).data( 'range' ), true );
 		} );
+
+		if ( $extraSelect.length ) {
+			$extraSelect.on( 'change', function () {
+				var current = $cards.filter( '.wpam-stat-card--active' ).data( 'range' ) || 'total';
+				applyFilter( current, false );
+			} );
+		}
 
 		var saved = 'total';
 		try { saved = localStorage.getItem( config.storageKey ) || 'total'; } catch ( e ) {}
@@ -180,6 +212,7 @@
 			ajaxAction: 'wpam_analytics_filter',
 			storageKey: 'wpam_analytics_filter_views',
 			extraData: { source: 'views' },
+			extraSelector: '#wpam-views-resource-type',
 		} );
 	} );
 

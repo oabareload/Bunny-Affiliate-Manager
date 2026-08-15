@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8.0] — Views generalizado a 7 tipos de recurso (Posts, Pages, Home, Search, 404, Categories, Tags)
+
+### Added
+
+- **Sistema de Views generalizado de `post_id` a `resource_type` + `resource_id`.** Nueva clase `Views\Resource_Resolver` (con prioridad de resolución 404 → Search → Home/Front Page → Post → Page → Category → Tag — una Page usada como portada resuelve como `home`, nunca como `page`). El pipeline existente (beacon JS, endpoint AJAX, `View_Tracker`, cookie de dedup) se reutiliza íntegramente para los 7 tipos; no existe un segundo sistema de tracking.
+- **Tabla `wpam_views` extendida** con columna `resource_type VARCHAR(20) NOT NULL DEFAULT 'post'` y `UNIQUE KEY (resource_type, post_id, period)` (la columna `post_id` se conserva sin renombrar — conceptualmente es `resource_id`). Migración no destructiva vía `dbDelta()`: las filas existentes quedan reclasificadas como `resource_type='post'` automáticamente por el `DEFAULT` de columna, sin ningún `UPDATE` manual. Gatillada una sola vez por actualización del plugin desde un chequeo de versión en `admin_init` (`Plugin::maybe_upgrade_views_schema()`).
+- **2 tablas auxiliares nuevas** para contexto agregado de Search/404: `wpam_views_search_terms` (término normalizado + día + contador) y `wpam_views_404` (path normalizado, sin dominio ni query string, + día + contador). Mismo modelo agregado que `wpam_views` — una fila por término/URL únicos por día, nunca una fila por visita. Normalización estricta (sin HTML, longitud acotada a 100/255 caracteres) antes de escribir.
+- **Settings → Views Tracking: activación individual por tipo de recurso** (`views.resource_types.{post|page|home|search|404|category|tag}`). Posts activado por defecto (preserva el comportamiento previo); el resto arranca desactivado. El chequeo de tipo habilitado es el primer paso dentro de `Views::is_eligible()`, antes de cualquier validación de contenido o regla de admin/logged-in/bot.
+- **Analytics → tab Views: selector de resource_type** (Posts/Pages/Categories/Tags/Home/Search/404, Posts por defecto). Reutiliza el mismo mecanismo de filtro AJAX existente (`wpam_analytics_filter`), ahora también actualizando los 4 números de las stat cards al cambiar de tipo. Search/404 muestran una lista simple de términos/URLs más frecuentes en vez del listado de posts.
+
+### Changed
+
+- **`Score_Query` fuerza `resource_type = 'post'` en las 5 queries que consumen `wpam_views`** (hardcoded, no parametrizado). Bunny Score y Analytics → Score quedan estrictamente limitados a Posts, sin excepción — ninguna regla de cálculo del Score cambió.
+- **`Views_Query`: todos los métodos públicos aceptan un `$resource_type` opcional (default `'post'`)**, preservando exactamente el comportamiento previo para todo consumidor existente (`WPAM_API::get_top_viewed_posts()`, Dashboard, shortcode `[wpam_top_posts]`). Añadidos `get_search_terms()`, `get_404_urls()`, `get_search_terms_stats()`, `get_404_stats()`.
+- **`View_Tracker::record()` generalizado** de `record(int $post_id)` a `record(string $resource_type, int $resource_id)`. Añadidos `record_search_term()` / `record_404_url()` (con normalización propia).
+- **Cookie de dedup (`wpam_v`)**: las claves pasan de `post_id` numérico a `"{resource_type}:{resource_id}"`, evitando colisiones entre un `post_id` y un `term_id` numéricamente iguales.
+
+### Notes
+
+- Sin cambios en las 5 reglas del algoritmo de Bunny Score ni en los contratos públicos de `WPAM_API` / `Top_Posts_Query` / shortcode `[wpam_top_posts]` / `Widget_Top_Posts`.
+- "Recent Views" en Analytics permanece exclusivamente Posts — fuera de alcance generalizarlo en esta versión.
+
+---
+
 ## [1.7.7] — TAG asociado vía autocomplete nativo (no texto libre) + preview en vivo + fixes críticos del algoritmo v2
 
 ### Changed

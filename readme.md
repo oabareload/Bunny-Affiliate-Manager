@@ -12,14 +12,14 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Domain Path: /languages
 - License: GPLv2 or later
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **1.7.2**
+- Current version: **1.8.0**
 
 ## Requirements
 
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v1.7.2)
+## Current scope (v1.8.0)
 
 ### Affiliates
 
@@ -58,10 +58,14 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 
 ### Views Tracking
 
-- Native page-view counter, independent of any third-party plugin: one row per `post_id + day`, incremented via an atomic upsert.
+- Native page-view counter, independent of any third-party plugin: one row per `resource_type + resource_id + day`, incremented via an atomic upsert (physical column is still named `post_id`, kept for backward compatibility — conceptually it's a generic `resource_id`).
+- **Generalized (v1.8.0) beyond Posts to 7 resource types**: Posts, Pages, Home/Front Page, Search, 404, Categories, Tags. A dedicated `Resource_Resolver` determines which type the current request corresponds to (with 404/Search taking priority over Home, and Home taking priority over a Page used as the static front page). The same tracking pipeline (beacon, AJAX endpoint, upsert, dedup cookie) is reused for all 7 types — there's no separate tracking system per type.
+- Search and 404 additionally keep a small aggregated context table each (`wpam_views_search_terms`, `wpam_views_404`) — normalized, HTML-stripped, length-capped, one row per unique term/path per day, never per visit.
+- **Enabled per resource type in Settings → Views Tracking → Track Views For.** Posts is on by default (preserves pre-1.8.0 behavior); the other 6 types are off until explicitly enabled.
 - Tracked via a lightweight AJAX beacon (native `Fetch` API, config injected with `wp_add_inline_script()`, never `wp_localize_script()`) — fully compatible with full-page caching, since the count happens after the cached HTML is served.
-- Deduplicated per visitor per day via an HttpOnly cookie (`wpam_v`) — the server, never the client, decides whether a view already counted.
-- Eligibility rules (bot filtering, whether to count admins, whether to count logged-in users) are governed by **Settings → Views** and evaluated through a single source of truth (`Views::is_eligible()`), used both when deciding whether to enqueue the beacon and when validating the AJAX request server-side.
+- Deduplicated per visitor per day via an HttpOnly cookie (`wpam_v`, keyed `"{resource_type}:{resource_id}"`) — the server, never the client, decides whether a view already counted.
+- Eligibility rules (which resource types are tracked, bot filtering, whether to count admins, whether to count logged-in users) are governed by **Settings → Views** and evaluated through a single source of truth (`Views::is_eligible()`), used both when deciding whether to enqueue the beacon and when validating the AJAX request server-side.
+- **Bunny Score and its Analytics tab remain strictly Posts-only** — `Score_Query` hardcodes `resource_type = 'post'` in every query, unaffected by the other 6 types being tracked.
 - **One-time importer** from the *Post Views Counter* plugin (**Settings → Maintenance → Import Views**): additive upsert (adds to existing counts, never overwrites), never modifies the source table, and can only run once per site.
 
 ### Recently Viewed Posts
@@ -88,7 +92,7 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 ### Analytics & Dashboard (admin)
 
 - **Dashboard** — executive summary: total/active affiliate counts, posts-with-affiliates count, an overview row (Total Score / Views / Clicks / Affiliates), recent activity (last 20 clicks, last 20 views), a Top 10 Overall list (by Score), and quick-access links to the other screens.
-- **Analytics** — dedicated screen with three horizontal tabs (**Score**, **Clicks**, **Views**), each with its own Today / Last 7 Days / Last 30 Days / All Time filter cards and ranking tables (Top Affiliates, Top Clicked Posts, Top Viewed Posts, Top Scored Posts, Recent Clicks, Recent Views). All three tabs share a single AJAX endpoint and a single client-side filter implementation.
+- **Analytics** — dedicated screen with three horizontal tabs (**Score**, **Clicks**, **Views**), each with its own Today / Last 7 Days / Last 30 Days / All Time filter cards and ranking tables (Top Affiliates, Top Clicked Posts, Top Viewed Posts, Top Scored Posts, Recent Clicks, Recent Views). All three tabs share a single AJAX endpoint and a single client-side filter implementation. The **Views** tab additionally has a resource-type selector (Posts/Pages/Categories/Tags/Home/Search/404, Posts by default) — Search and 404 show a simple most-frequent terms/URLs list instead of a post ranking.
 - **Settings** — plugin configuration (render mode, disclaimer, views, recently viewed, general options) plus **Maintenance** actions: rebuild the redirect token map, clear analytics, one-time Post Views Counter import.
 - **Broken Reports** — dedicated page listing every reported broken link, with per-report and clear-all actions.
 
@@ -213,9 +217,10 @@ Bunny-Affiliate-Manager/
 │   │   │       └── showcase-block.php        — Showcase Layout markup (v1.6.0)
 │   │   ├── views/
 │   │   │   ├── class-views.php               — eligibility + AJAX orchestration
-│   │   │   ├── class-view-tracker.php        — atomic upsert
-│   │   │   ├── class-views-table.php
-│   │   │   ├── class-views-query.php         — Top Viewed Posts data source
+│   │   │   ├── class-resource-resolver.php   — resource_type/resource_id resolution (v1.8.0)
+│   │   │   ├── class-view-tracker.php        — atomic upsert (+ search/404 aux tables)
+│   │   │   ├── class-views-table.php         — wpam_views + 2 aux tables (v1.8.0)
+│   │   │   ├── class-views-query.php         — Top Viewed data source, any resource_type
 │   │   │   ├── class-views-importer.php      — one-time Post Views Counter import
 │   │   │   └── class-recently-viewed.php
 │   │   ├── class-activator.php
