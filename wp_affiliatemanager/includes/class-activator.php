@@ -53,7 +53,18 @@ class Activator {
 		Redirect\Clicks_Table::create_table();
 
 		// v1.2.0: crear tabla SQL de vistas.
-		Views\Views_Table::create_table();
+		// v1.8.0: misma regla de seguridad que Plugin::maybe_upgrade_views_schema()
+		// — migrate_legacy_schema() elimina el índice legacy `post_period` (no-op
+		// en instalaciones nuevas, donde nunca existió), corre dbDelta() y verifica
+		// el resultado final con schema_is_correct() ANTES de devolver true/false.
+		// wpam_views_schema_version SOLO se escribe si esa verificación dio true;
+		// si algo falla, la opción queda sin escribir y la migración se reintenta
+		// sola en el primer 'admin_init' posterior (mismo mecanismo de reintento
+		// que cualquier sitio que actualiza sin pasar por activate()).
+		$views_schema_ok = Views\Views_Table::migrate_legacy_schema();
+		if ( $views_schema_ok ) {
+			update_option( Plugin::VIEWS_SCHEMA_VERSION_OPTION, Plugin::VIEWS_SCHEMA_TARGET_VERSION );
+		}
 
 		// v1.7.5: Bunny Score — programar la generación semanal de estadísticas
 		// históricas. IMPORTANTE: en la propia petición de activación, 'plugins_loaded'

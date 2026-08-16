@@ -351,29 +351,58 @@ final class Plugin {
 	}
 
 	/**
-	 * Migración de esquema de Views a v1.8.0 (resource_type + tablas
-	 * auxiliares de search/404) para sitios que actualizan desde una versión
-	 * anterior sin pasar por Activator::activate() (que solo corre al
-	 * activar/reactivar el plugin, no en un simple reemplazo de archivos).
+	 * Nombre de la opción que registra el estado de la migración de esquema
+	 * de Views a v1.8.0 (resource_type + índice resource_period + fix del
+	 * índice legacy post_period). Opción dedicada, separada de 'wpam_version'
+	 * a propósito: 'wpam_version' se actualiza en cada release del plugin,
+	 * cosa que dispararía este chequeo (y su DROP INDEX / dbDelta) en cada
+	 * actualización futura sin relación con este esquema. Esta opción solo se
+	 * escribe una vez, cuando la migración se completó y se verificó con éxito.
 	 *
-	 * Migración de una sola vez, deliberadamente simple: compara la versión
-	 * guardada en DB contra WPAM_VERSION y, si difieren, vuelve a llamar a
-	 * Views_Table::create_table() (dbDelta() es idempotente y no destructivo—
-	 * ver la documentación de esa clase) y actualiza la versión guardada. No
-	 * es un sistema de migraciones genérico ni versionado por pasos: es un
-	 * chequeo puntual para esta evolución concreta del esquema.
+	 * @since 1.8.0
+	 */
+	const VIEWS_SCHEMA_VERSION_OPTION = 'wpam_views_schema_version';
+
+	/**
+	 * Valor objetivo de VIEWS_SCHEMA_VERSION_OPTION una vez completada esta
+	 * migración concreta.
+	 *
+	 * @since 1.8.0
+	 */
+	const VIEWS_SCHEMA_TARGET_VERSION = '1.8.0';
+
+	/**
+	 * Migración de esquema de Views a v1.8.0 para sitios que actualizan desde
+	 * una versión anterior sin pasar por Activator::activate() (que solo corre
+	 * al activar/reactivar el plugin, no en un simple reemplazo de archivos).
+	 *
+	 * Gate por versión de esquema dedicada (no por WPAM_VERSION general — ver
+	 * VIEWS_SCHEMA_VERSION_OPTION): en ejecuciones posteriores, en cuanto la
+	 * opción ya vale VIEWS_SCHEMA_TARGET_VERSION, este método retorna de
+	 * inmediato sin volver a tocar el esquema. Si la migración falla (el
+	 * índice legacy no se pudo eliminar, o el esquema final no verifica), la
+	 * opción NO se escribe, así que se reintenta automáticamente en el
+	 * siguiente 'admin_init'.
+	 *
+	 * No es un framework de migraciones genérico ni versionado por pasos: es
+	 * un chequeo puntual y permanente para esta evolución concreta del
+	 * esquema (Views_Table::migrate_legacy_schema() concentra el trabajo real:
+	 * eliminar el índice legacy `post_period`, ejecutar dbDelta() y verificar
+	 * el resultado).
 	 *
 	 * @since 1.8.0
 	 * @return void
 	 */
 	public function maybe_upgrade_views_schema(): void {
-		if ( get_option( 'wpam_version' ) === WPAM_VERSION ) {
+		if ( get_option( self::VIEWS_SCHEMA_VERSION_OPTION ) === self::VIEWS_SCHEMA_TARGET_VERSION ) {
 			return;
 		}
 
-		Views\Views_Table::create_table();
+		$migrated = Views\Views_Table::migrate_legacy_schema();
 
-		update_option( 'wpam_version', WPAM_VERSION );
+		if ( $migrated ) {
+			update_option( self::VIEWS_SCHEMA_VERSION_OPTION, self::VIEWS_SCHEMA_TARGET_VERSION );
+		}
 	}
 
 	public function __clone()   {}
