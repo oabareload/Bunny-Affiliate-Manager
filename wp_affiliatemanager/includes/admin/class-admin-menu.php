@@ -289,9 +289,6 @@ class Admin_Menu {
 				submit_button( __( 'Save Settings', 'wp-affiliatemanager' ) );
 				?>
 			</form>
-
-			<?php // v1.4.0: Maintenance se mueve aquí desde el Dashboard — misma UI, mismos handlers. ?>
-			<?php $this->render_maintenance_card(); ?>
 		</div>
 		<?php
 		$this->render_admin_footer();
@@ -469,14 +466,42 @@ class Admin_Menu {
 
 			<div class="wpam-maintenance-row">
 				<div class="wpam-maintenance-info">
-					<strong><?php esc_html_e( 'Clear Analytics', 'wp-affiliatemanager' ); ?></strong>
-					<p class="description"><?php esc_html_e( 'Deletes all recorded click analytics. The clicks table remains intact and redirects continue working normally.', 'wp-affiliatemanager' ); ?></p>
+					<strong><?php esc_html_e( 'Clear All', 'wp-affiliatemanager' ); ?></strong>
+					<p class="description"><?php esc_html_e( 'Deletes Views and Clicks analytics.', 'wp-affiliatemanager' ); ?></p>
 				</div>
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return window.confirm('<?php echo esc_js( __( 'Delete all analytics records? This cannot be undone.', 'wp-affiliatemanager' ) ); ?>');">
-					<input type="hidden" name="action" value="wpam_clear_analytics" />
-					<?php wp_nonce_field( 'wpam_clear_analytics', 'wpam_nonce' ); ?>
+					<input type="hidden" name="action" value="wpam_clear_all" />
+					<?php wp_nonce_field( 'wpam_clear_all', 'wpam_nonce' ); ?>
 					<button type="submit" class="button button-secondary">
-						<?php esc_html_e( 'Clear Analytics', 'wp-affiliatemanager' ); ?>
+						<?php esc_html_e( 'Clear All', 'wp-affiliatemanager' ); ?>
+					</button>
+				</form>
+			</div>
+
+			<div class="wpam-maintenance-row">
+				<div class="wpam-maintenance-info">
+					<strong><?php esc_html_e( 'Clear Clicks', 'wp-affiliatemanager' ); ?></strong>
+					<p class="description"><?php esc_html_e( 'Deletes only click analytics; Views are preserved.', 'wp-affiliatemanager' ); ?></p>
+				</div>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return window.confirm('<?php echo esc_js( __( 'Delete click analytics only? This cannot be undone.', 'wp-affiliatemanager' ) ); ?>');">
+					<input type="hidden" name="action" value="wpam_clear_clicks" />
+					<?php wp_nonce_field( 'wpam_clear_clicks', 'wpam_nonce' ); ?>
+					<button type="submit" class="button button-secondary">
+						<?php esc_html_e( 'Clear Clicks', 'wp-affiliatemanager' ); ?>
+					</button>
+				</form>
+			</div>
+
+			<div class="wpam-maintenance-row">
+				<div class="wpam-maintenance-info">
+					<strong><?php esc_html_e( 'Clear Views', 'wp-affiliatemanager' ); ?></strong>
+					<p class="description"><?php esc_html_e( 'Deletes only view analytics; Clicks are preserved.', 'wp-affiliatemanager' ); ?></p>
+				</div>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return window.confirm('<?php echo esc_js( __( 'Delete view analytics only? This cannot be undone.', 'wp-affiliatemanager' ) ); ?>');">
+					<input type="hidden" name="action" value="wpam_clear_views" />
+					<?php wp_nonce_field( 'wpam_clear_views', 'wpam_nonce' ); ?>
+					<button type="submit" class="button button-secondary">
+						<?php esc_html_e( 'Clear Views', 'wp-affiliatemanager' ); ?>
 					</button>
 				</form>
 			</div>
@@ -560,9 +585,18 @@ class Admin_Menu {
 	 * @since 1.4.0 Redirige a wpam-settings en vez de wpam-dashboard.
 	 */
 	public function handle_clear_analytics(): void {
+		$this->handle_clear_all();
+	}
+
+	/**
+	 * Borra solo Clicks.
+	 *
+	 * @return void
+	 */
+	public function handle_clear_clicks(): void {
 		if (
 			! isset( $_POST['wpam_nonce'] ) ||
-			! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wpam_nonce'] ) ), 'wpam_clear_analytics' )
+			! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wpam_nonce'] ) ), 'wpam_clear_clicks' )
 		) {
 			wp_die( esc_html__( 'Security check failed.', 'wp-affiliatemanager' ) );
 		}
@@ -574,14 +608,103 @@ class Admin_Menu {
 		global $wpdb;
 		$table   = \WP_AffiliateManager\Redirect\Clicks_Table::table_name();
 		$deleted = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 
 		wp_safe_redirect( add_query_arg(
 			array(
-				'page'          => 'wpam-settings',
-				'wpam_cleared'  => '1',
-				'wpam_deleted'  => $deleted,
+				'page'             => 'wpam-settings',
+				'wpam_cleared'     => '1',
+				'wpam_cleared_clicks' => '1',
+				'wpam_deleted'     => $deleted,
+			),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	/**
+	 * Borra solo Views y tablas auxiliares asociadas.
+	 *
+	 * @return void
+	 */
+	public function handle_clear_views(): void {
+		if (
+			! isset( $_POST['wpam_nonce'] ) ||
+			! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wpam_nonce'] ) ), 'wpam_clear_views' )
+		) {
+			wp_die( esc_html__( 'Security check failed.', 'wp-affiliatemanager' ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'wp-affiliatemanager' ) );
+		}
+
+		global $wpdb;
+		$tables = array(
+			\WP_AffiliateManager\Views\Views_Table::table_name(),
+			\WP_AffiliateManager\Views\Views_Table::search_terms_table_name(),
+			\WP_AffiliateManager\Views\Views_Table::table_404_name(),
+		);
+
+		$deleted = 0;
+		foreach ( $tables as $table ) {
+			$deleted += (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		}
+
+		wp_safe_redirect( add_query_arg(
+			array(
+				'page'             => 'wpam-settings',
+				'wpam_cleared'     => '1',
+				'wpam_cleared_views' => '1',
+				'wpam_deleted'     => $deleted,
+			),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	/**
+	 * Borra tanto Views como Clicks.
+	 *
+	 * @return void
+	 */
+	public function handle_clear_all(): void {
+		if (
+			! isset( $_POST['wpam_nonce'] ) ||
+			! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wpam_nonce'] ) ), 'wpam_clear_all' )
+		) {
+			wp_die( esc_html__( 'Security check failed.', 'wp-affiliatemanager' ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'wp-affiliatemanager' ) );
+		}
+
+		global $wpdb;
+		$clicks_table = \WP_AffiliateManager\Redirect\Clicks_Table::table_name();
+		$clicks_rows = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $clicks_table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $clicks_table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
+		$view_tables = array(
+			\WP_AffiliateManager\Views\Views_Table::table_name(),
+			\WP_AffiliateManager\Views\Views_Table::search_terms_table_name(),
+			\WP_AffiliateManager\Views\Views_Table::table_404_name(),
+		);
+		$deleted_views = 0;
+		foreach ( $view_tables as $table ) {
+			$deleted_views += (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		}
+
+		wp_safe_redirect( add_query_arg(
+			array(
+				'page'               => 'wpam-settings',
+				'wpam_cleared'       => '1',
+				'wpam_cleared_all'   => '1',
+				'wpam_deleted'       => $clicks_rows + $deleted_views,
+				'wpam_deleted_clicks' => $clicks_rows,
+				'wpam_deleted_views'  => $deleted_views,
 			),
 			admin_url( 'admin.php' )
 		) );

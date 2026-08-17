@@ -158,13 +158,13 @@ class Views_Query {
 	 * Resuelve un [id, title, permalink] genérico según el resource_type,
 	 * sin SQL adicional — solo funciones nativas de WordPress.
 	 *
-	 * post/page: get_post(). category/tag: get_term(). home/search/404: no
-	 * tienen identidad individual, así que get()/get_cached() para esos 3
-	 * tipos no produce una lista "top" útil (siempre hay como mucho 1 fila,
-	 * resource_id=0) — Analytics los muestra solo vía get_stats(), no vía
-	 * esta lista.
+	 * post/page: get_post(). category/tag: get_term(). home/search/404: sin
+	 * identidad individual — devuelven una etiqueta fija (usado por
+	 * get_global(), que sí necesita mostrarlos como una fila más del ranking).
 	 *
 	 * @since  1.8.0
+	 * @since  1.8.2 Soporta home/search/404 con etiqueta fija (antes solo
+	 *               post/page/category/tag; home/search/404 devolvían null).
 	 * @param  string $resource_type
 	 * @param  int    $resource_id
 	 * @return array{id:int,title:string,permalink:string}|null
@@ -196,9 +196,358 @@ class Views_Query {
 					'permalink' => (string) get_term_link( $term ),
 				);
 
+			case 'home':
+				return array(
+					'id'        => 0,
+					'title'     => __( 'Home', 'wp-affiliatemanager' ),
+					'permalink' => home_url( '/' ),
+				);
+
+			case 'search':
+				return array(
+					'id'        => 0,
+					'title'     => __( 'Search', 'wp-affiliatemanager' ),
+					'permalink' => '',
+				);
+
+			case '404':
+				return array(
+					'id'        => 0,
+					'title'     => __( '404 Not Found', 'wp-affiliatemanager' ),
+					'permalink' => '',
+				);
+
 			default:
 				return null;
 		}
+	}
+
+	// -------------------------------------------------------------------------
+	// Top Viewed — Global (v1.8.2): mezcla de todos los resource_type habilitados
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Retorna los recursos con más vistas mezclando TODOS los resource_type
+	 * actualmente habilitados en Settings → Views Tracking (dinámico: si se
+	 * habilita un tipo nuevo, empieza a competir en el ranking; si se
+	 * deshabilita, deja de aparecer aunque tenga histórico).
+	 *
+	 * Home/Search/404 aportan como máximo 1 fila cada uno (su agregado total
+	 * para el rango — no tienen identidad individual) y compiten en el mismo
+	 * ranking que posts/pages/categories/tags según corresponda por su propio
+	 * view_count.
+	 *
+	 * Resolución en 2 pasadas para evitar N+1: se agrupan los IDs por tipo y
+	 * se resuelven en lote (get_posts() para post/page, get_terms() para
+	 * category/tag — nunca una consulta por fila), igual criterio que
+	 * Analytics_Renderer::render_recent_views_section().
+	 *
+	 * @since  1.8.2
+	 * @param  string $range today|week|month|total
+	 * @param  int    $limit Número máximo de resultados. Default 10.
+	 * @return array[] Cada elemento: [ id, resource_type, title, permalink, view_count ]
+	 */
+	public static function get_global( string $range = 'total', int $limit = 10 ): array {
+		global $wpdb;
+
+		$enabled_types = self::enabled_resource_types();
+		if ( empty( $enabled_types ) ) {
+			return array();
+		}
+
+		$table        = Views_Table::table_name();
+		$placeholders = implode( ',', array_fill( 0, count( $enabled_types ), '%s' ) );
+
+		$where_sql = " WHERE resource_type IN ({$placeholders})";
+		$params    = $enabled_types;
+
+		if ( 'total' !== $range ) {
+			$where_sql .= ' AND period >= %s';
+			$params[]   = self::range_to_period_since( $range );
+		}
+
+		$sql_limit = max( 1, min( 100, $limit ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT resource_type, post_id, SUM(count) AS view_count FROM %i{$where_sql} GROUP BY resource_type, post_id ORDER BY view_count DESC LIMIT %d",
+				array_merge( array( $table ), $params, array( $sql_limit ) )
+			),
+			ARRAY_A
+		);
+
+		if ( ! is_array( $rows ) || empty( $rows ) ) {
+			return array();
+		}
+
+		return self::resolve_global_items( $rows );
+	}
+
+	/**
+	 * get_global() con caché de objeto. La clave incluye la firma de tipos
+	 * habilitados (ordenada) para que un cambio en Settings → Views Tracking
+	 * no sirva datos obsoletos desde caché.
+	 *
+	 * @since  1.8.2
+	 * @param  string $range
+	 * @param  int    $limit
+	 * @return array[]
+	 */
+	public static function get_global_cached( string $range = 'total', int $limit = 10 ): array {
+		$cache_key = self::build_global_cache_key( $range, $limit );
+		$cached    = wp_cache_get( $cache_key, 'wpam' );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$items = self::get_global( $range, $limit );
+		wp_cache_set( $cache_key, $items, 'wpam', 300 );
+
+		return $items;
+	}
+
+	/**
+	 * Stats agregados (today/week/month/total) mezclando todos los
+	 * resource_type actualmente habilitados en Settings.
+	 *
+	 * @since  1.8.2
+	 * @return array{ today: int, week: int, month: int, total: int }
+	 */
+	public static function get_global_stats(): array {
+		global $wpdb;
+
+		$enabled_types = self::enabled_resource_types();
+		if ( empty( $enabled_types ) ) {
+			return array(
+				'today' => 0,
+				'week'  => 0,
+				'month' => 0,
+				'total' => 0,
+			);
+		}
+
+		$table        = Views_Table::table_name();
+		$placeholders = implode( ',', array_fill( 0, count( $enabled_types ), '%s' ) );
+
+		$today = self::range_to_period_since( 'today' );
+		$week  = self::range_to_period_since( 'week' );
+		$month = self::range_to_period_since( 'month' );
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$today_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT SUM(count) FROM %i WHERE resource_type IN ({$placeholders}) AND period >= %s", array_merge( array( $table ), $enabled_types, array( $today ) ) ) );
+		$week_count  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT SUM(count) FROM %i WHERE resource_type IN ({$placeholders}) AND period >= %s", array_merge( array( $table ), $enabled_types, array( $week ) ) ) );
+		$month_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT SUM(count) FROM %i WHERE resource_type IN ({$placeholders}) AND period >= %s", array_merge( array( $table ), $enabled_types, array( $month ) ) ) );
+		$total_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT SUM(count) FROM %i WHERE resource_type IN ({$placeholders})", array_merge( array( $table ), $enabled_types ) ) );
+		// phpcs:enable
+
+		return array(
+			'today' => $today_count,
+			'week'  => $week_count,
+			'month' => $month_count,
+			'total' => $total_count,
+		);
+	}
+
+	/**
+	 * get_global_stats() con caché de objeto. Misma clave-por-firma-de-tipos
+	 * que get_global_cached().
+	 *
+	 * @since  1.8.2
+	 * @return array{ today: int, week: int, month: int, total: int }
+	 */
+	public static function get_global_stats_cached(): array {
+		$enabled = self::enabled_resource_types();
+		sort( $enabled );
+		$cache_key = 'wpam_views_stats_global_' . md5( implode( ',', $enabled ) );
+		$cached    = wp_cache_get( $cache_key, 'wpam' );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$stats = self::get_global_stats();
+		wp_cache_set( $cache_key, $stats, 'wpam', 300 );
+
+		return $stats;
+	}
+
+	/**
+	 * Lista de resource_type actualmente habilitados en Settings → Views
+	 * Tracking, en el orden fijo de Resource_Resolver::TYPES. Única fuente de
+	 * verdad reutilizada por get_global(), get_global_cached(), get_global_stats()
+	 * y get_global_stats_cached() — así todas consultan exactamente el mismo
+	 * conjunto de tipos en cada llamada.
+	 *
+	 * @since  1.8.2
+	 * @return string[]
+	 */
+	private static function enabled_resource_types(): array {
+		$enabled = array();
+
+		foreach ( Resource_Resolver::TYPES as $type ) {
+			if ( Views::is_type_enabled( $type ) ) {
+				$enabled[] = $type;
+			}
+		}
+
+		return $enabled;
+	}
+
+	/**
+	 * Resuelve filas crudas de get_global() (resource_type, post_id,
+	 * view_count) a [id, resource_type, title, permalink, view_count]. Batch
+	 * por tipo — mismo patrón que
+	 * Analytics_Renderer::resolve_recent_views_display(), duplicado a
+	 * propósito para no acoplar Views_Query al Renderer (independencia de
+	 * módulos ya establecida en el proyecto).
+	 *
+	 * @since  1.8.2
+	 * @param  array[] $rows Filas crudas: [ resource_type, post_id, view_count ].
+	 * @return array[]
+	 */
+	private static function resolve_global_items( array $rows ): array {
+		$post_page_ids = array();
+		$category_ids  = array();
+		$tag_ids       = array();
+
+		foreach ( $rows as $row ) {
+			$id = (int) $row['post_id'];
+
+			switch ( $row['resource_type'] ) {
+				case 'post':
+				case 'page':
+					$post_page_ids[ $id ] = true;
+					break;
+				case 'category':
+					$category_ids[ $id ] = true;
+					break;
+				case 'tag':
+					$tag_ids[ $id ] = true;
+					break;
+			}
+		}
+
+		$post_map = array();
+		if ( ! empty( $post_page_ids ) ) {
+			$found = get_posts( array(
+				'post__in'            => array_keys( $post_page_ids ),
+				'post_type'           => array( 'post', 'page' ),
+				'post_status'         => 'any',
+				'posts_per_page'      => count( $post_page_ids ),
+				'orderby'             => 'post__in',
+				'ignore_sticky_posts' => true,
+				'no_found_rows'       => true,
+			) );
+			foreach ( $found as $post ) {
+				$post_map[ $post->ID ] = $post;
+			}
+		}
+
+		$term_map = array(); // Clave "taxonomy:id" — category_id=5 y tag_id=5 no deben colisionar.
+		if ( ! empty( $category_ids ) ) {
+			$terms = get_terms( array(
+				'taxonomy'   => 'category',
+				'include'    => array_keys( $category_ids ),
+				'hide_empty' => false,
+			) );
+			if ( is_array( $terms ) ) {
+				foreach ( $terms as $term ) {
+					$term_map[ 'category:' . $term->term_id ] = $term;
+				}
+			}
+		}
+		if ( ! empty( $tag_ids ) ) {
+			$terms = get_terms( array(
+				'taxonomy'   => 'post_tag',
+				'include'    => array_keys( $tag_ids ),
+				'hide_empty' => false,
+			) );
+			if ( is_array( $terms ) ) {
+				foreach ( $terms as $term ) {
+					$term_map[ 'tag:' . $term->term_id ] = $term;
+				}
+			}
+		}
+
+		$result = array();
+
+		foreach ( $rows as $row ) {
+			$id            = (int) $row['post_id'];
+			$resource_type = (string) $row['resource_type'];
+			$view_count    = (int) $row['view_count'];
+
+			switch ( $resource_type ) {
+				case 'post':
+				case 'page':
+					if ( ! isset( $post_map[ $id ] ) ) {
+						continue 2;
+					}
+					$post      = $post_map[ $id ];
+					$title     = $post->post_title ?: __( '(no title)', 'wp-affiliatemanager' );
+					$permalink = (string) get_permalink( $id );
+					break;
+
+				case 'category':
+				case 'tag':
+					$term_key = $resource_type . ':' . $id;
+					if ( ! isset( $term_map[ $term_key ] ) ) {
+						continue 2;
+					}
+					$term      = $term_map[ $term_key ];
+					$title     = $term->name;
+					$permalink = (string) get_term_link( $term );
+					break;
+
+				case 'home':
+					$title     = __( 'Home', 'wp-affiliatemanager' );
+					$permalink = home_url( '/' );
+					break;
+
+				case 'search':
+					$title     = __( 'Search', 'wp-affiliatemanager' );
+					$permalink = '';
+					break;
+
+				case '404':
+					$title     = __( '404 Not Found', 'wp-affiliatemanager' );
+					$permalink = '';
+					break;
+
+				default:
+					continue 2;
+			}
+
+			$result[] = array(
+				'id'            => $id,
+				'resource_type' => $resource_type,
+				'title'         => $title,
+				'permalink'     => $permalink,
+				'view_count'    => $view_count,
+			);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Clave de caché para get_global_cached() — incluye range/limit y una
+	 * firma (hash) de los tipos actualmente habilitados, ordenados, para que
+	 * un cambio en Settings → Views Tracking invalide la caché
+	 * automáticamente en vez de servir un ranking con tipos ya desactivados
+	 * (o le falte uno recién activado).
+	 *
+	 * @since  1.8.2
+	 * @param  string $range
+	 * @param  int    $limit
+	 * @return string
+	 */
+	private static function build_global_cache_key( string $range, int $limit ): string {
+		$enabled = self::enabled_resource_types();
+		sort( $enabled );
+
+		return 'wpam_top_viewed_global_' . $range . '_' . $limit . '_' . md5( implode( ',', $enabled ) );
 	}
 
 	// -------------------------------------------------------------------------
@@ -264,8 +613,8 @@ class Views_Query {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Retorna las filas más recientes de wpam_views para un resource_type
-	 * dado, sin caché (dato "vivo").
+	 * Retorna las filas más recientes de wpam_views, de CUALQUIER resource_type
+	 * (no filtra por tipo — v1.8.0: Recent Views es un listado general).
 	 *
 	 * wpam_views es un agregado diario, no un log de eventos: no existe una
 	 * columna de timestamp exacto. "Reciente" se ordena por `period` (día) y
@@ -273,21 +622,24 @@ class Views_Query {
 	 * conteo de UN día para UN recurso, no un evento individual.
 	 *
 	 * @since 1.2.0
-	 * @since 1.8.0 Añadido $resource_type (default 'post').
-	 * @param  int    $limit Número máximo de filas. Default 20.
-	 * @param  string $resource_type
-	 * @return array[] Cada elemento: [ post_id, period, count ] (crudo, sin enriquecer).
+	 * @since 1.8.0 Dejó de filtrar por resource_type='post' (por defecto
+	 *              implícito) — ahora devuelve filas de los 7 tipos
+	 *              mezcladas, con resource_type incluido en cada fila para
+	 *              que el renderer decida cómo resolver título/enlace. Único
+	 *              consumidor (Analytics_Screen::render() / Admin_Menu
+	 *              dashboard) ya no necesita pasar ningún parámetro extra.
+	 * @param  int $limit Número máximo de filas. Default 20.
+	 * @return array[] Cada elemento: [ post_id, resource_type, period, count ] (crudo, sin enriquecer).
 	 */
-	public static function get_recent( int $limit = 20, string $resource_type = 'post' ): array {
+	public static function get_recent( int $limit = 20 ): array {
 		global $wpdb;
 		$table = Views_Table::table_name();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				'SELECT post_id, period, count FROM %i WHERE resource_type = %s ORDER BY period DESC, id DESC LIMIT %d',
+				'SELECT post_id, resource_type, period, count FROM %i ORDER BY period DESC, id DESC LIMIT %d',
 				$table,
-				$resource_type,
 				$limit
 			),
 			ARRAY_A

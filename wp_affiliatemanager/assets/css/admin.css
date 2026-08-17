@@ -1428,6 +1428,24 @@ body.wpam-modal-open {
 }
 
 /* ==========================================================================
+   Analytics — Recent Views type badge (v1.8.0)
+   ========================================================================== */
+
+.wpam-recent-type-badge {
+	display: inline-block;
+	margin-left: 6px;
+	padding: 1px 8px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: .02em;
+	background: var(--wpam-gray-100);
+	color: var(--wpam-gray-700);
+	vertical-align: middle;
+}
+
+/* ==========================================================================
    Analytics — Views resource_type filter (v1.8.0)
    ========================================================================== */
 

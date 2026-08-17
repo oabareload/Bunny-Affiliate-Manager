@@ -167,6 +167,40 @@ class Settings {
 		);
 
 		// ---------------------------------------------------------------------------
+		// Sección: Google reCAPTCHA — v2 Checkbox
+		// ---------------------------------------------------------------------------
+		add_settings_section(
+			'wpam_section_recaptcha',
+			__( 'Google reCAPTCHA', 'wp-affiliatemanager' ),
+			array( $this, 'render_section_recaptcha' ),
+			self::PAGE_SLUG
+		);
+
+		add_settings_field(
+			'wpam_field_recaptcha_enabled',
+			__( 'Enable reCAPTCHA protection', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_recaptcha_enabled' ),
+			self::PAGE_SLUG,
+			'wpam_section_recaptcha'
+		);
+
+		add_settings_field(
+			'wpam_field_recaptcha_site_key',
+			__( 'Site Key', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_recaptcha_site_key' ),
+			self::PAGE_SLUG,
+			'wpam_section_recaptcha'
+		);
+
+		add_settings_field(
+			'wpam_field_recaptcha_secret_key',
+			__( 'Secret Key', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_recaptcha_secret_key' ),
+			self::PAGE_SLUG,
+			'wpam_section_recaptcha'
+		);
+
+		// ---------------------------------------------------------------------------
 		// Sección: Recently Viewed Posts — v1.3.0
 		// ---------------------------------------------------------------------------
 		add_settings_section(
@@ -219,6 +253,16 @@ class Settings {
 			'wpam_section_redirect',
 			__( 'Redirect / Interstitial', 'wp-affiliatemanager' ),
 			array( $this, 'render_section_redirect' ),
+			self::PAGE_SLUG
+		);
+
+		// ---------------------------------------------------------------------------
+		// Sección: Maintenance — v1.8.0
+		// ---------------------------------------------------------------------------
+		add_settings_section(
+			'wpam_section_maintenance',
+			__( 'Maintenance', 'wp-affiliatemanager' ),
+			array( $this, 'render_section_maintenance' ),
 			self::PAGE_SLUG
 		);
 
@@ -444,6 +488,20 @@ class Settings {
 	}
 
 	/**
+	 * Renderiza la sección Maintenance con las acciones de mantenimiento.
+	 *
+	 * @since  1.8.0
+	 * @return void
+	 */
+	public function render_section_maintenance(): void {
+		$admin_menu = new \WP_AffiliateManager\Admin\Admin_Menu();
+		$ref = new \ReflectionClass( $admin_menu );
+		$method = $ref->getMethod( 'render_maintenance_card' );
+		$method->setAccessible( true );
+		$method->invoke( $admin_menu );
+	}
+
+	/**
 	 * Renderiza la descripción de la sección Views Tracking.
 	 *
 	 * @since  1.2.0
@@ -451,6 +509,16 @@ class Settings {
 	 */
 	public function render_section_views(): void {
 		echo '<p>' . esc_html__( 'Controla qué tipo de visitantes cuentan para las estadísticas de vistas de posts.', 'wp-affiliatemanager' ) . '</p>';
+	}
+
+	/**
+	 * Renderiza la descripción de la sección Google reCAPTCHA.
+	 *
+	 * @since  1.8.0
+	 * @return void
+	 */
+	public function render_section_recaptcha(): void {
+		echo '<p>' . esc_html__( 'Protege los clicks que no tengan una View válida con Google reCAPTCHA v2 Checkbox.', 'wp-affiliatemanager' ) . '</p>';
 	}
 
 	/**
@@ -1018,6 +1086,53 @@ class Settings {
 	 * @since  1.8.0
 	 * @return void
 	 */
+	public function render_field_recaptcha_enabled(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = ! empty( $options['recaptcha']['enabled'] ?? false );
+		?>
+		<label>
+			<input
+				type="checkbox"
+				name="<?php echo esc_attr( self::OPTION_NAME . '[recaptcha][enabled]' ); ?>"
+				value="1"
+				<?php checked( $value ); ?>
+			/>
+			<?php esc_html_e( 'Enable Google reCAPTCHA protection before redirecting when no valid View cookie exists.', 'wp-affiliatemanager' ); ?>
+		</label>
+		<p class="description"><?php esc_html_e( 'When disabled, the plugin does not allow a click to bypass the view gate without a valid cookie.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	public function render_field_recaptcha_site_key(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['recaptcha']['site_key'] ?? '';
+		?>
+		<input
+			type="text"
+			name="<?php echo esc_attr( self::OPTION_NAME . '[recaptcha][site_key]' ); ?>"
+			value="<?php echo esc_attr( $value ); ?>"
+			class="regular-text"
+			placeholder="6Le..."
+		/>
+		<p class="description"><?php esc_html_e( 'Public site key from Google reCAPTCHA v2 Checkbox.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	public function render_field_recaptcha_secret_key(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['recaptcha']['secret_key'] ?? '';
+		?>
+		<input
+			type="password"
+			name="<?php echo esc_attr( self::OPTION_NAME . '[recaptcha][secret_key]' ); ?>"
+			value="<?php echo esc_attr( $value ); ?>"
+			class="regular-text"
+			placeholder="6Le..."
+		/>
+		<p class="description"><?php esc_html_e( 'Secret key remains server-side only and is never exposed to frontend JavaScript.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
 	public function render_field_resource_types(): void {
 		$options  = get_option( self::OPTION_NAME, $this->get_defaults() );
 		$values   = $options['views']['resource_types'] ?? array();
@@ -1551,6 +1666,13 @@ class Settings {
 			$sanitized['views']['resource_types'] = $sanitized_types;
 		}
 
+		// Google reCAPTCHA v2 Checkbox.
+		if ( isset( $input['recaptcha'] ) && is_array( $input['recaptcha'] ) ) {
+			$sanitized['recaptcha']['enabled'] = ! empty( $input['recaptcha']['enabled'] );
+			$sanitized['recaptcha']['site_key'] = sanitize_text_field( $input['recaptcha']['site_key'] ?? '' );
+			$sanitized['recaptcha']['secret_key'] = sanitize_text_field( $input['recaptcha']['secret_key'] ?? '' );
+		}
+
 		// Recently Viewed Posts — v1.3.0.
 		if ( isset( $input['recently_viewed'] ) && is_array( $input['recently_viewed'] ) ) {
 			$sanitized['recently_viewed']['enabled']     = ! empty( $input['recently_viewed']['enabled'] );
@@ -1731,6 +1853,11 @@ class Settings {
 				'count_logged_in_users' => true,
 				'count_bot_traffic'     => false,
 				'resource_types'        => Views::default_resource_type_toggles(),
+			),
+			'recaptcha' => array(
+				'enabled'    => false,
+				'site_key'   => '',
+				'secret_key' => '',
 			),
 			'recently_viewed' => array(
 				'enabled'     => false,

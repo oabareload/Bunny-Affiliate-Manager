@@ -115,11 +115,44 @@ class Analytics_Renderer {
 	 * funciones de WordPress (get_post_thumbnail_id, wp_get_attachment_image_url,
 	 * get_edit_post_link) — nunca SQL directo.
 	 *
+	 * Cuando $resource_type === 'global' (v1.8.2), $items ya viene con un
+	 * resource_type PROPIO por elemento (ver Views_Query::get_global()) —
+	 * cada fila se resuelve según su propio tipo en vez de asumir uno único
+	 * para toda la lista.
+	 *
 	 * @since  1.4.0
+	 * @since  1.8.2 Soporta $resource_type === 'global' (resolución por-item).
 	 * @param  array[] $items
 	 * @return array[]
 	 */
 	private static function enrich_for_display( array $items, string $resource_type = 'post' ): array {
+		if ( 'global' === $resource_type ) {
+			foreach ( $items as &$item ) {
+				$item_type = $item['resource_type'] ?? 'post';
+
+				if ( in_array( $item_type, array( 'category', 'tag' ), true ) ) {
+					$taxonomy           = 'category' === $item_type ? 'category' : 'post_tag';
+					$edit_link          = get_edit_term_link( $item['id'], $taxonomy );
+					$item['thumb_url']  = '';
+					$item['edit_url']   = is_string( $edit_link ) ? $edit_link : '';
+				} elseif ( in_array( $item_type, array( 'post', 'page' ), true ) ) {
+					$thumb_id           = get_post_thumbnail_id( $item['id'] );
+					$item['thumb_url']  = $thumb_id ? (string) wp_get_attachment_image_url( $thumb_id, 'thumbnail' ) : '';
+					$item['edit_url']   = (string) get_edit_post_link( $item['id'], 'raw' );
+				} elseif ( 'home' === $item_type ) {
+					$item['thumb_url'] = '';
+					$item['edit_url']  = home_url( '/' );
+				} else {
+					// search / 404 — sin identidad propia, sin thumbnail ni enlace.
+					$item['thumb_url'] = '';
+					$item['edit_url']  = '';
+				}
+			}
+			unset( $item );
+
+			return $items;
+		}
+
 		if ( in_array( $resource_type, array( 'category', 'tag' ), true ) ) {
 			$taxonomy = 'category' === $resource_type ? 'category' : 'post_tag';
 
@@ -149,13 +182,19 @@ class Analytics_Renderer {
 	 * Top Viewed Posts y Top Scored Posts. Solo cambia qué campo de conteo
 	 * se usa.
 	 *
+	 * Cuando $resource_type === 'global' (v1.8.2), cada fila muestra además
+	 * el badge de tipo (mismo estilo que Recent Views) para distinguir un
+	 * Post de una Category en el mismo ranking mezclado.
+	 *
 	 * @since  1.4.0
+	 * @since  1.8.2 Badge de tipo cuando $resource_type === 'global'.
 	 * @param  array[] $items       Cada elemento debe tener: id, title, permalink y $count_field.
 	 * @param  string  $count_field 'click_count' | 'view_count' | 'score'.
 	 * @return void
 	 */
 	private static function render_top_list( array $items, string $count_field, string $resource_type = 'post' ): void {
-		$items = self::enrich_for_display( $items, $resource_type );
+		$items      = self::enrich_for_display( $items, $resource_type );
+		$show_badge = ( 'global' === $resource_type );
 		?>
 		<ul class="wpam-top-list">
 		<?php foreach ( $items as $item ) : ?>
@@ -166,7 +205,14 @@ class Analytics_Renderer {
 					<?php else : ?>
 						<span class="wpam-top-thumb-placeholder">📄</span>
 					<?php endif; ?>
-					<a class="wpam-top-name" href="<?php echo esc_url( $item['edit_url'] ); ?>"><?php echo esc_html( $item['title'] ); ?></a>
+					<?php if ( $item['edit_url'] ) : ?>
+						<a class="wpam-top-name" href="<?php echo esc_url( $item['edit_url'] ); ?>"><?php echo esc_html( $item['title'] ); ?></a>
+					<?php else : ?>
+						<span class="wpam-top-name"><?php echo esc_html( $item['title'] ); ?></span>
+					<?php endif; ?>
+					<?php if ( $show_badge ) : ?>
+						<span class="wpam-recent-type-badge"><?php echo esc_html( self::type_badge_label( $item['resource_type'] ?? 'post' ) ); ?></span>
+					<?php endif; ?>
 				</div>
 				<span class="wpam-top-count"><?php echo esc_html( number_format_i18n( $item[ $count_field ] ) ); ?></span>
 			</li>
@@ -221,6 +267,36 @@ class Analytics_Renderer {
 			<?php endif; ?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Etiqueta legible para el badge de tipo — fuente única de verdad
+	 * compartida entre Recent Views y Top Viewed (modo Global). Mismos 7
+	 * valores que Resource_Resolver::TYPES.
+	 *
+	 * @since  1.8.2
+	 * @param  string $resource_type
+	 * @return string
+	 */
+	private static function type_badge_label( string $resource_type ): string {
+		switch ( $resource_type ) {
+			case 'post':
+				return __( 'Post', 'wp-affiliatemanager' );
+			case 'page':
+				return __( 'Page', 'wp-affiliatemanager' );
+			case 'category':
+				return __( 'Category', 'wp-affiliatemanager' );
+			case 'tag':
+				return __( 'Tag', 'wp-affiliatemanager' );
+			case 'home':
+				return __( 'Home', 'wp-affiliatemanager' );
+			case 'search':
+				return __( 'Search', 'wp-affiliatemanager' );
+			case '404':
+				return __( '404', 'wp-affiliatemanager' );
+			default:
+				return '';
+		}
 	}
 
 	/**
@@ -349,14 +425,34 @@ class Analytics_Renderer {
 	 * Renderiza "Recent Views".
 	 *
 	 * $views es el array crudo de Views_Query::get_recent()
-	 * (post_id, period, count) — el enriquecimiento (título, edit_url) se
-	 * resuelve aquí con get_post() / get_edit_post_link(), sin SQL directo.
+	 * (post_id, resource_type, period, count) — mezcla de los 7 tipos de
+	 * recurso soportados. El enriquecimiento (título, enlace) se resuelve
+	 * aquí en 2 pasadas para evitar N+1: primero se agrupan los IDs por
+	 * resource_type, luego se resuelven en lote (get_posts()/get_terms(),
+	 * nunca una consulta individual por fila) antes de renderizar.
+	 *
+	 * Resolución por tipo:
+	 * - post/page: título + enlace de edición (get_edit_post_link()) —
+	 *   exactamente el mismo comportamiento que tenía Posts antes de v1.8.0.
+	 * - category/tag: nombre del término + enlace de edición del término.
+	 * - home: etiqueta fija "Home" enlazada a home_url('/').
+	 * - search: etiqueta fija "Search" sin enlace — wpam_views solo guarda
+	 *   resource_id=0 para búsquedas (el término real vive en la tabla
+	 *   auxiliar wpam_views_search_terms, agregada de forma independiente sin
+	 *   relación directa fila-a-fila con wpam_views, así que no hay un
+	 *   término específico que asociar a esta fila sin introducir una
+	 *   asociación artificial).
+	 * - 404: etiqueta fija "404 Not Found" sin enlace, mismo motivo que Search.
 	 *
 	 * @since  1.4.0
+	 * @since  1.8.0 Generalizado a los 7 resource_type (antes asumía Posts
+	 *               implícitamente y descartaba silenciosamente cualquier
+	 *               fila donde get_post() no devolviera un WP_Post).
 	 * @param  array[] $views
 	 * @return void
 	 */
 	public static function render_recent_views_section( array $views ): void {
+		$views = self::resolve_recent_views_display( $views );
 		?>
 		<div class="wpam-analytics-card wpam-analytics-card--full">
 			<h3 class="wpam-analytics-card-title">
@@ -370,25 +466,23 @@ class Analytics_Renderer {
 					<table class="wpam-table wpam-recent-views-table">
 						<thead><tr>
 							<th><?php esc_html_e( 'Date', 'wp-affiliatemanager' ); ?></th>
-							<th><?php esc_html_e( 'Post Title', 'wp-affiliatemanager' ); ?></th>
+							<th><?php esc_html_e( 'Resource', 'wp-affiliatemanager' ); ?></th>
 							<th><?php esc_html_e( 'Views', 'wp-affiliatemanager' ); ?></th>
 						</tr></thead>
 						<tbody>
 						<?php foreach ( $views as $view ) :
-							$post_id = (int) $view['post_id'];
-							$post    = get_post( $post_id );
-
-							if ( ! $post instanceof \WP_Post ) {
-								continue;
-							}
-
-							$title        = $post->post_title;
-							$edit_url     = (string) get_edit_post_link( $post_id, 'raw' );
 							$date_display = mysql2date( get_option( 'date_format' ), $view['period'] . '000000' );
 						?>
 							<tr>
 								<td class="wpam-recent-ts"><?php echo esc_html( $date_display ); ?></td>
-								<td><?php if ( $edit_url ) : ?><a href="<?php echo esc_url( $edit_url ); ?>"><?php echo esc_html( $title ); ?></a><?php else : ?><?php echo esc_html( $title ); ?><?php endif; ?></td>
+								<td>
+									<?php if ( $view['url'] ) : ?>
+										<a href="<?php echo esc_url( $view['url'] ); ?>"><?php echo esc_html( $view['label'] ); ?></a>
+									<?php else : ?>
+										<?php echo esc_html( $view['label'] ); ?>
+									<?php endif; ?>
+									<span class="wpam-recent-type-badge"><?php echo esc_html( $view['type_label'] ); ?></span>
+								</td>
 								<td><?php echo esc_html( number_format_i18n( (int) $view['count'] ) ); ?></td>
 							</tr>
 						<?php endforeach; ?>
@@ -398,5 +492,154 @@ class Analytics_Renderer {
 			<?php endif; ?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Resuelve las filas crudas de get_recent() (post_id, resource_type,
+	 * period, count) a [label, url, type_label, period, count] listo para
+	 * renderizar. Batch por tipo (2 llamadas a get_posts()/get_terms() como
+	 * máximo, nunca una consulta por fila) en vez de resolver una a una.
+	 *
+	 * @since  1.8.0
+	 * @param  array[] $views Filas crudas de Views_Query::get_recent().
+	 * @return array[] Filas enriquecidas, mismo orden que la entrada.
+	 */
+	private static function resolve_recent_views_display( array $views ): array {
+		if ( empty( $views ) ) {
+			return array();
+		}
+
+		// Paso 1: agrupar IDs por resource_type.
+		$post_page_ids = array();
+		$category_ids  = array();
+		$tag_ids       = array();
+
+		foreach ( $views as $view ) {
+			$id = (int) $view['post_id'];
+
+			switch ( $view['resource_type'] ) {
+				case 'post':
+				case 'page':
+					$post_page_ids[ $id ] = true;
+					break;
+				case 'category':
+					$category_ids[ $id ] = true;
+					break;
+				case 'tag':
+					$tag_ids[ $id ] = true;
+					break;
+			}
+		}
+
+		// Paso 2: resolver en lote — como máximo 1 query por grupo, nunca por fila.
+		$post_map = array();
+		if ( ! empty( $post_page_ids ) ) {
+			$found = get_posts( array(
+				'post__in'            => array_keys( $post_page_ids ),
+				'post_type'           => array( 'post', 'page' ),
+				'post_status'         => 'any',
+				'posts_per_page'      => count( $post_page_ids ),
+				'orderby'             => 'post__in',
+				'ignore_sticky_posts' => true,
+				'no_found_rows'       => true,
+			) );
+			foreach ( $found as $post ) {
+				$post_map[ $post->ID ] = $post;
+			}
+		}
+
+		$term_map = array(); // Clave "taxonomy:id" — category_id=5 y tag_id=5 no deben colisionar.
+		if ( ! empty( $category_ids ) ) {
+			$terms = get_terms( array(
+				'taxonomy'   => 'category',
+				'include'    => array_keys( $category_ids ),
+				'hide_empty' => false,
+			) );
+			if ( is_array( $terms ) ) {
+				foreach ( $terms as $term ) {
+					$term_map[ 'category:' . $term->term_id ] = $term;
+				}
+			}
+		}
+		if ( ! empty( $tag_ids ) ) {
+			$terms = get_terms( array(
+				'taxonomy'   => 'post_tag',
+				'include'    => array_keys( $tag_ids ),
+				'hide_empty' => false,
+			) );
+			if ( is_array( $terms ) ) {
+				foreach ( $terms as $term ) {
+					$term_map[ 'tag:' . $term->term_id ] = $term;
+				}
+			}
+		}
+
+		// Paso 3: construir las filas de salida usando únicamente los mapas ya resueltos.
+		$resolved = array();
+
+		foreach ( $views as $view ) {
+			$id            = (int) $view['post_id'];
+			$resource_type = (string) $view['resource_type'];
+			$row           = array(
+				'period' => $view['period'],
+				'count'  => $view['count'],
+				'label'  => '',
+				'url'    => '',
+			);
+
+			switch ( $resource_type ) {
+				case 'post':
+				case 'page':
+					if ( ! isset( $post_map[ $id ] ) ) {
+						continue 2; // Post/page borrado desde el tracking — mismo comportamiento que antes de v1.8.0.
+					}
+					$post              = $post_map[ $id ];
+					$row['label']      = $post->post_title ?: __( '(no title)', 'wp-affiliatemanager' );
+					$row['url']        = (string) get_edit_post_link( $id, 'raw' );
+					$row['type_label'] = self::type_badge_label( $resource_type );
+					break;
+
+				case 'category':
+				case 'tag':
+					$term_key = $resource_type . ':' . $id;
+					if ( ! isset( $term_map[ $term_key ] ) ) {
+						continue 2; // Término borrado — mismo criterio que un post borrado.
+					}
+					$term              = $term_map[ $term_key ];
+					$edit_link         = get_edit_term_link( $term->term_id, 'category' === $resource_type ? 'category' : 'post_tag' );
+					$row['label']      = $term->name;
+					$row['url']        = is_string( $edit_link ) ? $edit_link : '';
+					$row['type_label'] = self::type_badge_label( $resource_type );
+					break;
+
+				case 'home':
+					$row['label']      = __( 'Home', 'wp-affiliatemanager' );
+					$row['url']        = home_url( '/' );
+					$row['type_label'] = self::type_badge_label( 'home' );
+					break;
+
+				case 'search':
+					// wpam_views solo guarda resource_id=0 para búsquedas; el término
+					// real vive en wpam_views_search_terms (tabla agregada
+					// independiente, sin relación fila-a-fila con esta). Mostrar la
+					// etiqueta genérica evita una asociación artificial entre ambas.
+					$row['label']      = __( 'Search', 'wp-affiliatemanager' );
+					$row['type_label'] = self::type_badge_label( 'search' );
+					break;
+
+				case '404':
+					// Mismo motivo que 'search' — ver comentario arriba, aplicado a wpam_views_404.
+					$row['label']      = __( '404 Not Found', 'wp-affiliatemanager' );
+					$row['type_label'] = self::type_badge_label( '404' );
+					break;
+
+				default:
+					continue 2; // resource_type desconocido — no debería ocurrir, pero no romper el listado.
+			}
+
+			$resolved[] = $row;
+		}
+
+		return $resolved;
 	}
 }

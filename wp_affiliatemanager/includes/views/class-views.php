@@ -77,6 +77,73 @@ class Views {
 		$this->tracker = new View_Tracker();
 	}
 
+	/**
+	 * Genera la clave de deduplicación del navegador para un recurso.
+	 *
+	 * Debe coincidir exactamente con el formato usado en ajax_track() y
+	 * mark_viewed_today(): "{resource_type}:{resource_id}".
+	 *
+	 * @since  1.8.0
+	 * @param  string $resource_type
+	 * @param  int    $resource_id
+	 * @return string
+	 */
+	public static function build_cookie_key( string $resource_type, int $resource_id ): string {
+		return $resource_type . ':' . $resource_id;
+	}
+
+	/**
+	 * Determina si el navegador actual ya tiene una View válida para este recurso
+	 * en la cookie local `wpam_v` del período actual.
+	 *
+	 * Esta es la comprobación principal para el flujo de /go/...: no se consulta
+	 * wpam_views, porque una fila histórica pertenece a otro navegador/usuario.
+	 *
+	 * @since  1.8.0
+	 * @param  string $resource_type
+	 * @param  int    $resource_id
+	 * @return bool
+	 */
+	public static function has_valid_view_cookie( string $resource_type, int $resource_id ): bool {
+		$dedup_key = self::build_cookie_key( $resource_type, $resource_id );
+		return in_array( $dedup_key, self::get_cookie_ids(), true );
+	}
+
+	/**
+	 * Registra una View usando la misma lógica central de Views.
+	 *
+	 * Reutiliza View_Tracker::record(), deduplicación y cookie local, y evita
+	 * cualquier SQL directo fuera de este módulo.
+	 *
+	 * @since  1.8.0
+	 * @param  string $resource_type
+	 * @param  int    $resource_id
+	 * @return bool
+	 */
+	public function record_valid_view( string $resource_type, int $resource_id ): bool {
+		if ( ! in_array( $resource_type, Resource_Resolver::TYPES, true ) ) {
+			return false;
+		}
+
+		if ( ! $this->is_eligible( $resource_type, $resource_id ) ) {
+			return false;
+		}
+
+		$dedup_key = self::build_cookie_key( $resource_type, $resource_id );
+		if ( self::has_valid_view_cookie( $resource_type, $resource_id ) ) {
+			return true;
+		}
+
+		$this->tracker->record( $resource_type, $resource_id );
+		$this->mark_viewed_today( $dedup_key );
+
+		if ( 'post' === $resource_type ) {
+			Recently_Viewed::track( $resource_id );
+		}
+
+		return true;
+	}
+
 	// -------------------------------------------------------------------------
 	// Settings — tracking habilitado por tipo de recurso
 	// -------------------------------------------------------------------------
@@ -413,7 +480,7 @@ class Views {
 	 * @return bool
 	 */
 	private function has_viewed_today( string $dedup_key ): bool {
-		return in_array( $dedup_key, $this->get_cookie_ids(), true );
+		return in_array( $dedup_key, self::get_cookie_ids(), true );
 	}
 
 	/**
@@ -433,7 +500,7 @@ class Views {
 			return;
 		}
 
-		$ids   = $this->get_cookie_ids();
+		$ids   = self::get_cookie_ids();
 		$ids[] = $dedup_key;
 
 		// Limitar tamaño para no dejar crecer la cookie sin límite.
@@ -466,7 +533,7 @@ class Views {
 	 * @since  1.8.0 Devuelve claves string "{type}:{id}" en vez de int post_ids.
 	 * @return string[] Lista de claves ya contadas en el período actual.
 	 */
-	private function get_cookie_ids(): array {
+	public static function get_cookie_ids(): array {
 		if ( ! isset( $_COOKIE[ self::COOKIE_NAME ] ) ) {
 			return array();
 		}

@@ -47,14 +47,15 @@ class Analytics_Screen {
 			wp_die( esc_html__( 'You do not have permission to access this page.', 'wp-affiliatemanager' ) );
 		}
 
-		$score_stats  = Score_Query::get_stats_cached();
-		$clicks_stats = Top_Posts_Query::get_stats_cached();
-		$views_stats  = Views_Query::get_stats_cached();
+		$score_stats     = Score_Query::get_stats_cached();
+		$clicks_stats    = Top_Posts_Query::get_stats_cached();
+		$views_stats     = Views_Query::get_global_stats_cached();
+		$default_views_resource_type = 'global';
 
 		$top_scored     = Score_Query::get_cached( 'total', 10 );
 		$top_affiliates = Top_Posts_Query::get_top_affiliates( 'total', 10 );
 		$top_clicked    = Top_Posts_Query::get_cached( 'total', 10 );
-		$top_viewed     = Views_Query::get_cached( 'total', 10 );
+		$top_viewed     = Views_Query::get_global_cached( 'total', 10 );
 
 		$recent_clicks = Top_Posts_Query::get_recent( 20 );
 		$recent_views  = Views_Query::get_recent( 20 );
@@ -120,7 +121,7 @@ class Analytics_Screen {
 					<label for="wpam-views-resource-type"><?php esc_html_e( 'Resource type:', 'wp-affiliatemanager' ); ?></label>
 					<select id="wpam-views-resource-type">
 						<?php foreach ( self::resource_type_labels() as $type => $label ) : ?>
-							<option value="<?php echo esc_attr( $type ); ?>" <?php selected( 'post', $type ); ?>><?php echo esc_html( $label ); ?></option>
+							<option value="<?php echo esc_attr( $type ); ?>" <?php selected( $default_views_resource_type, $type ); ?>><?php echo esc_html( $label ); ?></option>
 						<?php endforeach; ?>
 					</select>
 				</div>
@@ -133,10 +134,10 @@ class Analytics_Screen {
 				</div>
 
 				<div class="wpam-analytics-viewed-posts-col">
-					<?php Analytics_Renderer::render_top_viewed_posts_section( $top_viewed, 'post' ); ?>
+					<?php Analytics_Renderer::render_top_viewed_posts_section( $top_viewed, $default_views_resource_type ); ?>
 				</div>
 
-				<?php // Recent Views permanece exclusivamente Posts — fuera de alcance generalizar este listado en v1.8.0. ?>
+				<?php // v1.8.0: Recent Views ahora es un listado general (los 7 resource_type), no solo Posts. ?>
 				<?php Analytics_Renderer::render_recent_views_section( $recent_views ); ?>
 			</div>
 
@@ -152,6 +153,7 @@ class Analytics_Screen {
 	 */
 	private static function resource_type_labels(): array {
 		return array(
+			'global'   => __( 'Global', 'wp-affiliatemanager' ),
 			'post'     => __( 'Posts', 'wp-affiliatemanager' ),
 			'page'     => __( 'Pages', 'wp-affiliatemanager' ),
 			'category' => __( 'Categories', 'wp-affiliatemanager' ),
@@ -210,14 +212,17 @@ class Analytics_Screen {
 				break;
 
 			case 'views':
-				$resource_type = sanitize_key( wp_unslash( $_POST['resource_type'] ?? 'post' ) );
-				if ( ! in_array( $resource_type, Resource_Resolver::TYPES, true ) ) {
-					$resource_type = 'post';
-				}
-
-				ob_start();
-
-				if ( in_array( $resource_type, array( 'post', 'page', 'category', 'tag' ), true ) ) {
+				$resource_type = sanitize_key( wp_unslash( $_POST['resource_type'] ?? 'global' ) );
+				if ( 'global' === $resource_type ) {
+					$viewed = Views_Query::get_global_cached( $range, 10 );
+					$stats  = Views_Query::get_global_stats_cached();
+					Analytics_Renderer::render_top_viewed_posts_section( $viewed, 'global' );
+				} elseif ( ! in_array( $resource_type, Resource_Resolver::TYPES, true ) ) {
+					$resource_type = 'global';
+					$viewed = Views_Query::get_global_cached( $range, 10 );
+					$stats  = Views_Query::get_global_stats_cached();
+					Analytics_Renderer::render_top_viewed_posts_section( $viewed, 'global' );
+				} elseif ( in_array( $resource_type, array( 'post', 'page', 'category', 'tag' ), true ) ) {
 					$viewed = Views_Query::get_cached( $range, 10, array(), $resource_type );
 					$stats  = Views_Query::get_stats_cached( $resource_type );
 					Analytics_Renderer::render_top_viewed_posts_section( $viewed, $resource_type );

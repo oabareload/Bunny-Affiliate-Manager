@@ -5,12 +5,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8.2] — Analytics > Views: vista Global y stats agregadas
+
+### Added
+
+- **Analytics > Views ahora arranca en vista Global.** El selector muestra `Global` primero, por defecto queda seleccionado, y mantiene los selectores por tipo individuales funcionando como antes.
+- **Global respeta Settings → Views Tracking.** `Views_Query::get_global()` y `Views_Query::get_global_stats()` agregan únicamente los `resource_type` habilitados en ese momento; si se activa un tipo nuevo, Global lo incluye automáticamente sin nuevas opciones.
+- **Global Top Viewed combina los tipos habilitados en un único ranking.** La identidad de cada fila es `resource_type + resource_id`, evitando colisiones entre `post_id`/`term_id`/`page_id`, y los casos `home`, `search` y `404` participan como recursos independientes en la misma lista.
+- **Global Stats suma los tipos habilitados.** Las cards `Today`, `Last 7 Days`, `Last 30 Days` y `All Time` del tab Views ya muestran la agregación total de todos los tipos activos, no solo Posts.
+- **Diferenciación visual por tipo** en Global Top Viewed usando el mismo patrón visual ya usado por Recent Views: badge de tipo (`[POST]`, `[PAGE]`, `[CATEGORY]`, `[TAG]`, `[HOME]`, `[SEARCH]`, `[404]`).
+
+### Changed
+
+- **Analytics screen integrado con la implementación global ya existente.** Se conecta el selector, el valor inicial y la respuesta AJAX del tab Views a `Views_Query::get_global*()`, sin tocar el tracking ni el resto del flujo de vistas.
+- **Recent Views no se rompe.** La parte ya generalizada sigue funcionando como antes; el cambio queda limitado a la vista Global del tab Views.
+
+### Notes
+
+- No se modifican tracking, redirect, click analytics, schema, migraciones ni Bunny Score.
+
+---
+
+## [1.8.1] — Fix migración de índice legacy + Recent Views generalizado
+
+### Fixed
+
+- **`dbDelta()` no eliminaba el índice `UNIQUE KEY` legacy `post_period` (post_id, period)** al migrar el esquema a v1.8.0 — dbDelta() solo agrega, nunca borra. Si `post_period` sobrevivía junto al nuevo `resource_period`, seguía activo como restricción UNIQUE independiente y bloqueaba exactamente el caso que `resource_type` fue diseñado para permitir: un `post_id=123` y un `term_id=123` de una categoría no podían coexistir el mismo `period`. `Views_Table::migrate_legacy_schema()` ahora elimina explícitamente `post_period` (vía `information_schema.STATISTICS` + `ALTER TABLE ... DROP INDEX`) antes de correr `dbDelta()`, y `schema_is_correct()` verifica el resultado final (columna `resource_type` + su `DEFAULT 'post'`, índice `resource_period` presente, `post_period` ausente) antes de que `Plugin::maybe_upgrade_views_schema()` (gate por opción dedicada `wpam_views_schema_version`, independiente de la versión general del plugin) o `Activator::activate()` marquen la migración como completada. Si la verificación falla, no se marca nada y se reintenta sola en el siguiente `admin_init`.
+
+### Changed
+
+- **Recent Views (Analytics + Dashboard) generalizado a los 7 resource_type** — antes filtraba implícitamente a Posts y descartaba en silencio cualquier fila que `get_post()` no resolviera (category/tag/home/search/404 nunca aparecían). `Views_Query::get_recent()` deja de filtrar por tipo y devuelve `resource_type` en cada fila; `Analytics_Renderer::render_recent_views_section()` resuelve título/enlace por lote (máximo 2 queries adicionales — `get_posts()` para post/page, `get_terms()` para category/tag — nunca una consulta por fila) y muestra etiquetas fijas para Home/Search/404 sin intentar asociar el término de búsqueda o la URL 404 real (viven en tablas auxiliares agregadas, sin relación fila-a-fila con `wpam_views`). Mismo componente compartido entre Analytics y el Dashboard, ambos se benefician sin código duplicado.
+
+### Notes
+
+- Score/Bunny Score, tracking/beacon/AJAX, Settings, esquema de BD y migración: sin cambios en este release más allá del fix de `post_period` arriba descrito.
+
+---
+
 ## [1.8.0] — Views generalizado a 7 tipos de recurso (Posts, Pages, Home, Search, 404, Categories, Tags)
 
 ### Added
 
 - **Sistema de Views generalizado de `post_id` a `resource_type` + `resource_id`.** Nueva clase `Views\Resource_Resolver` (con prioridad de resolución 404 → Search → Home/Front Page → Post → Page → Category → Tag — una Page usada como portada resuelve como `home`, nunca como `page`). El pipeline existente (beacon JS, endpoint AJAX, `View_Tracker`, cookie de dedup) se reutiliza íntegramente para los 7 tipos; no existe un segundo sistema de tracking.
-- **Tabla `wpam_views` extendida** con columna `resource_type VARCHAR(20) NOT NULL DEFAULT 'post'` y `UNIQUE KEY (resource_type, post_id, period)` (la columna `post_id` se conserva sin renombrar — conceptualmente es `resource_id`). Migración no destructiva vía `dbDelta()`: las filas existentes quedan reclasificadas como `resource_type='post'` automáticamente por el `DEFAULT` de columna, sin ningún `UPDATE` manual. Gatillada una sola vez por sitio, controlada por una opción dedicada de versión de esquema (`wpam_views_schema_version`) — independiente de la versión general del plugin — evaluada en `admin_init` (`Plugin::maybe_upgrade_views_schema()`). Incluye la eliminación explícita del índice `UNIQUE KEY` legacy `post_period` (`Views_Table::migrate_legacy_schema()`), ya que `dbDelta()` nunca elimina índices por sí solo: si `post_period` sobreviviera junto al nuevo `resource_period`, seguiría bloqueando como restricción UNIQUE independiente que dos recursos distintos (ej. `post_id=123` y `term_id=123` de una categoría) compartan `period` — exactamente el caso que `resource_type` fue diseñado para permitir. La migración verifica el esquema final antes de marcarse como completada, y se reintenta sola en la siguiente carga de `admin_init` si algo falla a mitad de camino.
+- **Tabla `wpam_views` extendida** con columna `resource_type VARCHAR(20) NOT NULL DEFAULT 'post'` y `UNIQUE KEY (resource_type, post_id, period)` (la columna `post_id` se conserva sin renombrar — conceptualmente es `resource_id`). Migración no destructiva vía `dbDelta()`: las filas existentes quedan reclasificadas como `resource_type='post'` automáticamente por el `DEFAULT` de columna, sin ningún `UPDATE` manual. Gatillada una sola vez por sitio, evaluada en `admin_init` (`Plugin::maybe_upgrade_views_schema()`).
 - **2 tablas auxiliares nuevas** para contexto agregado de Search/404: `wpam_views_search_terms` (término normalizado + día + contador) y `wpam_views_404` (path normalizado, sin dominio ni query string, + día + contador). Mismo modelo agregado que `wpam_views` — una fila por término/URL únicos por día, nunca una fila por visita. Normalización estricta (sin HTML, longitud acotada a 100/255 caracteres) antes de escribir.
 - **Settings → Views Tracking: activación individual por tipo de recurso** (`views.resource_types.{post|page|home|search|404|category|tag}`). Posts activado por defecto (preserva el comportamiento previo); el resto arranca desactivado. El chequeo de tipo habilitado es el primer paso dentro de `Views::is_eligible()`, antes de cualquier validación de contenido o regla de admin/logged-in/bot.
 - **Analytics → tab Views: selector de resource_type** (Posts/Pages/Categories/Tags/Home/Search/404, Posts por defecto). Reutiliza el mismo mecanismo de filtro AJAX existente (`wpam_analytics_filter`), ahora también actualizando los 4 números de las stat cards al cambiar de tipo. Search/404 muestran una lista simple de términos/URLs más frecuentes en vez del listado de posts.
@@ -25,7 +62,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Notes
 
 - Sin cambios en las 5 reglas del algoritmo de Bunny Score ni en los contratos públicos de `WPAM_API` / `Top_Posts_Query` / shortcode `[wpam_top_posts]` / `Widget_Top_Posts`.
-- "Recent Views" en Analytics permanece exclusivamente Posts — fuera de alcance generalizarlo en esta versión.
 
 ---
 

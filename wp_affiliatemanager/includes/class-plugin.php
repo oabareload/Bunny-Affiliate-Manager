@@ -285,6 +285,9 @@ final class Plugin {
 		$admin_menu_maint = new Admin\Admin_Menu();
 		$this->loader->add_action( 'admin_post_wpam_rebuild_token_map', $admin_menu_maint, 'handle_rebuild_token_map' );
 		$this->loader->add_action( 'admin_post_wpam_clear_analytics',    $admin_menu_maint, 'handle_clear_analytics' );
+		$this->loader->add_action( 'admin_post_wpam_clear_all',          $admin_menu_maint, 'handle_clear_all' );
+		$this->loader->add_action( 'admin_post_wpam_clear_clicks',       $admin_menu_maint, 'handle_clear_clicks' );
+		$this->loader->add_action( 'admin_post_wpam_clear_views',        $admin_menu_maint, 'handle_clear_views' );
 		$this->loader->add_action( 'admin_post_wpam_import_post_views_counter', $admin_menu_maint, 'handle_import_post_views_counter' );
 
 		// v0.2.7: Broken link report clear actions (admin-only).
