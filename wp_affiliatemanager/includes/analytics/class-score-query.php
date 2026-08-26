@@ -81,7 +81,7 @@ class Score_Query {
 
 		if ( 'total' !== $range ) {
 			$since_datetime = Top_Posts_Query::range_to_since( $range );
-			$since_period   = gmdate( 'Ymd', strtotime( $since_datetime ) );
+			$since_period   = Top_Posts_Query::range_to_period_since( $range );
 			$views_where   .= $wpdb->prepare( ' AND period >= %s', $since_period );
 			$clicks_where   = $wpdb->prepare( ' WHERE ts >= %s', $since_datetime );
 		}
@@ -202,7 +202,7 @@ class Score_Query {
 
 		if ( 'total' !== $range ) {
 			$since_datetime = Top_Posts_Query::range_to_since( $range );
-			$since_period   = gmdate( 'Ymd', strtotime( $since_datetime ) );
+			$since_period   = Top_Posts_Query::range_to_period_since( $range );
 			$views_where   .= $wpdb->prepare( ' AND period >= %s', $since_period );
 			$clicks_where   = $wpdb->prepare( ' WHERE ts >= %s', $since_datetime );
 		}
@@ -329,7 +329,7 @@ class Score_Query {
 
 		if ( 'total' !== $range ) {
 			$since_datetime = Top_Posts_Query::range_to_since( $range );
-			$since_period   = gmdate( 'Ymd', strtotime( $since_datetime ) );
+			$since_period   = Top_Posts_Query::range_to_period_since( $range );
 			$views_where   .= $wpdb->prepare( ' AND period >= %s', $since_period );
 			$clicks_where   = $wpdb->prepare( ' WHERE ts >= %s', $since_datetime );
 		}
@@ -389,7 +389,7 @@ class Score_Query {
 
 		if ( 'total' !== $range ) {
 			$since_datetime = Top_Posts_Query::range_to_since( $range );
-			$since_period   = gmdate( 'Ymd', strtotime( $since_datetime ) );
+			$since_period   = Top_Posts_Query::range_to_period_since( $range );
 			$views_where   .= $wpdb->prepare( ' AND period >= %s', $since_period );
 			$clicks_where   = $wpdb->prepare( ' WHERE ts >= %s', $since_datetime );
 		}
@@ -431,7 +431,7 @@ class Score_Query {
 
 		if ( 'total' !== $range ) {
 			$since_datetime = Top_Posts_Query::range_to_since( $range );
-			$since_period   = gmdate( 'Ymd', strtotime( $since_datetime ) );
+			$since_period   = Top_Posts_Query::range_to_period_since( $range );
 			$views_where   .= $wpdb->prepare( ' AND period >= %s', $since_period );
 			$clicks_where   = $wpdb->prepare( ' WHERE ts >= %s', $since_datetime );
 		}

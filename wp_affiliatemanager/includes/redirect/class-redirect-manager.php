@@ -159,6 +159,23 @@ class Redirect_Manager {
 			return;
 		}
 
+		$this->continue_authorized_redirect( $destination, $token, $goa_post_id, $goa_affiliate_id );
+	}
+
+	/**
+	 * Continúa el flujo normal del redirect una vez que el navegador ya está
+	 * autorizado por cookie o por validación CAPTCHA.
+	 *
+	 * @param  array  $destination
+	 * @param  string $token
+	 * @param  int    $goa_post_id
+	 * @param  int    $goa_affiliate_id
+	 * @return void
+	 */
+	private function continue_authorized_redirect( array $destination, string $token, int $goa_post_id = 0, int $goa_affiliate_id = 0 ): void {
+		$options        = get_option( WPAM_OPTION_KEY, array() );
+		$exclude_admins = ! empty( $options['general']['exclude_admins_from_analytics'] );
+
 		if ( ! ( $exclude_admins && current_user_can( 'manage_options' ) ) ) {
 			try {
 				$tracker = new Click_Tracker();
@@ -210,13 +227,8 @@ class Redirect_Manager {
 			if ( '' !== $token_response && $this->verify_recaptcha( $token_response ) ) {
 				$views = new Views();
 				$views->record_valid_view( 'post', (int) $destination['post_id'] );
-
-				if ( ! ( ! empty( $options['general']['exclude_admins_from_analytics'] ) && current_user_can( 'manage_options' ) ) ) {
-					$tracker = new Click_Tracker();
-					$tracker->record( $destination['post_id'], $destination['affiliate_id'], $destination['url'] );
-				}
-
-				$this->redirect_to_destination( $destination['url'] );
+				$this->continue_authorized_redirect( $destination, $token, $goa_post_id, $goa_affiliate_id );
+				return;
 			}
 		}
 

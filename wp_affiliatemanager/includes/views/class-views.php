@@ -486,8 +486,8 @@ class Views {
 	/**
 	 * Añade la clave "{type}:{id}" a la cookie de deduplicación del período actual.
 	 *
-	 * La cookie expira a medianoche UTC, alineada con el corte de `period`
-	 * (gmdate('Ymd')) usado en Views_Table, así el dedup y el histórico
+	 * La cookie expira a medianoche del timezone de WordPress, alineada con el
+	 * corte de `period` (wp_date('Ymd')) usado en Views_Table, así el dedup y el histórico
 	 * diario nunca quedan desincronizados por husos horarios.
 	 *
 	 * @since  1.2.0
@@ -508,14 +508,20 @@ class Views {
 			$ids = array_slice( $ids, -self::COOKIE_MAX_ENTRIES );
 		}
 
-		$expire = ( new \DateTime( 'now', new \DateTimeZone( 'UTC' ) ) )
+		$expire = current_datetime()
 			->setTime( 0, 0, 0 )
 			->modify( '+1 day' )
 			->getTimestamp();
 
+		$value = implode( ',', $ids );
+		if ( function_exists( 'wp_set_cookie' ) ) {
+			wp_set_cookie( self::COOKIE_NAME, $value, 'statistics', $expire, '/', '', is_ssl(), true );
+			return;
+		}
+
 		setcookie(
 			self::COOKIE_NAME,
-			implode( ',', $ids ),
+			$value,
 			array(
 				'expires'  => $expire,
 				'path'     => '/',
@@ -544,8 +550,22 @@ class Views {
 			return array();
 		}
 
-		// sanitize_key() por entrada: una cookie manipulada no puede inyectar
-		// nada distinto de [a-z0-9_:-], suficiente para el formato "type:id".
-		return array_map( 'sanitize_key', explode( ',', $raw ) );
+		// El formato funcional de la clave es siempre "resource_type:resource_id".
+		// No se puede aplicar sanitize_key() porque ese helper convierte ':' en '_'
+		// y rompe la comparación con build_cookie_key(). Solo aceptamos entradas
+		// válidas dentro del formato esperado (tipo + id), conservando exactamente
+		// la cadena que se escribió en la cookie.
+		$ids = array();
+		foreach ( array_map( 'trim', explode( ',', $raw ) ) as $entry ) {
+			$entry = sanitize_text_field( $entry );
+			if ( '' === $entry ) {
+				continue;
+			}
+			if ( 1 === preg_match( '/^[a-z0-9_]+:[0-9]+$/i', $entry ) ) {
+				$ids[] = $entry;
+			}
+		}
+
+		return $ids;
 	}
 }

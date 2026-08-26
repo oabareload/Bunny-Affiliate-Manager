@@ -980,7 +980,6 @@ class Views_Query {
 	 * @return string  YYYYMMDD
 	 */
 	private static function range_to_period_since( string $range ): string {
-		$since_datetime = Top_Posts_Query::range_to_since( $range );
-		return gmdate( 'Ymd', strtotime( $since_datetime ) );
+		return Top_Posts_Query::range_to_period_since( $range );
 	}
 }

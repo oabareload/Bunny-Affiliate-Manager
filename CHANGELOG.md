@@ -5,6 +5,56 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8.8] — WordPress Consent API para `wpam_v`
+
+### Added
+
+- **Integración opcional con WordPress Consent API.** Bunny Affiliate Manager declara compatibilidad y registra `wpam_v` en la categoría `statistics`, describiendo su finalidad de relacionar una View con un posterior Click de afiliado.
+
+### Changed
+
+- **Creación de `wpam_v` mediante Consent API cuando está disponible.** Se conservan el nombre, valor, expiración, flags de seguridad y flujo View → Click; si Consent API no está instalado, se mantiene la creación directa compatible.
+
+### Notes
+
+- La lectura de `wpam_v`, la lógica de deduplicación y el tracking no fueron modificados.
+
+---
+
+## [1.8.7] — Timezone de WordPress para Views, Clicks y Analytics
+
+### Fixed
+
+- **Períodos diarios homologados al timezone configurado en WordPress.** Views y sus tablas auxiliares ahora asignan `period` con `wp_date('Ymd')`, y la cookie diaria de deduplicación expira en la medianoche local correspondiente.
+- **Today, Week y Month corregidos en todas las estadísticas.** Top Clicked, Top Viewed, Score/Bunny Score y las estadísticas agregadas comparten límites calculados desde `current_datetime()` y `wp_timezone()`.
+- **Clicks históricos mantienen compatibilidad con la base de datos.** El campo `ts` conserva su formato `DATETIME`; los límites locales se convierten a UTC solamente al comparar contra ese almacenamiento.
+- **Recent Clicks se presenta en el timezone de WordPress.** Se mantiene intacto el tracking y el formato existente de `period` y `ts`.
+
+### Notes
+
+- No se modifican tracking, deduplicación funcional, schema, migraciones ni el formato de timestamps existentes.
+
+---
+
+## [1.8.6] — Fix `wpam_v` cookie key validation
+
+### Fixed
+
+- **Corregida la lectura de las claves de `wpam_v`.** La cookie sigue guardando exactamente el formato funcional `resource_type:resource_id` (por ejemplo `post:123`, `page:45`, `home:0`, `search:0`, `404:0`, `category:12`, `tag:34`), y la lectura ya no aplica `sanitize_key()` sobre ese valor, evitando la conversión accidental `post:123` → `post_123`.
+- **Views previamente registradas vuelven a ser reconocidas por `/go/...`.** El redirect ahora compara la clave generada por `build_cookie_key()` con el valor real leído de la cookie, manteniendo la consistencia entre almacenamiento y validación.
+- **Se evita el CAPTCHA innecesario tras una View válida.** Si el visitante ya tiene la cookie de deduplicación válida para la publicación, el segundo `/go/...` ya no vuelve a pedir validación humana.
+- **El flujo CAPTCHA → View → Click → Interstitial → redirect se mantiene intacto.** La corrección es estrictamente de lectura de la cookie y no cambia comportamiento de tracking, Beacon, AJAX, View_Tracker, click analytics ni schema.
+
+### Changed
+
+- **Se preserva el formato de `wpam_v` como fuente única de verdad.** `build_cookie_key()` sigue generando `resource_type:resource_id` y `get_cookie_ids()` ahora devuelve exactamente esas claves funcionales sin convertir `:` a `_`.
+
+### Notes
+
+- El fix es limitado a la validación de cookies de deduplicación; no modifica redirect, CAPTCHA, schema, migración ni Bunny Score.
+
+---
+
 ## [1.8.2] — Analytics > Views: vista Global y stats agregadas
 
 ### Added

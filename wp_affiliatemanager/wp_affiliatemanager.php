@@ -3,7 +3,7 @@
  * Plugin Name:       Bunny Affiliate Manager
  * Plugin URI:        https://bunnychase.net/bunny-affiliate-manager
  * Description:       Sistema modular y escalable para administrar enlaces de afiliados por entrada/post dentro de WordPress.
- * Version:           1.8.2
+ * Version:           1.8.8
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            BunnyChase
@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ---------------------------------------------------------------------------
 
 /** Versión actual del plugin. */
-define( 'WPAM_VERSION', '1.8.2' );
+define( 'WPAM_VERSION', '1.8.8' );
 
 /** Ruta absoluta al archivo principal del plugin. */
 define( 'WPAM_PLUGIN_FILE', __FILE__ );
@@ -51,6 +51,29 @@ define( 'WPAM_BUNNY_SCORE_SETTINGS_KEY', 'wpam_bunny_score_settings' );
  * bajo demanda desde la pantalla Bunny Score).
  */
 define( 'WPAM_BUNNY_SCORE_CACHE_KEY', 'wpam_bunny_score_cache' );
+
+// WP Consent API integration is optional.
+$wpam_consent_plugin = plugin_basename( __FILE__ );
+add_filter( "wp_consent_api_registered_{$wpam_consent_plugin}", '__return_true' );
+
+/**
+ * Register WPAM's view-to-click cookie with the optional Consent API.
+ *
+ * @return void
+ */
+function wpam_register_consent_api_cookie(): void {
+	if ( function_exists( 'wp_add_cookie_info' ) ) {
+		wp_add_cookie_info(
+			'wpam_v',
+			'Bunny Affiliate Manager',
+			'statistics',
+			'Until end of day',
+			'Relates a view to a later affiliate click.',
+			''
+		);
+	}
+}
+add_action( 'plugins_loaded', 'wpam_register_consent_api_cookie', 10 );
 
 // ---------------------------------------------------------------------------
 // Autoload de clases base

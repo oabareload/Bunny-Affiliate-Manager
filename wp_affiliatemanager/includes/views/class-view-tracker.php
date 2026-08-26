@@ -65,7 +65,7 @@ class View_Tracker {
 
 		global $wpdb;
 
-		$period = gmdate( 'Ymd' );
+		$period = wp_date( 'Ymd' );
 		$table  = Views_Table::table_name();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
@@ -104,7 +104,7 @@ class View_Tracker {
 
 		global $wpdb;
 
-		$period = gmdate( 'Ymd' );
+		$period = wp_date( 'Ymd' );
 		$table  = Views_Table::search_terms_table_name();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
@@ -141,7 +141,7 @@ class View_Tracker {
 
 		global $wpdb;
 
-		$period = gmdate( 'Ymd' );
+		$period = wp_date( 'Ymd' );
 		$table  = Views_Table::table_404_name();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared

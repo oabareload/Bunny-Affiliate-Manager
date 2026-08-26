@@ -133,7 +133,7 @@ class Views_Table {
 	 *
 	 * period es CHAR(8) (YYYYMMDD) en vez de DATE para permitir comparaciones
 	 * e índices simples sin conversión de tipo, y para que la generación del
-	 * valor en PHP (gmdate('Ymd')) sea trivial y libre de timezone del servidor.
+	 * valor en PHP (wp_date('Ymd')) use el timezone configurado en WordPress.
 	 *
 	 * @since  1.2.0
 	 * @since  1.8.0 Añade resource_type a la tabla principal y crea las 2

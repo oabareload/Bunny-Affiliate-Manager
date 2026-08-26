@@ -256,16 +256,6 @@ class Settings {
 			self::PAGE_SLUG
 		);
 
-		// ---------------------------------------------------------------------------
-		// Sección: Maintenance — v1.8.0
-		// ---------------------------------------------------------------------------
-		add_settings_section(
-			'wpam_section_maintenance',
-			__( 'Maintenance', 'wp-affiliatemanager' ),
-			array( $this, 'render_section_maintenance' ),
-			self::PAGE_SLUG
-		);
-
 		add_settings_field(
 			'wpam_field_enable_interstitial',
 			__( 'Habilitar página interstitial', 'wp-affiliatemanager' ),
@@ -461,6 +451,7 @@ class Settings {
 			self::PAGE_SLUG,
 			'wpam_section_appearance'
 		);
+
 	}
 
 	// ---------------------------------------------------------------------------
@@ -485,20 +476,6 @@ class Settings {
 	 */
 	public function render_section_redirect(): void {
 		echo '<p>' . esc_html__( 'Configura la página interstitial que aparece antes de redirigir al sitio externo.', 'wp-affiliatemanager' ) . '</p>';
-	}
-
-	/**
-	 * Renderiza la sección Maintenance con las acciones de mantenimiento.
-	 *
-	 * @since  1.8.0
-	 * @return void
-	 */
-	public function render_section_maintenance(): void {
-		$admin_menu = new \WP_AffiliateManager\Admin\Admin_Menu();
-		$ref = new \ReflectionClass( $admin_menu );
-		$method = $ref->getMethod( 'render_maintenance_card' );
-		$method->setAccessible( true );
-		$method->invoke( $admin_menu );
 	}
 
 	/**

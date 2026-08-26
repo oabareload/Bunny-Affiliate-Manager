@@ -98,6 +98,15 @@ class Admin_Menu {
 
 		add_submenu_page(
 			self::PARENT_SLUG,
+			__( 'Maintenance — Bunny Affiliate Manager', 'wp-affiliatemanager' ),
+			__( 'Maintenance', 'wp-affiliatemanager' ),
+			self::CAPABILITY,
+			'wpam-maintenance',
+			array( $this, 'render_maintenance_page' )
+		);
+
+		add_submenu_page(
+			self::PARENT_SLUG,
 			__( 'Bunny Score — Bunny Affiliate Manager', 'wp-affiliatemanager' ),
 			__( 'Bunny Score', 'wp-affiliatemanager' ),
 			self::CAPABILITY,
@@ -353,6 +362,7 @@ class Admin_Menu {
 			'wpam-post-affiliates' => __( 'Post Affiliates', 'wp-affiliatemanager' ),
 			'wpam-broken-reports'  => __( 'Broken Reports', 'wp-affiliatemanager' ),
 			'wpam-settings'        => __( 'Settings', 'wp-affiliatemanager' ),
+			'wpam-maintenance'     => __( 'Maintenance', 'wp-affiliatemanager' ),
 			'wpam-bunny-score'     => __( 'Bunny Score', 'wp-affiliatemanager' ),
 		);
 
@@ -372,17 +382,29 @@ class Admin_Menu {
 	}
 
 	// -------------------------------------------------------------------------
-	// v0.2.4 — Maintenance (movido a la página Settings en v1.4.0)
+	// Maintenance page (independent admin page)
 	// -------------------------------------------------------------------------
 
-	/**
-	 * Renderiza la card de mantenimiento.
-	 *
-	 * Se muestra ahora en la página Settings en vez del Dashboard (v1.4.0).
-	 * Sin cambios de funcionalidad ni de handlers.
-	 *
-	 * @since 0.2.4
-	 */
+	public function render_maintenance_page(): void {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'No tienes permisos para acceder a esta página.', 'wp-affiliatemanager' ) );
+		}
+
+		$this->render_admin_header( __( 'Maintenance', 'wp-affiliatemanager' ) );
+		?>
+		<div class="bunny-page-content wpam-maintenance-page">
+			<div class="wpam-screen-header">
+				<div class="wpam-screen-header-info">
+					<h2 class="wpam-screen-title"><?php esc_html_e( 'Maintenance', 'wp-affiliatemanager' ); ?></h2>
+					<p class="description"><?php esc_html_e( 'Manage analytics data and maintenance actions for the plugin.', 'wp-affiliatemanager' ); ?></p>
+				</div>
+			</div>
+			<?php $this->render_maintenance_card(); ?>
+		</div>
+		<?php
+		$this->render_admin_footer();
+	}
+
 	private function render_maintenance_card(): void {
 		// Mostrar notice si venimos de una reconstrucción exitosa.
 		// phpcs:disable WordPress.Security.NonceVerification
@@ -507,19 +529,6 @@ class Admin_Menu {
 			</div>
 
 			<?php if ( \WP_AffiliateManager\Views\Views_Importer::can_run() ) : ?>
-			<div class="wpam-maintenance-row">
-				<div class="wpam-maintenance-info">
-					<strong><?php esc_html_e( 'Import from Post Views Counter', 'wp-affiliatemanager' ); ?></strong>
-					<p class="description"><?php esc_html_e( 'One-time migration: imports daily view counts (type=0) from Post Views Counter into wpam_views. Existing counts are added to, never overwritten. The source table is never modified. This can only be run once.', 'wp-affiliatemanager' ); ?></p>
-				</div>
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return window.confirm('<?php echo esc_js( __( 'Import view counts from Post Views Counter? This can only be run once.', 'wp-affiliatemanager' ) ); ?>');">
-					<input type="hidden" name="action" value="wpam_import_post_views_counter" />
-					<?php wp_nonce_field( 'wpam_import_post_views_counter', 'wpam_nonce' ); ?>
-					<button type="submit" class="button button-secondary">
-						<?php esc_html_e( 'Import Views', 'wp-affiliatemanager' ); ?>
-					</button>
-				</form>
-			</div>
 			<?php endif; ?>
 		</div>
 		<?php
@@ -916,12 +925,18 @@ class Admin_Menu {
 		$reports = is_array( $reports ) ? $reports : array();
 
 		if ( isset( $reports[ $token ] ) ) {
-			$last_ts = strtotime( $reports[ $token ]['last_reported'] ?? '' );
+			$last_reported = (string) ( $reports[ $token ]['last_reported'] ?? '' );
+			$last_datetime = \DateTimeImmutable::createFromFormat(
+				'!Y-m-d H:i:s',
+				$last_reported,
+				new \DateTimeZone( 'UTC' )
+			);
+			$last_ts = $last_datetime instanceof \DateTimeImmutable ? $last_datetime->getTimestamp() : 0;
 			if ( $last_ts && ( time() - $last_ts ) < 600 ) {
 				wp_die( '', '', array( 'response' => 200 ) );
 			}
 			$reports[ $token ]['count']         = absint( $reports[ $token ]['count'] ) + 1;
-			$reports[ $token ]['last_reported'] = gmdate( 'Y-m-d H:i:s' );
+			$reports[ $token ]['last_reported'] = current_time( 'mysql', true );
 			if ( 0 === absint( $reports[ $token ]['post_id'] ?? 0 ) && $post_id > 0 ) {
 				$reports[ $token ]['post_id'] = $post_id;
 			}
@@ -929,7 +944,7 @@ class Admin_Menu {
 			$reports[ $token ] = array(
 				'count'         => 1,
 				'post_id'       => $post_id,
-				'last_reported' => gmdate( 'Y-m-d H:i:s' ),
+				'last_reported' => current_time( 'mysql', true ),
 			);
 		}
 

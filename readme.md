@@ -12,14 +12,14 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Domain Path: /languages
 - License: GPLv2 or later
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **1.8.2**
+- Current version: **1.8.8**
 
 ## Requirements
 
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v1.8.2)
+## Current scope (v1.8.8)
 
 ### Affiliates
 
@@ -67,6 +67,8 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Eligibility rules (which resource types are tracked, bot filtering, whether to count admins, whether to count logged-in users) are governed by **Settings → Views** and evaluated through a single source of truth (`Views::is_eligible()`), used both when deciding whether to enqueue the beacon and when validating the AJAX request server-side.
 - **Bunny Score and its Analytics tab remain strictly Posts-only** — `Score_Query` hardcodes `resource_type = 'post'` in every query, unaffected by the other 6 types being tracked.
 - **One-time importer** from the *Post Views Counter* plugin (**Settings → Maintenance → Import Views**): additive upsert (adds to existing counts, never overwrites), never modifies the source table, and can only run once per site.
+- **Timezone unificado:** Views, Clicks, Today, Week, Month, Recent, Top Viewed, Top Clicked y Bunny Score determinan sus períodos usando el timezone configurado en WordPress. Los límites de Clicks se convierten a UTC únicamente al consultar el `ts` histórico almacenado, sin cambiar el formato de la base de datos.
+- **Consent API:** la cookie `wpam_v` se registra como `statistics` y se escribe mediante la API cuando está disponible, manteniendo un fallback compatible cuando no está instalado.
 
 ### Recently Viewed Posts
 

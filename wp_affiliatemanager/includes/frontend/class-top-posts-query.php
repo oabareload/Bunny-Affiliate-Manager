@@ -304,16 +304,37 @@ class Top_Posts_Query {
 	 * @return string  Y-m-d H:i:s en UTC
 	 */
 	public static function range_to_since( string $range ): string {
+		$timezone = wp_timezone();
+		$now      = current_datetime()->setTimezone( $timezone )->setTime( 0, 0, 0 );
+		$since    = $now;
+
 		switch ( $range ) {
 			case 'today':
-				return gmdate( 'Y-m-d' ) . ' 00:00:00';
+				break;
 			case 'week':
-				return gmdate( 'Y-m-d', strtotime( '-7 days' ) ) . ' 00:00:00';
+				$since = $now->modify( '-7 days' );
+				break;
 			case 'month':
-				return gmdate( 'Y-m-d', strtotime( '-30 days' ) ) . ' 00:00:00';
+				$since = $now->modify( '-30 days' );
+				break;
 			default:
 				return '1970-01-01 00:00:00';
 		}
+
+		return $since->setTimezone( new \DateTimeZone( 'UTC' ) )->format( 'Y-m-d H:i:s' );
+	}
+
+	/**
+	 * Convierte un rango al período diario almacenado por Views.
+	 *
+	 * @param  string $range today|week|month
+	 * @return string YYYYMMDD
+	 */
+	public static function range_to_period_since( string $range ): string {
+		$since = self::range_to_since( $range );
+		$utc   = new \DateTimeImmutable( $since, new \DateTimeZone( 'UTC' ) );
+
+		return wp_date( 'Ymd', $utc->getTimestamp() );
 	}
 
 	// -------------------------------------------------------------------------
@@ -335,14 +356,14 @@ class Top_Posts_Query {
 		global $wpdb;
 		$table = Clicks_Table::table_name();
 
-		$today = gmdate( 'Y-m-d' );
-		$week  = gmdate( 'Y-m-d', strtotime( '-7 days' ) );
-		$month = gmdate( 'Y-m-d', strtotime( '-30 days' ) );
+		$today = self::range_to_since( 'today' );
+		$week  = self::range_to_since( 'week' );
+		$month = self::range_to_since( 'month' );
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$today_count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE ts >= %s', $table, $today . ' 00:00:00' ) );
-		$week_count  = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE ts >= %s', $table, $week  . ' 00:00:00' ) );
-		$month_count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE ts >= %s', $table, $month . ' 00:00:00' ) );
+		$today_count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE ts >= %s', $table, $today ) );
+		$week_count  = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE ts >= %s', $table, $week ) );
+		$month_count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE ts >= %s', $table, $month ) );
 		$total_count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $table ) );
 		// phpcs:enable
 

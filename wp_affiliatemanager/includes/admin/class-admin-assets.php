@@ -28,6 +28,7 @@ class Admin_Assets {
 		'bunny-affiliates_page_wpam-post-affiliates',
 		'bunny-affiliates_page_wpam-broken-reports',
 		'bunny-affiliates_page_wpam-settings',
+		'bunny-affiliates_page_wpam-maintenance',
 		'bunny-affiliates_page_wpam-bunny-score',
 	);
 

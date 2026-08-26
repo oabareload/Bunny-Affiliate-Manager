@@ -213,6 +213,13 @@ class Analytics_Screen {
 
 			case 'views':
 				$resource_type = sanitize_key( wp_unslash( $_POST['resource_type'] ?? 'global' ) );
+
+				// Debe abrirse ANTES de cualquier render_*() de esta rama — las 5
+				// ramas siguientes (global/tipo específico/search/404/home)
+				// comparten el mismo ob_get_clean() al final del case. Sin esto, el
+				// HTML se imprime crudo antes del JSON y rompe la respuesta AJAX.
+				ob_start();
+
 				if ( 'global' === $resource_type ) {
 					$viewed = Views_Query::get_global_cached( $range, 10 );
 					$stats  = Views_Query::get_global_stats_cached();
