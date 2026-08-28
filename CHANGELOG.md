@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8.10] — Top UTM Sources en Analytics → Views
+
+### Added
+
+- **Sección "Top UTM Sources" en Analytics → Views.** Muestra `utm_source` y número de Views agregados desde la tabla auxiliar `wpam_views_utm` (poblada desde v1.8.9), con una sola consulta `GROUP BY` — sin consultas individuales por fuente.
+
+### Notes
+
+- Respeta exactamente el mismo rango (Today/Week/Month/All Time) y timezone que el resto de Views, reutilizando `range_to_period_since()`; no introduce una segunda lógica de fechas.
+- No modifica `wpam_views`, su deduplicación, el tracking de Clicks, ni la estructura o el tracking de `wpam_views_utm` (ya existentes desde v1.8.9). Solo agrega lectura/visualización.
+
+---
+
 ## [1.8.8] — WordPress Consent API para `wpam_v`
 
 ### Added

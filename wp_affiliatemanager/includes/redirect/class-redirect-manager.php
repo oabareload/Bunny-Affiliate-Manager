@@ -59,6 +59,29 @@ class Redirect_Manager {
 	/** @since 1.5.0 Query var para el affiliate_id en la ruta /goa/. */
 	const QUERY_VAR_DEFAULT_AFFILIATE = 'wpam_goa_affiliate';
 
+	/**
+	 * Prefijo del slug para el interstitial de enlaces externos genéricos
+	 * dentro del contenido (no ligados a un afiliado). Ruta: /goext/{sig}/?u={url}
+	 *
+	 * La URL de destino viaja en el query string estándar (?u=), no en el
+	 * path — no requiere registrarse como query var de WordPress: PHP la
+	 * expone siempre en $_GET independientemente del rewrite, igual que
+	 * ocurre con cualquier parámetro adicional anexado a una URL reescrita.
+	 *
+	 * @since 1.8.9
+	 */
+	const SLUG_EXTERNAL = 'goext';
+
+	/** @since 1.8.9 Query var para la firma HMAC en la ruta /goext/. */
+	const QUERY_VAR_EXTERNAL_SIG = 'wpam_goext_sig';
+
+	/**
+	 * Longitud en caracteres hex de la firma HMAC de /goext/.
+	 *
+	 * @since 1.8.9
+	 */
+	const EXTERNAL_SIG_LENGTH = 16;
+
 	// -------------------------------------------------------------------------
 	// Registro de rewrite rule y query var
 	// -------------------------------------------------------------------------
@@ -87,6 +110,16 @@ class Redirect_Manager {
 			'index.php?' . self::QUERY_VAR_DEFAULT_POST . '=$matches[1]&' . self::QUERY_VAR_DEFAULT_AFFILIATE . '=$matches[2]',
 			'top'
 		);
+
+		// v1.8.9: interstitial genérico para enlaces externos dentro del
+		// contenido. La firma va en el path (validada server-side contra HMAC),
+		// la URL de destino viaja en el query string (?u=) y no necesita
+		// query var propia (ver nota en QUERY_VAR_EXTERNAL_SIG).
+		add_rewrite_rule(
+			'^' . self::SLUG_EXTERNAL . '/([a-f0-9]{' . self::EXTERNAL_SIG_LENGTH . '})/?$',
+			'index.php?' . self::QUERY_VAR_EXTERNAL_SIG . '=$matches[1]',
+			'top'
+		);
 	}
 
 	/**
@@ -101,6 +134,7 @@ class Redirect_Manager {
 		$vars[] = self::QUERY_VAR;
 		$vars[] = self::QUERY_VAR_DEFAULT_POST;
 		$vars[] = self::QUERY_VAR_DEFAULT_AFFILIATE;
+		$vars[] = self::QUERY_VAR_EXTERNAL_SIG;
 		return $vars;
 	}
 
@@ -130,7 +164,14 @@ class Redirect_Manager {
 		$goa_affiliate_id = absint( get_query_var( self::QUERY_VAR_DEFAULT_AFFILIATE, 0 ) );
 		$is_goa           = ( $goa_post_id > 0 && $goa_affiliate_id > 0 );
 
-		if ( '' === $token && ! $is_goa ) {
+		// v1.8.9: interstitial genérico para enlaces externos del contenido.
+		// La sig viaja como query var (path), la URL destino como $_GET['u']
+		// crudo (nunca se registra como query var de WP, ver constante).
+		$goext_sig = (string) get_query_var( self::QUERY_VAR_EXTERNAL_SIG, '' );
+		$goext_url = isset( $_GET['u'] ) ? esc_url_raw( wp_unslash( $_GET['u'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$is_goext  = ( '' !== $goext_sig && '' !== $goext_url );
+
+		if ( '' === $token && ! $is_goa && ! $is_goext ) {
 			return; // No es nuestra petición.
 		}
 
@@ -138,9 +179,13 @@ class Redirect_Manager {
 		$exclude_admins = ! empty( $options['general']['exclude_admins_from_analytics'] );
 
 		try {
-			$destination = $is_goa
-				? $this->resolve_default( $goa_post_id, $goa_affiliate_id )
-				: $this->resolve( $token );
+			if ( $is_goext ) {
+				$destination = $this->resolve_external( $goext_url, $goext_sig );
+			} elseif ( $is_goa ) {
+				$destination = $this->resolve_default( $goa_post_id, $goa_affiliate_id );
+			} else {
+				$destination = $this->resolve( $token );
+			}
 		} catch ( \Throwable $e ) {
 			$destination = null;
 		}
@@ -148,6 +193,16 @@ class Redirect_Manager {
 		if ( null === $destination ) {
 			wp_safe_redirect( home_url() );
 			exit;
+		}
+
+		// Los enlaces externos genéricos no pasan por el view-gate de
+		// reCAPTCHA/cookie (es una protección específica del flujo de
+		// afiliados) ni registran Click en wpam_clicks (no hay affiliate_id
+		// real al que asociar la fila) — solo reutilizan el interstitial y el
+		// redirect seguro existentes.
+		if ( $is_goext ) {
+			$this->continue_external_redirect( $destination );
+			return;
 		}
 
 		$resource_type = 'post';
@@ -195,6 +250,30 @@ class Redirect_Manager {
 		if ( $enable_interstitial && $delay > 0 ) {
 			$renderer = new Interstitial_Renderer();
 			$renderer->render( array_merge( $destination, array( 'token' => $token ) ) );
+			return;
+		}
+
+		$this->redirect_to_destination( $destination['url'] );
+	}
+
+	/**
+	 * Continúa el flujo de un enlace externo genérico (no afiliado) hacia el
+	 * interstitial existente. A diferencia de continue_authorized_redirect():
+	 * no registra Click (no hay affiliate_id real) y no pasa por el view-gate
+	 * de reCAPTCHA/cookie (protección específica del flujo de afiliados).
+	 *
+	 * @since  1.8.9
+	 * @param  array $destination { @type int $post_id 0, @type int $affiliate_id 0, @type string $url }
+	 * @return void
+	 */
+	private function continue_external_redirect( array $destination ): void {
+		$options              = get_option( WPAM_OPTION_KEY, array() );
+		$enable_interstitial = ! empty( $options['redirect']['enable_interstitial'] ?? true );
+		$delay                = absint( $options['redirect']['redirect_delay'] ?? 3 );
+
+		if ( $enable_interstitial && $delay > 0 ) {
+			$renderer = new Interstitial_Renderer();
+			$renderer->render( array_merge( $destination, array( 'token' => '' ) ) );
 			return;
 		}
 
@@ -541,6 +620,195 @@ class Redirect_Manager {
 			'link_index'   => (int) $link['order'],
 			'affiliate_id' => $affiliate_id,
 			'url'          => $url,
+		);
+	}
+
+	/**
+	 * Resuelve un destino de enlace externo genérico para la ruta
+	 * /goext/{sig}/?u={url}.
+	 *
+	 * A diferencia de resolve() y resolve_default(), no depende del mapa de
+	 * tokens ni de Post_Links: la URL de destino viaja en claro en el query
+	 * string, protegida únicamente por la firma HMAC (ver
+	 * generate_external_signature()). Esta firma es la única razón por la que
+	 * /goext/ no es un open redirect: nadie puede producir una firma válida
+	 * para una URL arbitraria sin conocer wp_salt(), así que solo las URLs
+	 * que el propio sitio firmó previamente (ver External_Links, que las
+	 * firma a partir de los href externos ya presentes en el post_content)
+	 * pueden resolverse aquí.
+	 *
+	 * @since  1.8.9
+	 * @param  string $url URL de destino cruda (ya pasada por esc_url_raw() en handle()).
+	 * @param  string $sig Firma HMAC recibida en el path.
+	 * @return array|null { @type int $post_id 0, @type int $affiliate_id 0, @type string $url } o null si inválido.
+	 */
+	private function resolve_external( string $url, string $sig ): ?array {
+		if ( '' === $url || 1 !== preg_match( '/^[a-f0-9]{' . self::EXTERNAL_SIG_LENGTH . '}$/', $sig ) ) {
+			return null;
+		}
+
+		$scheme = strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) );
+		if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+			return null;
+		}
+
+		// Verificar la firma ANTES de cualquier otra cosa: si no coincide, la
+		// URL no fue emitida por este sitio y se descarta sin más validaciones.
+		$expected = $this->generate_external_signature( $url );
+		if ( ! hash_equals( $expected, $sig ) ) {
+			return null;
+		}
+
+		// Defensa adicional: nunca redirigir "externamente" al propio host.
+		$host      = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
+		$site_host = strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
+		if ( '' === $host || $host === $site_host ) {
+			return null;
+		}
+
+		return array(
+			'post_id'      => 0,
+			'affiliate_id' => 0,
+			'url'          => $url,
+		);
+	}
+
+	/**
+	 * Genera la firma HMAC estable para una URL de enlace externo genérico.
+	 *
+	 * Público porque ajax_sign_external() (mismo objetivo, bajo demanda) y el
+	 * helper wpam_goext_url() la reutilizan.
+	 *
+	 * @since  1.8.9
+	 * @param  string $url URL absoluta (http/https) ya normalizada.
+	 * @return string Firma hex de EXTERNAL_SIG_LENGTH caracteres.
+	 */
+	public function generate_external_signature( string $url ): string {
+		return substr( hash_hmac( 'sha256', $url, wp_salt() ), 0, self::EXTERNAL_SIG_LENGTH );
+	}
+
+	// -------------------------------------------------------------------------
+	// External Links — firma bajo demanda (solo en el momento del click)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Nombre de la acción del nonce / AJAX de firma de enlaces externos.
+	 *
+	 * @since 1.8.9
+	 */
+	const AJAX_ACTION_SIGN_EXTERNAL = 'wpam_sign_external';
+
+	/**
+	 * Encola el script mínimo que detecta clicks en enlaces externos del
+	 * contenido y pide la firma solo para la URL realmente clickeada.
+	 *
+	 * Deliberadamente barato: ningún escaneo del post_content aquí — el JS
+	 * decide en el propio navegador si un link es externo (comparando host),
+	 * y solo entonces llama a ajax_sign_external() con esa única URL. El
+	 * costo de firmar/validar ocurre exclusivamente cuando hay un click real,
+	 * nunca en cada carga de página.
+	 *
+	 * Colgado de 'wp_enqueue_scripts'.
+	 *
+	 * @since  1.8.9
+	 * @return void
+	 */
+	public function maybe_enqueue_external_links_script(): void {
+		if ( is_preview() || is_feed() || ! is_singular() ) {
+			return;
+		}
+
+		$post_id = get_queried_object_id();
+		if ( $post_id <= 0 ) {
+			return;
+		}
+
+		wp_enqueue_script(
+			'wpam-external-links',
+			WPAM_PLUGIN_URL . 'assets/js/external-links.js',
+			array(),
+			WPAM_VERSION,
+			true
+		);
+
+		$config = array(
+			'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
+			'action'   => self::AJAX_ACTION_SIGN_EXTERNAL,
+			'postId'   => $post_id,
+			'nonce'    => wp_create_nonce( self::AJAX_ACTION_SIGN_EXTERNAL ),
+			'siteHost' => (string) wp_parse_url( home_url(), PHP_URL_HOST ),
+		);
+
+		// Mismo patrón que Views::maybe_enqueue_beacon(): objeto global
+		// inyectado ANTES del script principal, sin wp_localize_script().
+		wp_add_inline_script(
+			'wpam-external-links',
+			'window.wpamExternalLinks = ' . wp_json_encode( $config ) . ';',
+			'before'
+		);
+	}
+
+	/**
+	 * Handler de 'wp_ajax_wpam_sign_external' / 'wp_ajax_nopriv_wpam_sign_external'.
+	 *
+	 * Firma UNA sola URL, solo cuando el navegador reporta un click real
+	 * sobre ella. Dos capas de protección contra open redirect, ambas
+	 * necesarias:
+	 *  1. La URL debe aparecer literalmente en el post_content del post_id
+	 *     indicado (comprobación ligera con str_contains(), sin parser HTML:
+	 *     es la prueba de que el enlace realmente existe en el contenido
+	 *     publicado, no algo que el cliente inventó).
+	 *  2. La firma HMAC devuelta (generate_external_signature(), la misma
+	 *     que valida resolve_external() en handle()) es lo que impide que
+	 *     alguien reutilice /goext/ con una URL distinta sin pasar por aquí.
+	 *
+	 * @since  1.8.9
+	 * @return void
+	 */
+	public function ajax_sign_external(): void {
+		check_ajax_referer( self::AJAX_ACTION_SIGN_EXTERNAL, 'nonce' );
+
+		$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$url     = isset( $_POST['url'] ) ? esc_url_raw( wp_unslash( $_POST['url'] ) ) : '';
+
+		if ( $post_id <= 0 || '' === $url ) {
+			wp_send_json_error();
+		}
+
+		$scheme = strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) );
+		if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+			wp_send_json_error();
+		}
+
+		$host      = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
+		$site_host = strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
+		if ( '' === $host || $host === $site_host ) {
+			wp_send_json_error(); // Enlace interno: nada que firmar.
+		}
+
+		$post = get_post( $post_id );
+		if ( ! $post instanceof \WP_Post || 'publish' !== $post->post_status ) {
+			wp_send_json_error();
+		}
+
+		// Comprobación ligera de pertenencia: la URL (o su variante
+		// protocol-relative "//host/...") debe existir literalmente en el
+		// post_content. Sin parser HTML — un post_content típico no supera
+		// unos pocos KB, y str_contains() sobre eso es una operación trivial
+		// que solo se paga en el click real, no en cada carga de página.
+		$content       = (string) $post->post_content;
+		$without_https = preg_replace( '#^https?:#i', '', $url );
+
+		if ( ! str_contains( $content, $url ) && ! str_contains( $content, $without_https ) ) {
+			wp_send_json_error();
+		}
+
+		$sig = $this->generate_external_signature( $url );
+
+		wp_send_json_success(
+			array(
+				'redirectUrl' => home_url( '/' . self::SLUG_EXTERNAL . '/' . $sig . '/?u=' . rawurlencode( $url ) ),
+			)
 		);
 	}
 

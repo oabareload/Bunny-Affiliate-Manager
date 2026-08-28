@@ -155,6 +155,14 @@ final class Plugin {
 		$this->loader->add_filter( 'query_vars',       $redirect, 'add_query_var' );
 		$this->loader->add_action( 'template_redirect', $redirect, 'handle' );
 
+		// v1.8.9: External Links — firma bajo demanda de un enlace externo del
+		// contenido, solo en el momento del click (no hay escaneo de contenido
+		// en cada carga de página). admin-ajax.php corre con is_admin() === true,
+		// así que va en hooks globales, igual que el resto de wp_ajax_* de este
+		// bloque.
+		$this->loader->add_action( 'wp_ajax_wpam_sign_external',        $redirect, 'ajax_sign_external' );
+		$this->loader->add_action( 'wp_ajax_nopriv_wpam_sign_external', $redirect, 'ajax_sign_external' );
+
 		// v0.2.7: Broken link AJAX report — fires for logged-in and logged-out users.
 		$admin_menu_report = new Admin\Admin_Menu();
 		$this->loader->add_action( 'wp_ajax_nopriv_wpam_report_broken_link', $admin_menu_report, 'handle_report_broken_link' );
@@ -322,6 +330,13 @@ final class Plugin {
 		// el post links afiliados.
 		$views = new Views\Views();
 		$this->loader->add_action( 'wp_enqueue_scripts', $views, 'maybe_enqueue_beacon' );
+
+		// v1.8.9: External Links — encolado mínimo (sin escaneo de contenido)
+		// del script que detecta clicks en enlaces externos del contenido y
+		// pide la firma solo para la URL realmente clickeada. Ver
+		// Redirect_Manager::maybe_enqueue_external_links_script()/ajax_sign_external().
+		$redirect_frontend = new Redirect\Redirect_Manager();
+		$this->loader->add_action( 'wp_enqueue_scripts', $redirect_frontend, 'maybe_enqueue_external_links_script' );
 
 		// v1.3.0: Recently Viewed — filtro the_content, prioridad 21 (un paso
 		// después del bloque de affiliate links en 20). La condición de Settings

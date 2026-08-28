@@ -56,6 +56,7 @@ class Analytics_Screen {
 		$top_affiliates = Top_Posts_Query::get_top_affiliates( 'total', 10 );
 		$top_clicked    = Top_Posts_Query::get_cached( 'total', 10 );
 		$top_viewed     = Views_Query::get_global_cached( 'total', 10 );
+		$utm_sources    = Views_Query::get_utm_sources( 'total', 10 );
 
 		$recent_clicks = Top_Posts_Query::get_recent( 20 );
 		$recent_views  = Views_Query::get_recent( 20 );
@@ -135,6 +136,8 @@ class Analytics_Screen {
 
 				<div class="wpam-analytics-viewed-posts-col">
 					<?php Analytics_Renderer::render_top_viewed_posts_section( $top_viewed, $default_views_resource_type ); ?>
+					<?php // v1.8.10: utm_source es independiente del resource_type seleccionado — se agrega desde su propia tabla auxiliar y se muestra siempre dentro de esta misma columna, para heredar automáticamente el refresco de rango/resource_type que ya hace analytics.js sobre .wpam-analytics-viewed-posts-col. ?>
+					<?php Analytics_Renderer::render_top_terms_section( __( 'Top UTM Sources', 'wp-affiliatemanager' ), '🔗', $utm_sources, 'source' ); ?>
 				</div>
 
 				<?php // v1.8.0: Recent Views ahora es un listado general (los 7 resource_type), no solo Posts. ?>
@@ -246,6 +249,13 @@ class Analytics_Screen {
 					// stats ya lo resume, no hace falta ninguna lista debajo.
 					$stats = Views_Query::get_stats_cached( 'home' );
 				}
+
+				// v1.8.10: utm_source no depende del resource_type seleccionado en
+				// el dropdown (una View de tipo 'post' o 'search', etc. puede traer
+				// utm_source igual) — se agrega en su propia tabla auxiliar y se
+				// muestra siempre dentro del mismo bloque, respetando el $range
+				// seleccionado igual que el resto de esta pantalla.
+				Analytics_Renderer::render_top_terms_section( __( 'Top UTM Sources', 'wp-affiliatemanager' ), '🔗', Views_Query::get_utm_sources( $range, 10 ), 'source' );
 
 				$viewed_html = ob_get_clean();
 

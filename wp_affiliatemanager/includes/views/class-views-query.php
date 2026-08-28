@@ -762,6 +762,71 @@ class Views_Query {
 		return self::get_aux_table_stats( Views_Table::table_404_name() );
 	}
 
+	// -------------------------------------------------------------------------
+	// utm_source — tabla auxiliar (v1.8.9 tracking, v1.8.10 consulta desde Analytics)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Retorna los utm_source más frecuentes para el rango dado.
+	 *
+	 * Mismo patrón exacto que get_search_terms()/get_404_urls(): una sola
+	 * consulta agregada (GROUP BY) contra la tabla auxiliar wpam_views_utm,
+	 * nunca una consulta por fuente. Comparte range_to_period_since() con el
+	 * resto de Views — mismo rango temporal y timezone que Today/Week/Month
+	 * en toda la pantalla de Analytics, sin lógica de fechas propia.
+	 *
+	 * @since  1.8.10
+	 * @param  string $range today|week|month|total
+	 * @param  int    $limit
+	 * @return array[] Cada elemento: [ source, count ]
+	 */
+	public static function get_utm_sources( string $range = 'total', int $limit = 10 ): array {
+		global $wpdb;
+		$table = Views_Table::utm_table_name();
+
+		$where = '';
+		if ( 'total' !== $range ) {
+			$since = self::range_to_period_since( $range );
+			$where = $wpdb->prepare( ' WHERE period >= %s', $since );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT utm_source, SUM(count) AS total_count FROM %i{$where} GROUP BY utm_source ORDER BY total_count DESC LIMIT %d",
+				$table,
+				max( 1, min( 100, $limit ) )
+			),
+			ARRAY_A
+		);
+
+		if ( ! is_array( $rows ) ) {
+			return array();
+		}
+
+		return array_map(
+			static function ( array $row ): array {
+				return array(
+					'source' => $row['utm_source'],
+					'count'  => (int) $row['total_count'],
+				);
+			},
+			$rows
+		);
+	}
+
+	/**
+	 * Stats agregados (today/week/month/total) para utm_source. Misma lógica
+	 * compartida (get_aux_table_stats()) que search_terms/404 — mismos
+	 * límites de período, mismo timezone, sin código de fechas duplicado.
+	 *
+	 * @since  1.8.10
+	 * @return array{ today: int, week: int, month: int, total: int }
+	 */
+	public static function get_utm_sources_stats(): array {
+		return self::get_aux_table_stats( Views_Table::utm_table_name() );
+	}
+
 	/**
 	 * Lógica compartida de get_search_terms_stats() / get_404_stats(): ambas
 	 * tablas auxiliares tienen exactamente la misma forma (period, count),

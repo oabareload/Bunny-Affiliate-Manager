@@ -12,14 +12,14 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Domain Path: /languages
 - License: GPLv2 or later
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **1.8.8**
+- Current version: **1.8.10**
 
 ## Requirements
 
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v1.8.8)
+## Current scope (v1.8.10)
 
 ### Affiliates
 
@@ -69,6 +69,7 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - **One-time importer** from the *Post Views Counter* plugin (**Settings → Maintenance → Import Views**): additive upsert (adds to existing counts, never overwrites), never modifies the source table, and can only run once per site.
 - **Timezone unificado:** Views, Clicks, Today, Week, Month, Recent, Top Viewed, Top Clicked y Bunny Score determinan sus períodos usando el timezone configurado en WordPress. Los límites de Clicks se convierten a UTC únicamente al consultar el `ts` histórico almacenado, sin cambiar el formato de la base de datos.
 - **Consent API:** la cookie `wpam_v` se registra como `statistics` y se escribe mediante la API cuando está disponible, manteniendo un fallback compatible cuando no está instalado.
+- **utm_source:** las Views registran el `utm_source` de la URL de entrada (o `direct` si no viene ninguno) en una tabla auxiliar agregada, `wpam_views_utm` — mismo patrón que los términos de búsqueda y las URLs 404. Consultable desde **Analytics → Views → Top UTM Sources**, respetando el mismo rango (Today/Week/Month/All Time) y timezone que el resto de Views.
 
 ### Recently Viewed Posts
 

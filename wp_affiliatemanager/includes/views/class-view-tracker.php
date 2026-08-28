@@ -41,6 +41,21 @@ class View_Tracker {
 	const URL_404_MAX_LENGTH = 255;
 
 	/**
+	 * Longitud máxima de un utm_source normalizado.
+	 *
+	 * @since 1.8.9
+	 */
+	const UTM_SOURCE_MAX_LENGTH = 50;
+
+	/**
+	 * Valor usado cuando la visita no trae utm_source (o queda vacío tras
+	 * normalizar). Nunca se intenta inferir el origen real del tráfico.
+	 *
+	 * @since 1.8.9
+	 */
+	const UTM_SOURCE_DIRECT = 'direct';
+
+	/**
 	 * Registra una vista para el resource_type + resource_id + período (día) actual.
 	 *
 	 * Usa INSERT ... ON DUPLICATE KEY UPDATE sobre la UNIQUE KEY
@@ -159,6 +174,46 @@ class View_Tracker {
 		return false !== $result;
 	}
 
+	/**
+	 * Registra el utm_source de una visita en la tabla auxiliar agregada.
+	 *
+	 * Mismo modelo agregado que record_search_term()/record_404_url(): una
+	 * fila por utm_source único por día, upsert atómico. No afecta a la
+	 * tabla principal wpam_views ni a su UNIQUE KEY de deduplicación — es
+	 * puramente información de contexto adicional sobre una View que ya se
+	 * contó (o no) por el flujo normal.
+	 *
+	 * @since  1.8.9
+	 * @param  string $raw_source utm_source sin sanitizar (puede venir vacío).
+	 * @return bool True si la query se ejecutó sin error.
+	 */
+	public function record_utm_source( string $raw_source ): bool {
+		$source = self::normalize_utm_source( $raw_source );
+
+		if ( '' === $source ) {
+			return false;
+		}
+
+		global $wpdb;
+
+		$period = wp_date( 'Ymd' );
+		$table  = Views_Table::utm_table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$result = $wpdb->query(
+			$wpdb->prepare(
+				'INSERT INTO %i (utm_source, period, count)
+				 VALUES (%s, %s, 1)
+				 ON DUPLICATE KEY UPDATE count = count + 1',
+				$table,
+				$source,
+				$period
+			)
+		);
+
+		return false !== $result;
+	}
+
 	// -------------------------------------------------------------------------
 	// Normalización — nunca HTML, siempre acotado en longitud
 	// -------------------------------------------------------------------------
@@ -218,5 +273,33 @@ class View_Tracker {
 		}
 
 		return substr( $path, 0, self::URL_404_MAX_LENGTH );
+	}
+
+	/**
+	 * Normaliza un utm_source: sin HTML, minúsculas, trim, longitud acotada.
+	 * Si queda vacío (no vino utm_source o solo tenía espacios/HTML), se
+	 * clasifica como UTM_SOURCE_DIRECT sin intentar inferir nada más sobre
+	 * el origen real del tráfico.
+	 *
+	 * @since  1.8.9
+	 * @param  string $raw
+	 * @return string Nunca vacío: como mínimo UTM_SOURCE_DIRECT.
+	 */
+	public static function normalize_utm_source( string $raw ): string {
+		$source = sanitize_text_field( $raw );
+		$source = function_exists( 'mb_strtolower' ) ? mb_strtolower( $source ) : strtolower( $source );
+		$source = trim( $source );
+
+		if ( '' === $source ) {
+			return self::UTM_SOURCE_DIRECT;
+		}
+
+		if ( function_exists( 'mb_substr' ) ) {
+			$source = mb_substr( $source, 0, self::UTM_SOURCE_MAX_LENGTH );
+		} else {
+			$source = substr( $source, 0, self::UTM_SOURCE_MAX_LENGTH );
+		}
+
+		return '' !== $source ? $source : self::UTM_SOURCE_DIRECT;
 	}
 }

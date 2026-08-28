@@ -120,6 +120,17 @@ class Views_Table {
 		return $wpdb->prefix . 'wpam_views_404';
 	}
 
+	/**
+	 * Retorna el nombre completo de la tabla auxiliar de utm_source.
+	 *
+	 * @since  1.8.9
+	 * @return string
+	 */
+	public static function utm_table_name(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'wpam_views_utm';
+	}
+
 	// -------------------------------------------------------------------------
 	// Creación / actualización de tablas
 	// -------------------------------------------------------------------------
@@ -192,6 +203,24 @@ class Views_Table {
 			count          INT UNSIGNED    NOT NULL DEFAULT 1,
 			PRIMARY KEY (id),
 			UNIQUE KEY url_period (url_normalized(191), period),
+			KEY period (period)
+		) {$charset_collate};";
+
+		dbDelta( $sql );
+
+		// -----------------------------------------------------------------
+		// Auxiliar — utm_source (agregado diario, no por visita). Mismo
+		// patrón exacto que las 2 tablas auxiliares anteriores: no toca la
+		// tabla principal de wpam_views ni su UNIQUE KEY/dedup.
+		// -----------------------------------------------------------------
+		$utm_table = self::utm_table_name();
+		$sql       = "CREATE TABLE {$utm_table} (
+			id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			utm_source VARCHAR(50)     NOT NULL,
+			period     CHAR(8)         NOT NULL,
+			count      INT UNSIGNED    NOT NULL DEFAULT 1,
+			PRIMARY KEY (id),
+			UNIQUE KEY utm_period (utm_source, period),
 			KEY period (period)
 		) {$charset_collate};";
 

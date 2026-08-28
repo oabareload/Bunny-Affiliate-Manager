@@ -363,6 +363,15 @@ class Views {
 			'nonce'        => wp_create_nonce( self::AJAX_ACTION ),
 		);
 
+		// v1.8.9: utm_source de la visita actual, capturado una única vez aquí
+		// (donde $_GET todavía refleja la URL de entrada) para cualquier
+		// resource_type — no solo search/404. Se normaliza recién en
+		// View_Tracker::record_utm_source() (aquí solo se sanitiza como texto
+		// plano de tránsito, igual que searchTerm/requestedUrl abajo).
+		if ( isset( $_GET['utm_source'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$config['utmSource'] = sanitize_text_field( wp_unslash( $_GET['utm_source'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		}
+
 		// Contexto adicional solo para search/404 — nunca se resuelve en
 		// AJAX (no hay WP_Query ahí), así que se captura una vez aquí, en
 		// el momento en que la query principal ya corrió.
@@ -447,6 +456,15 @@ class Views {
 		if ( 'post' === $resource_type ) {
 			Recently_Viewed::track( $resource_id );
 		}
+
+		// v1.8.9: utm_source de la visita, para cualquier resource_type. Mismo
+		// tratamiento que search_term/404 abajo: información de contexto
+		// agregada en su propia tabla auxiliar, no afecta la deduplicación ni
+		// el conteo de la View ya registrada arriba. Si no vino utm_source,
+		// record_utm_source() lo clasifica como 'direct' — nunca se intenta
+		// inferir el origen real del tráfico.
+		$raw_utm_source = isset( $_POST['utm_source'] ) ? sanitize_text_field( wp_unslash( $_POST['utm_source'] ) ) : '';
+		$this->tracker->record_utm_source( $raw_utm_source );
 
 		// Contexto agregado adicional — search/404. No afecta el modelo
 		// agregado principal (tablas separadas), solo suma información para

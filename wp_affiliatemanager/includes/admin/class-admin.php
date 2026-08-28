@@ -58,6 +58,15 @@ class Admin {
 		$stored_version = get_option( 'wpam_version', '' );
 		if ( $stored_version !== WPAM_VERSION ) {
 			flush_rewrite_rules();
+
+			// v1.8.9: crear la tabla auxiliar wpam_views_utm en sitios ya
+			// migrados a v1.8.0 (donde migrate_legacy_schema() ya no vuelve a
+			// ejecutarse por el gate de wpam_views_schema_version). dbDelta()
+			// es idempotente y create_table() no toca las tablas existentes,
+			// así que reutilizar el bloque de version-bump ya existente aquí
+			// evita crear un nuevo option gate solo para esto.
+			\WP_AffiliateManager\Views\Views_Table::create_table();
+
 			update_option( 'wpam_version', WPAM_VERSION );
 		}
 	}

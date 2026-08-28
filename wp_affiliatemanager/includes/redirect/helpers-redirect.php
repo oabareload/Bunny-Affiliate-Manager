@@ -58,3 +58,38 @@ function wpam_go_default_url( int $post_id, int $affiliate_id ): string {
 
 	return home_url( '/' . WP_AffiliateManager\Redirect\Redirect_Manager::SLUG_DEFAULT . '/' . $post_id . '/' . $affiliate_id );
 }
+
+/**
+ * Retorna la URL interna /goext/{sig}/?u={url} para un enlace externo
+ * genérico (no ligado a un afiliado).
+ *
+ * No usado internamente por el flujo de clicks (que firma bajo demanda vía
+ * Redirect_Manager::ajax_sign_external(), disparado desde external-links.js
+ * solo en el momento del click real). Se expone como helper público por si
+ * un template u otro módulo necesita generar en PHP la misma URL firmada
+ * para una URL cuya pertenencia al contenido ya se dio por válida.
+ *
+ * @since  1.8.9
+ * @param  string $url URL externa absoluta (http/https).
+ * @return string URL interna tipo https://site.com/goext/abcdef0123456789/?u=..., o '' si inválida.
+ */
+function wpam_goext_url( string $url ): string {
+	$url = esc_url_raw( $url );
+	if ( '' === $url ) {
+		return '';
+	}
+
+	$scheme = strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) );
+	if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+		return '';
+	}
+
+	$manager = new WP_AffiliateManager\Redirect\Redirect_Manager();
+	$sig     = $manager->generate_external_signature( $url );
+
+	return add_query_arg(
+		'u',
+		rawurlencode( $url ),
+		home_url( '/' . WP_AffiliateManager\Redirect\Redirect_Manager::SLUG_EXTERNAL . '/' . $sig )
+	);
+}
