@@ -320,6 +320,15 @@ class Settings {
 			'wpam_section_redirect'
 		);
 
+		// v1.8.11: utm_source configurable para destinos externos (/go, /goa, /goext).
+		add_settings_field(
+			'wpam_field_outbound_utm_source',
+			__( 'Outbound UTM Source', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_outbound_utm_source' ),
+			self::PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
 		// ---------------------------------------------------------------------------
 		// Sección: Interstitial — Content Slots
 		// ---------------------------------------------------------------------------
@@ -707,6 +716,28 @@ class Settings {
 			<?php endforeach; ?>
 		</select>
 		<p class="description"><?php esc_html_e( 'Ancho máximo de la card interstitial. Full Width ocupa todo el viewport.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el campo 'outbound_utm_source'.
+	 *
+	 * @since  1.8.11
+	 * @return void
+	 */
+	public function render_field_outbound_utm_source(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = $options['redirect']['outbound_utm_source'] ?? 'bunnychase';
+		?>
+		<input
+			type="text"
+			name="<?php echo esc_attr( self::OPTION_NAME . '[redirect][outbound_utm_source]' ); ?>"
+			value="<?php echo esc_attr( $value ); ?>"
+			class="regular-text"
+			maxlength="64"
+			placeholder="bunnychase"
+		/>
+		<p class="description"><?php esc_html_e( 'Valor de utm_source añadido automáticamente a los destinos externos de /go, /goa y /goext. Por defecto: bunnychase.', 'wp-affiliatemanager' ); ?></p>
 		<?php
 	}
 
@@ -1701,6 +1732,13 @@ class Settings {
 			$allowed_widths = array( '460', '600', '800', '1000', 'full' );
 			$width_val      = sanitize_text_field( $input['redirect']['interstitial_width'] ?? '460' );
 			$sanitized['redirect']['interstitial_width'] = in_array( $width_val, $allowed_widths, true ) ? $width_val : '460';
+
+			// v1.8.11: utm_source para destinos externos. Sin validación de URL —
+			// es solo el valor de un parámetro, no una URL completa. Límite de 64
+			// caracteres, fallback a 'bunnychase' si queda vacío tras sanitizar.
+			$utm_source = sanitize_text_field( $input['redirect']['outbound_utm_source'] ?? '' );
+			$utm_source = substr( $utm_source, 0, 64 );
+			$sanitized['redirect']['outbound_utm_source'] = '' !== $utm_source ? $utm_source : 'bunnychase';
 		}
 
 		// v0.2.6: content_slots — array indexado para soporte futuro de múltiples slots.

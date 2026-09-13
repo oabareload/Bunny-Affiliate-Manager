@@ -12,14 +12,14 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Domain Path: /languages
 - License: GPLv2 or later
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **1.8.10**
+- Current version: **1.8.11**
 
 ## Requirements
 
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v1.8.10)
+## Current scope (v1.8.11)
 
 ### Affiliates
 
@@ -55,6 +55,7 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Optional **interstitial page**: a branded countdown page shown before the final redirect (configurable delay, or `0` to redirect instantly). Includes a **"Report broken link"** button on `/go/` links (see Broken Link Reporting below); not shown on `/goa/` fallback links, which don't have a reportable token.
 - `allowed_redirect_hosts` is populated dynamically from every active affiliate's configured domains, so `wp_safe_redirect()` never blocks a legitimate destination.
 - Admins can be excluded from click analytics via **Settings → General → Exclude admins from analytics**.
+- **Outbound UTM Source (v1.8.11):** every external destination URL from `/go/`, `/goa/`, and `/goext/` gets a configurable `utm_source` parameter appended (or replaced if already present) right before the final redirect — one setting in **Settings → Redirect / Interstitial → Outbound UTM Source**, default `bunnychase`.
 
 ### Views Tracking
 

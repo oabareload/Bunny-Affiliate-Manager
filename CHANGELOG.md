@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8.11] — Outbound UTM Source en redirecciones externas
+
+### Added
+
+- **`utm_source` configurable añadido automáticamente a los destinos externos finales de `/go/`, `/goa/` y `/goext/`.** Nueva opción *Outbound UTM Source* en Settings → Redirect / Interstitial, con valor por defecto `bunnychase`.
+
+### Notes
+
+- Implementado en un único punto (`Redirect_Manager::redirect_to_destination()`), por el que convergen los tres flujos de redirección — sin lógica duplicada.
+- Usa `add_query_arg()` nativo de WordPress, que preserva correctamente parámetros existentes y el fragment (`#...`) de la URL; un `utm_source` previo en la URL de destino es reemplazado, no duplicado.
+- No afecta Views, Clicks, `wpam_v`, reCAPTCHA, el interstitial, HMAC, ni las validaciones de host existentes. `/goext/` sigue sin registrar Clicks de afiliado ni Views.
+- No se crean tablas, cookies, AJAX ni JavaScript nuevos.
+
+---
+
 ## [1.8.10] — Top UTM Sources en Analytics → Views
 
 ### Added

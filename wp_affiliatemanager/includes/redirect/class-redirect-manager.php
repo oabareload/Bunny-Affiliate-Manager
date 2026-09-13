@@ -415,13 +415,40 @@ class Redirect_Manager {
 	}
 
 	/**
+	 * Añade (o reemplaza) el parámetro `utm_source` configurable al destino
+	 * final externo. Punto único para los tres flujos (/go/, /goa/, /goext/),
+	 * ya que todos convergen en redirect_to_destination() antes del
+	 * wp_safe_redirect().
+	 *
+	 * add_query_arg() extrae el fragment (#...) antes de tocar la query
+	 * string y lo reañade al final, así que preserva correctamente URLs con
+	 * fragment sin necesidad de parsing manual. También urlencodea el valor
+	 * y reemplaza (no duplica) un `utm_source` ya presente en la URL.
+	 *
+	 * @since  1.8.11
+	 * @param  string $url URL de destino externa.
+	 * @return string URL con `utm_source` añadido/reemplazado.
+	 */
+	private function append_outbound_utm( string $url ): string {
+		$options    = get_option( WPAM_OPTION_KEY, array() );
+		$utm_source = trim( (string) ( $options['redirect']['outbound_utm_source'] ?? '' ) );
+
+		if ( '' === $utm_source ) {
+			$utm_source = 'bunnychase';
+		}
+
+		return (string) add_query_arg( 'utm_source', $utm_source, $url );
+	}
+
+	/**
 	 * Redirige de forma segura al destino del afiliado.
 	 *
 	 * @param  string $url
 	 * @return void
 	 */
 	private function redirect_to_destination( string $url ): void {
-		$destination_host = (string) wp_parse_url( $url, PHP_URL_HOST );
+		$url               = $this->append_outbound_utm( $url );
+		$destination_host  = (string) wp_parse_url( $url, PHP_URL_HOST );
 		add_filter(
 			'allowed_redirect_hosts',
 			function( array $hosts ) use ( $destination_host ): array {
