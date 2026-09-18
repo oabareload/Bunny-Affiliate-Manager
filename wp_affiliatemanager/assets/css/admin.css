@@ -1465,3 +1465,75 @@ body.wpam-modal-open {
 	border-radius: var(--wpam-radius-sm);
 	border: 1px solid var(--bunny-border-strong);
 }
+
+/* ==========================================================================
+   Dashboard — Daily Activity chart (v1.8.12)
+   ========================================================================== */
+
+.wpam-dashboard-chart-controls {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.wpam-dashboard-chart-metric {
+	display: inline-flex;
+	border: 1px solid var(--wpam-gray-200);
+	border-radius: 999px;
+	overflow: hidden;
+}
+
+.wpam-chart-pill {
+	appearance: none;
+	background: #fff;
+	border: none;
+	cursor: pointer;
+	padding: 6px 16px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--wpam-gray-400);
+	transition: background var(--wpam-transition), color var(--wpam-transition);
+}
+
+.wpam-chart-pill + .wpam-chart-pill {
+	border-left: 1px solid var(--wpam-gray-200);
+}
+
+.wpam-chart-pill:hover {
+	color: var(--wpam-primary);
+}
+
+.wpam-chart-pill--active {
+	background: var(--wpam-primary);
+	color: #fff !important;
+}
+
+.wpam-dashboard-chart-resource-type {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.wpam-dashboard-chart-resource-type label {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--wpam-gray-700);
+}
+
+.wpam-dashboard-chart-resource-type select {
+	border-radius: var(--wpam-radius-sm);
+	border: 1px solid var(--wpam-gray-200);
+}
+
+.wpam-dashboard-chart-resource-type select:disabled {
+	opacity: 0.5;
+}
+
+.wpam-dashboard-chart-canvas-wrap {
+	position: relative;
+	height: 280px;
+}
+

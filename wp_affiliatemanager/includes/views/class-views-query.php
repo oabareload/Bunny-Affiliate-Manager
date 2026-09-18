@@ -551,6 +551,51 @@ class Views_Query {
 	}
 
 	// -------------------------------------------------------------------------
+	// Dashboard — Daily Activity chart (v1.8.12)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Totales diarios de Views agrupados por resource_type, para el gráfico
+	 * de actividad diaria del Dashboard.
+	 *
+	 * UNA sola consulta agregada cubre TODO el rango y TODOS los
+	 * resource_type a la vez (GROUP BY period, resource_type) — el filtro
+	 * por tipo que aplica el selector del Dashboard se resuelve leyendo este
+	 * mismo resultado en PHP, sin lanzar una query adicional por tipo.
+	 *
+	 * @since  1.8.12
+	 * @param  string $since_period YYYYMMDD (inclusive).
+	 * @param  string $until_period YYYYMMDD (inclusive).
+	 * @return array<string,array<string,int>> period => [ resource_type => count ]
+	 */
+	public static function get_daily_totals_by_type( string $since_period, string $until_period ): array {
+		global $wpdb;
+		$table = Views_Table::table_name();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT period, resource_type, SUM(count) AS total FROM %i WHERE period BETWEEN %s AND %s GROUP BY period, resource_type',
+				$table,
+				$since_period,
+				$until_period
+			),
+			ARRAY_A
+		);
+
+		if ( ! is_array( $rows ) ) {
+			return array();
+		}
+
+		$totals = array();
+		foreach ( $rows as $row ) {
+			$totals[ $row['period'] ][ $row['resource_type'] ] = (int) $row['total'];
+		}
+
+		return $totals;
+	}
+
+	// -------------------------------------------------------------------------
 	// Dashboard stat cards
 	// -------------------------------------------------------------------------
 

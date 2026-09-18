@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8.12] — Dashboard: gráfico de actividad diaria (Clicks + Views)
+
+### Added
+
+- **Nueva sección "Daily Activity" en el Dashboard**: gráfico de línea de los últimos 30 días con selector de métrica (Clicks / Views / Clicks + Views, por defecto Views) y selector de tipo de recurso (Todos, Post, Page, Category, Tag, Home, Search, 404).
+- Cuando se muestran Clicks + Views a la vez, el gráfico usa dos ejes Y independientes (Clicks a la izquierda, Views a la derecha) para que ninguna de las dos series aplaste visualmente a la otra; con una sola métrica seleccionada usa un único eje.
+- `Views_Query::get_daily_totals_by_type()`: una sola consulta agregada (`GROUP BY period, resource_type`) que cubre todo el rango y todos los tipos a la vez — el filtro de tipo del selector se resuelve en PHP sobre este mismo resultado.
+- `Top_Posts_Query::get_daily_totals()`: una sola consulta agregada de Clicks, agrupada por hora calendario UTC y re-agrupada en PHP al día local exacto según la timezone de WordPress (correcto incluso si el rango cruza un cambio de horario).
+- Chart.js 4.5.1 (UMD, minificado) añadido como vendor local del plugin (`assets/vendor/chartjs/`) — se carga únicamente en la pantalla Dashboard, nunca en frontend ni en otras pantallas de administración.
+
+### Notes
+
+- Rendimiento: exactamente 2 consultas agregadas totales para construir los 30 días completos (una para Views, una para Clicks), sin importar cuántos tipos de recurso existan ni cuál esté seleccionado. Cero consultas por día. Cero AJAX — todo el dataset se inyecta una sola vez como JSON en el `<script>` y el selector cambia la vista puramente en el navegador.
+- Clicks no tiene dimensión `resource_type` (`wpam_clicks` solo registra clicks sobre posts, vía los flujos `/go/`, `/goa/`, `/goext/`): el selector de tipo de recurso filtra únicamente la serie de Views; Clicks se mantiene como un total global fijo.
+- Días sin actividad se representan como `0`, nunca como huecos.
+- No se crean tablas nuevas, no se toca `WPAM_API`, `Score_Query`, ni el AJAX existente de Analytics.
+
+---
+
 ## [1.8.11] — Outbound UTM Source en redirecciones externas
 
 ### Added

@@ -244,6 +244,13 @@ class Redirect_Manager {
 			}
 		}
 
+		// v1.8.11 (fix): el UTM se aplica aquí, una sola vez, ANTES de decidir
+		// entre interstitial o redirect directo. El interstitial construye su
+		// propio destino (botón + JS) a partir de $destination['url'] y nunca
+		// pasaba por redirect_to_destination(), por lo que el UTM se perdía
+		// cuando enable_interstitial + delay > 0 (el caso por defecto).
+		$destination['url'] = $this->append_outbound_utm( $destination['url'] );
+
 		$enable_interstitial = ! empty( $options['redirect']['enable_interstitial'] ?? true );
 		$delay               = absint( $options['redirect']['redirect_delay'] ?? 3 );
 
@@ -268,6 +275,11 @@ class Redirect_Manager {
 	 */
 	private function continue_external_redirect( array $destination ): void {
 		$options              = get_option( WPAM_OPTION_KEY, array() );
+
+		// v1.8.11 (fix): mismo criterio que continue_authorized_redirect() —
+		// aplicar el UTM antes de la bifurcación, para que también llegue al
+		// destino usado por el interstitial (botón + JS), no solo al redirect directo.
+		$destination['url']   = $this->append_outbound_utm( $destination['url'] );
 		$enable_interstitial = ! empty( $options['redirect']['enable_interstitial'] ?? true );
 		$delay                = absint( $options['redirect']['redirect_delay'] ?? 3 );
 
@@ -443,11 +455,17 @@ class Redirect_Manager {
 	/**
 	 * Redirige de forma segura al destino del afiliado.
 	 *
-	 * @param  string $url
+	 * El UTM ya se aplicó antes de llegar aquí (en continue_authorized_redirect()
+	 * / continue_external_redirect(), justo antes de la bifurcación
+	 * interstitial/directo) para que también alcance al destino usado por el
+	 * interstitial. No volver a llamar a append_outbound_utm() aquí —
+	 * duplicaría el parámetro.
+	 *
+	 * @since  1.8.11
+	 * @param  string $url URL de destino, ya con `utm_source` aplicado.
 	 * @return void
 	 */
 	private function redirect_to_destination( string $url ): void {
-		$url               = $this->append_outbound_utm( $url );
 		$destination_host  = (string) wp_parse_url( $url, PHP_URL_HOST );
 		add_filter(
 			'allowed_redirect_hosts',

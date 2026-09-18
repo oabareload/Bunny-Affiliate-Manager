@@ -338,6 +338,87 @@ class Top_Posts_Query {
 	}
 
 	// -------------------------------------------------------------------------
+	// Dashboard — Daily Activity chart (v1.8.12)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Totales diarios de Clicks para el gráfico de actividad del Dashboard,
+	 * agrupados por día calendario en la timezone de WordPress — correcto
+	 * incluso si el rango solicitado atraviesa un cambio de horario (DST).
+	 *
+	 * wpam_clicks.ts es un DATETIME en UTC puro sin resource_type (los
+	 * clicks solo existen sobre posts — ver Clicks_Table): no hay forma
+	 * correcta de filtrarlos por tipo de recurso sin inventar una relación
+	 * que no existe hoy, así que este método siempre devuelve el total
+	 * global de clicks, sin parámetro de tipo.
+	 *
+	 * Estrategia (una sola consulta agregada, nunca una por día): se agrupa
+	 * en SQL por HORA calendario UTC (como mucho 30*24=720 filas para un mes,
+	 * un volumen trivial), y cada bucket horario se convierte en PHP a la
+	 * timezone del sitio con DateTimeImmutable — que sí resuelve DST de forma
+	 * exacta para cualquier fecha — para acumularlo en el día local correcto.
+	 * Se evita así depender de CONVERT_TZ con nombres de zona, que requiere
+	 * las tablas de timezone de MySQL cargadas (no siempre disponibles en
+	 * hosting compartido) y sería incorrecto con un offset fijo si el rango
+	 * cruza un cambio de horario.
+	 *
+	 * @since  1.8.12
+	 * @param  string $since_period YYYYMMDD (local, inclusive) — primer día.
+	 * @param  string $until_period YYYYMMDD (local, inclusive) — último día.
+	 * @return array<string,int> period(YYYYMMDD, local) => click count
+	 */
+	public static function get_daily_totals( string $since_period, string $until_period ): array {
+		global $wpdb;
+		$table    = Clicks_Table::table_name();
+		$timezone = wp_timezone();
+
+		$start_local = \DateTimeImmutable::createFromFormat( '!Ymd', $since_period, $timezone );
+		$end_local   = \DateTimeImmutable::createFromFormat( '!Ymd', $until_period, $timezone );
+
+		if ( ! $start_local || ! $end_local ) {
+			return array();
+		}
+
+		$end_local = $end_local->modify( '+1 day' ); // Límite superior exclusivo.
+
+		$start_utc = $start_local->setTimezone( new \DateTimeZone( 'UTC' ) );
+		$end_utc   = $end_local->setTimezone( new \DateTimeZone( 'UTC' ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT DATE_FORMAT(ts, '%%Y-%%m-%%d %%H:00:00') AS hour_bucket, COUNT(*) AS total
+				 FROM %i
+				 WHERE ts >= %s AND ts < %s
+				 GROUP BY hour_bucket",
+				$table,
+				$start_utc->format( 'Y-m-d H:i:s' ),
+				$end_utc->format( 'Y-m-d H:i:s' )
+			),
+			ARRAY_A
+		);
+
+		if ( ! is_array( $rows ) ) {
+			return array();
+		}
+
+		$utc_zone = new \DateTimeZone( 'UTC' );
+		$totals   = array();
+
+		foreach ( $rows as $row ) {
+			$hour_utc = \DateTimeImmutable::createFromFormat( 'Y-m-d H:i:s', $row['hour_bucket'], $utc_zone );
+			if ( ! $hour_utc ) {
+				continue;
+			}
+
+			$local_period = $hour_utc->setTimezone( $timezone )->format( 'Ymd' );
+			$totals[ $local_period ] = ( $totals[ $local_period ] ?? 0 ) + (int) $row['total'];
+		}
+
+		return $totals;
+	}
+
+	// -------------------------------------------------------------------------
 	// Dashboard / Analytics stat cards — equivalente a Views_Query::get_stats()
 	// -------------------------------------------------------------------------
 

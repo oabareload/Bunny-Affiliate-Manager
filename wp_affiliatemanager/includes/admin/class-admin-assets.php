@@ -180,6 +180,36 @@ class Admin_Assets {
 				);
 			}
 
+			// v1.8.12: Daily Activity chart en el Dashboard — Chart.js local (vendor), sin CDN,
+			// cargado Únicamente en esta pantalla. Los datos van embebidos vía wp_add_inline_script
+			// desde Admin_Menu::render_daily_activity_chart() — sin AJAX.
+			if ( 'toplevel_page_wpam-dashboard' === $hook_suffix ) {
+				wp_enqueue_script(
+					'wpam-chartjs',
+					WPAM_PLUGIN_URL . 'assets/vendor/chartjs/chart.umd.min.js',
+					array(),
+					'4.5.1',
+					true
+				);
+
+				wp_enqueue_script(
+					'wpam-dashboard-chart',
+					WPAM_PLUGIN_URL . 'assets/js/dashboard-chart.js',
+					array( 'wpam-chartjs' ),
+					$this->version,
+					true
+				);
+
+				wp_localize_script(
+					'wpam-dashboard-chart',
+					'wpamDashboardChartI18n',
+					array(
+						'clicks' => __( 'Clicks', 'wp-affiliatemanager' ),
+						'views'  => __( 'Views', 'wp-affiliatemanager' ),
+					)
+				);
+			}
+
 			// Media Library: CPT edit screen + pantalla inline de affiliates (v0.0.6).
 			if ( $this->is_cpt_edit_screen( $hook_suffix ) || 'bunny-affiliates_page_wpam-affiliates' === $hook_suffix ) {
 				wp_enqueue_media();

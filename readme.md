@@ -12,7 +12,7 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Domain Path: /languages
 - License: GPLv2 or later
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **1.8.11**
+- Current version: **1.8.12**
 
 ## Requirements
 

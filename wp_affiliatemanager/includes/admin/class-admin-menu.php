@@ -19,6 +19,8 @@ use WP_AffiliateManager\Affiliates\Repository;
 use WP_AffiliateManager\Affiliates\CPT;
 use WP_AffiliateManager\Analytics\Score_Query;
 use WP_AffiliateManager\Frontend\Top_Posts_Query;
+use WP_AffiliateManager\Views\Resource_Resolver;
+use WP_AffiliateManager\Views\Views;
 use WP_AffiliateManager\Views\Views_Query;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -200,6 +202,9 @@ class Admin_Menu {
 				<?php Analytics_Renderer::render_stat_card( __( 'Total Affiliates', 'wp-affiliatemanager' ), (string) $total, '📦' ); ?>
 			</div>
 
+			<h2 class="wpam-section-heading"><?php esc_html_e( 'Daily Activity', 'wp-affiliatemanager' ); ?></h2>
+			<?php $this->render_daily_activity_chart(); ?>
+
 			<h2 class="wpam-section-heading"><?php esc_html_e( 'Recent Activity', 'wp-affiliatemanager' ); ?></h2>
 			<?php Analytics_Renderer::render_recent_clicks_section( $recent_clicks ); ?>
 			<?php Analytics_Renderer::render_recent_views_section( $recent_views ); ?>
@@ -230,6 +235,146 @@ class Admin_Menu {
 		</div><!-- .bunny-page-content -->
 		<?php
 		$this->render_admin_footer();
+	}
+
+	// -------------------------------------------------------------------------
+	// Dashboard — Daily Activity chart (v1.8.12)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Etiquetas del selector de tipo de recurso del gráfico. Mismo criterio
+	 * que Analytics_Screen::resource_type_labels() (duplicado intencional,
+	 * módulos independientes) más la opción 'all' que agrega todos los tipos
+	 * habilitados.
+	 *
+	 * @since  1.8.12
+	 * @return array<string,string>
+	 */
+	private static function chart_resource_type_labels(): array {
+		return array(
+			'all'      => __( 'All', 'wp-affiliatemanager' ),
+			'post'     => __( 'Posts', 'wp-affiliatemanager' ),
+			'page'     => __( 'Pages', 'wp-affiliatemanager' ),
+			'category' => __( 'Categories', 'wp-affiliatemanager' ),
+			'tag'      => __( 'Tags', 'wp-affiliatemanager' ),
+			'home'     => __( 'Home', 'wp-affiliatemanager' ),
+			'search'   => __( 'Search', 'wp-affiliatemanager' ),
+			'404'      => __( '404', 'wp-affiliatemanager' ),
+		);
+	}
+
+	/**
+	 * Construye el dataset de 30 días para el gráfico de actividad diaria.
+	 *
+	 * Rendimiento: exactamente 2 consultas agregadas en total (una para
+	 * Views vía Views_Query::get_daily_totals_by_type(), una para Clicks vía
+	 * Top_Posts_Query::get_daily_totals()) sin importar cuántos tipos de
+	 * recurso tenga habilitados el sitio ni cuál esté seleccionado en el
+	 * selector — el filtrado por tipo se resuelve en PHP sobre el resultado
+	 * ya obtenido. Los días sin actividad se rellenan con 0.
+	 *
+	 * Clicks no tiene dimensión resource_type (wpam_clicks solo registra
+	 * clicks sobre posts, ver Top_Posts_Query::get_daily_totals()) — por eso
+	 * 'clicks' es una sola serie plana, mientras que 'views' trae una serie
+	 * por cada tipo habilitado más 'all'.
+	 *
+	 * @since  1.8.12
+	 * @return array{ labels: string[], clicks: int[], views: array<string,int[]> }
+	 */
+	private function build_dashboard_chart_data(): array {
+		$timezone = wp_timezone();
+		$today    = current_datetime()->setTimezone( $timezone )->setTime( 0, 0, 0 );
+
+		$labels = array();
+		for ( $i = 29; $i >= 0; $i-- ) {
+			$labels[] = $today->modify( "-{$i} days" )->format( 'Ymd' );
+		}
+
+		$since = $labels[0];
+		$until = $labels[ count( $labels ) - 1 ];
+
+		$clicks_totals   = Top_Posts_Query::get_daily_totals( $since, $until );
+		$views_by_period = Views_Query::get_daily_totals_by_type( $since, $until );
+
+		$enabled_types = array();
+		foreach ( Resource_Resolver::TYPES as $type ) {
+			if ( Views::is_type_enabled( $type ) ) {
+				$enabled_types[] = $type;
+			}
+		}
+
+		$views_series = array();
+		foreach ( array_merge( array( 'all' ), $enabled_types ) as $type ) {
+			$series = array();
+			foreach ( $labels as $day ) {
+				$day_totals = $views_by_period[ $day ] ?? array();
+
+				if ( 'all' === $type ) {
+					$count = 0;
+					foreach ( $enabled_types as $enabled_type ) {
+						$count += $day_totals[ $enabled_type ] ?? 0;
+					}
+				} else {
+					$count = $day_totals[ $type ] ?? 0;
+				}
+
+				$series[] = $count;
+			}
+			$views_series[ $type ] = $series;
+		}
+
+		$clicks_series = array();
+		foreach ( $labels as $day ) {
+			$clicks_series[] = $clicks_totals[ $day ] ?? 0;
+		}
+
+		return array(
+			'labels' => $labels,
+			'clicks' => $clicks_series,
+			'views'  => $views_series,
+		);
+	}
+
+	/**
+	 * Renderiza el contenedor del gráfico + selectores. El dataset completo
+	 * (30 días, todas las métricas y todos los tipos habilitados) se inyecta
+	 * una sola vez como JSON — cambiar de métrica o tipo de recurso es
+	 * puramente client-side (dashboard-chart.js), sin AJAX.
+	 *
+	 * @since 1.8.12
+	 */
+	private function render_daily_activity_chart(): void {
+		$chart_data     = $this->build_dashboard_chart_data();
+		$type_labels    = self::chart_resource_type_labels();
+		$available_type = array_keys( $chart_data['views'] ); // 'all' + tipos habilitados, en ese orden.
+
+		wp_add_inline_script(
+			'wpam-dashboard-chart',
+			'window.wpamDashboardChartData = ' . wp_json_encode( $chart_data ) . ';',
+			'before'
+		);
+		?>
+		<div class="wpam-analytics-card wpam-analytics-card--full wpam-dashboard-chart-card">
+			<div class="wpam-dashboard-chart-controls">
+				<div class="wpam-dashboard-chart-metric" role="group" aria-label="<?php esc_attr_e( 'Metric', 'wp-affiliatemanager' ); ?>">
+					<button type="button" class="wpam-chart-pill" data-metric="clicks"><?php esc_html_e( 'Clicks', 'wp-affiliatemanager' ); ?></button>
+					<button type="button" class="wpam-chart-pill wpam-chart-pill--active" data-metric="views"><?php esc_html_e( 'Views', 'wp-affiliatemanager' ); ?></button>
+					<button type="button" class="wpam-chart-pill" data-metric="both"><?php esc_html_e( 'Clicks + Views', 'wp-affiliatemanager' ); ?></button>
+				</div>
+				<div class="wpam-dashboard-chart-resource-type">
+					<label for="wpam-dashboard-chart-resource-type"><?php esc_html_e( 'Resource type:', 'wp-affiliatemanager' ); ?></label>
+					<select id="wpam-dashboard-chart-resource-type">
+						<?php foreach ( $available_type as $type ) : ?>
+							<option value="<?php echo esc_attr( $type ); ?>"><?php echo esc_html( $type_labels[ $type ] ?? $type ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</div>
+			</div>
+			<div class="wpam-dashboard-chart-canvas-wrap">
+				<canvas id="wpam-dashboard-chart" height="90"></canvas>
+			</div>
+		</div>
+		<?php
 	}
 
 	// -------------------------------------------------------------------------
