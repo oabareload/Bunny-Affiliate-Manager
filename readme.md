@@ -12,14 +12,14 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Domain Path: /languages
 - License: GPLv2 or later
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **1.8.12**
+- Current version: **1.8.13**
 
 ## Requirements
 
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v1.8.11)
+## Current scope (v1.8.13)
 
 ### Affiliates
 
@@ -56,6 +56,7 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - `allowed_redirect_hosts` is populated dynamically from every active affiliate's configured domains, so `wp_safe_redirect()` never blocks a legitimate destination.
 - Admins can be excluded from click analytics via **Settings → General → Exclude admins from analytics**.
 - **Outbound UTM Source (v1.8.11):** every external destination URL from `/go/`, `/goa/`, and `/goext/` gets a configurable `utm_source` parameter appended (or replaced if already present) right before the final redirect — one setting in **Settings → Redirect / Interstitial → Outbound UTM Source**, default `bunnychase`.
+- **External link integration API (v1.8.13):** `wpam_get_external_link_url( string $url, int $post_id = 0 ): string` lets other plugins active on the same WordPress site generate a signed `/goext/` URL directly in PHP — no AJAX, no REST, no JavaScript, no knowledge of the underlying HMAC/salt required. Returns `''` (never the original URL) if it can't produce a valid signed link, so the calling plugin makes its own explicit fallback decision. Backed by the same `Redirect_Manager::sign_external_url()` validation (scheme http/https + external host) used internally by `wpam_goext_url()` and the content-detection AJAX flow.
 
 ### Views Tracking
 
@@ -297,6 +298,26 @@ wpam_generate_affiliate_url_by_slug( string $slug, string $url ): string
 ```
 
 Both functions return the unmodified URL if the affiliate is inactive.
+
+## External link integration API (for other plugins)
+
+```php
+wpam_get_external_link_url( string $url, int $post_id = 0 ): string
+```
+
+Lets any other plugin active on the same WordPress installation route one of its own external links through WPAM's existing `/goext/` interstitial/redirect flow, without needing to understand HMAC signing:
+
+```php
+$href = wpam_get_external_link_url( 'https://example.com/product', get_the_ID() );
+if ( '' === $href ) {
+    $href = 'https://example.com/product'; // explicit fallback — the caller's choice
+}
+```
+
+- Returns a signed `/goext/{sig}/?u=...` URL on success.
+- Returns `''` — never the unsigned original URL — if the URL is invalid, uses a scheme other than http/https, or points at this site's own host. This keeps the contract unambiguous: the caller always knows whether it got an authorized WPAM link or not, and chooses its own fallback explicitly.
+- `$post_id` is optional and accepted for symmetry with `wpam_go_url()` / `wpam_go_default_url()`; it currently has no effect on the signature, the destination, or any validation.
+- No AJAX, no REST endpoint, and no JavaScript involved — it's a plain PHP function call.
 
 ## Helper functions
 

@@ -5,6 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8.13] — API pública de integración para enlaces externos (`wpam_get_external_link_url()`)
+
+### Added
+
+- **Nueva función pública `wpam_get_external_link_url( string $url, int $post_id = 0 ): string`**, para que otros plugins instalados en el mismo WordPress puedan generar directamente una URL `/goext/{sig}/?u=...` firmada, sin AJAX, sin REST, sin JavaScript y sin conocer HMAC ni salts internos. Devuelve `''` si no puede generar un enlace válido (scheme no http/https, host igual al del propio sitio, o el parámetro `$url` es inválido) — nunca la URL original sin firmar, para que el plugin consumidor decida explícitamente su propio fallback.
+- `$post_id` se acepta por simetría con `wpam_go_url()` / `wpam_go_default_url()`, pero actualmente no afecta la firma, el destino ni ninguna validación.
+
+### Changed
+
+- **Nuevo método `Redirect_Manager::sign_external_url()`**, punto único de validación (scheme http/https + host externo distinto al propio sitio) y construcción de la URL `/goext/`, reutilizado por `wpam_goext_url()`, `wpam_get_external_link_url()` y `ajax_sign_external()`.
+- `wpam_goext_url()` ahora delega en `sign_external_url()`: gana la validación de host externo que antes le faltaba (antes solo validaba el scheme).
+- `ajax_sign_external()` delega scheme/host/firma/construcción de URL en `sign_external_url()`; conserva intacta y exclusiva su comprobación de pertenencia al `post_content` del post (única de este flujo de detección de clicks vía JS).
+
+### Notes
+
+- Sin cambios funcionales en `resolve_external()`, `Interstitial_Renderer`, `external-links.js`, ni en Settings.
+- Sin tablas nuevas, sin AJAX nuevo, sin REST API, sin tracking adicional.
+- El flujo `/goext/` existente (enlaces externos autodetectados en el contenido) se comporta exactamente igual que antes.
+
+---
+
 ## [1.8.12] — Dashboard: gráfico de actividad diaria (Clicks + Views)
 
 ### Added

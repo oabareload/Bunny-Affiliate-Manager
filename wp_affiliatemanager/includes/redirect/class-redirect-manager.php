@@ -732,6 +732,54 @@ class Redirect_Manager {
 		return substr( hash_hmac( 'sha256', $url, wp_salt() ), 0, self::EXTERNAL_SIG_LENGTH );
 	}
 
+	/**
+	 * Valida y firma una URL externa, devolviendo la URL final `/goext/{sig}/?u=...`.
+	 *
+	 * Punto único de validación (scheme http/https + host externo distinto al
+	 * propio sitio) y construcción de la URL firmada. Reutilizado por:
+	 *  - wpam_goext_url() (helper público de templates/módulos internos).
+	 *  - wpam_get_external_link_url() (API pública de integración para otros
+	 *    plugins, v1.8.13).
+	 *  - ajax_sign_external() (flujo de detección de clicks en contenido vía JS),
+	 *    que además exige su propia comprobación de pertenencia a post_content
+	 *    ANTES de llamar aquí — esa comprobación es exclusiva de ese flujo y no
+	 *    se centraliza, porque no aplica a URLs que otro plugin firma directamente.
+	 *
+	 * No hace ninguna comprobación de origen de la petición (nonce, AJAX,
+	 * capacidades): eso es responsabilidad de quien llama, según su propio
+	 * contexto de confianza.
+	 *
+	 * @since  1.8.13
+	 * @param  string $url URL externa candidata (se sanitiza internamente).
+	 * @return string URL firmada `/goext/{sig}/?u=...`, o '' si la URL es inválida,
+	 *                de scheme no http/https, o apunta al propio host del sitio.
+	 */
+	public function sign_external_url( string $url ): string {
+		$url = esc_url_raw( $url );
+		if ( '' === $url ) {
+			return '';
+		}
+
+		$scheme = strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) );
+		if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+			return '';
+		}
+
+		$host      = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
+		$site_host = strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
+		if ( '' === $host || $host === $site_host ) {
+			return '';
+		}
+
+		$sig = $this->generate_external_signature( $url );
+
+		return (string) add_query_arg(
+			'u',
+			rawurlencode( $url ),
+			home_url( '/' . self::SLUG_EXTERNAL . '/' . $sig )
+		);
+	}
+
 	// -------------------------------------------------------------------------
 	// External Links — firma bajo demanda (solo en el momento del click)
 	// -------------------------------------------------------------------------
@@ -820,17 +868,6 @@ class Redirect_Manager {
 			wp_send_json_error();
 		}
 
-		$scheme = strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) );
-		if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
-			wp_send_json_error();
-		}
-
-		$host      = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
-		$site_host = strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
-		if ( '' === $host || $host === $site_host ) {
-			wp_send_json_error(); // Enlace interno: nada que firmar.
-		}
-
 		$post = get_post( $post_id );
 		if ( ! $post instanceof \WP_Post || 'publish' !== $post->post_status ) {
 			wp_send_json_error();
@@ -841,6 +878,10 @@ class Redirect_Manager {
 		// post_content. Sin parser HTML — un post_content típico no supera
 		// unos pocos KB, y str_contains() sobre eso es una operación trivial
 		// que solo se paga en el click real, no en cada carga de página.
+		// Exclusiva de este flujo (v1.8.9): no se centraliza en
+		// sign_external_url() porque no aplica a URLs que otro plugin firma
+		// directamente vía wpam_get_external_link_url() (v1.8.13) — esas no
+		// tienen por qué estar en el post_content de ningún post.
 		$content       = (string) $post->post_content;
 		$without_https = preg_replace( '#^https?:#i', '', $url );
 
@@ -848,11 +889,18 @@ class Redirect_Manager {
 			wp_send_json_error();
 		}
 
-		$sig = $this->generate_external_signature( $url );
+		// v1.8.13: scheme http/https, host externo y firma ahora centralizados
+		// en sign_external_url() (misma lógica que usan wpam_goext_url() y
+		// wpam_get_external_link_url()). Un resultado vacío cubre exactamente
+		// los mismos casos que antes validaban las comprobaciones inline aquí.
+		$redirect_url = $this->sign_external_url( $url );
+		if ( '' === $redirect_url ) {
+			wp_send_json_error();
+		}
 
 		wp_send_json_success(
 			array(
-				'redirectUrl' => home_url( '/' . self::SLUG_EXTERNAL . '/' . $sig . '/?u=' . rawurlencode( $url ) ),
+				'redirectUrl' => $redirect_url,
 			)
 		);
 	}

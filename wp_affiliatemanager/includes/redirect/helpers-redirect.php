@@ -69,27 +69,57 @@ function wpam_go_default_url( int $post_id, int $affiliate_id ): string {
  * un template u otro módulo necesita generar en PHP la misma URL firmada
  * para una URL cuya pertenencia al contenido ya se dio por válida.
  *
+ * v1.8.13: delega enteramente en Redirect_Manager::sign_external_url(), el
+ * mismo punto único de validación (scheme http/https + host externo) y
+ * firma que usan ajax_sign_external() y wpam_get_external_link_url(). Antes
+ * validaba el scheme pero no comprobaba que el host fuera distinto al del
+ * propio sitio; ahora comparte exactamente esa validación, sin duplicarla.
+ *
  * @since  1.8.9
  * @param  string $url URL externa absoluta (http/https).
  * @return string URL interna tipo https://site.com/goext/abcdef0123456789/?u=..., o '' si inválida.
  */
 function wpam_goext_url( string $url ): string {
-	$url = esc_url_raw( $url );
-	if ( '' === $url ) {
-		return '';
-	}
-
-	$scheme = strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) );
-	if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
-		return '';
-	}
-
 	$manager = new WP_AffiliateManager\Redirect\Redirect_Manager();
-	$sig     = $manager->generate_external_signature( $url );
+	return $manager->sign_external_url( $url );
+}
 
-	return add_query_arg(
-		'u',
-		rawurlencode( $url ),
-		home_url( '/' . WP_AffiliateManager\Redirect\Redirect_Manager::SLUG_EXTERNAL . '/' . $sig )
-	);
+/**
+ * API pública de integración: genera una URL /goext/ firmada para que OTROS
+ * plugins instalados en el mismo WordPress puedan enviar sus propios enlaces
+ * externos a través del mismo interstitial/flujo de redirect que ya usa WPAM.
+ *
+ * Uso desde un plugin consumidor:
+ *
+ *   $href = wpam_get_external_link_url( 'https://example.com/product', get_the_ID() );
+ *   if ( '' === $href ) {
+ *       $href = 'https://example.com/product'; // fallback explícito del consumidor
+ *   }
+ *
+ * No requiere AJAX, REST ni JavaScript, y no expone HMAC ni salts: es un
+ * wrapper de wpam_goext_url() (misma validación y firma centralizadas en
+ * Redirect_Manager::sign_external_url()) bajo el nombre público de esta API
+ * de integración.
+ *
+ * Contrato de retorno deliberadamente estricto: devuelve '' — nunca la URL
+ * original — si no puede generar un enlace WPAM válido (scheme inválido, la
+ * URL apunta al propio host del sitio, o el plugin no está activo/cargado).
+ * Así el llamador puede distinguir siempre "enlace autorizado por WPAM" de
+ * "fallo/URL no apta", y decidir su propio fallback explícitamente en vez de
+ * que WPAM lo enmascare devolviendo silenciosamente la URL sin firmar.
+ *
+ * $post_id se acepta por simetría con wpam_go_url()/wpam_go_default_url()
+ * (pensando en el contexto habitual de generación de enlaces desde un post),
+ * pero actualmente NO afecta la firma, el destino ni ninguna validación: la
+ * firma depende únicamente de la URL. No se usa en HMAC, tracking ni Analytics.
+ *
+ * @since  1.8.13
+ * @param  string $url     URL externa de destino (http/https).
+ * @param  int    $post_id Opcional. Aceptado por simetría con otros helpers
+ *                         de este archivo; actualmente sin efecto.
+ * @return string URL firmada `/goext/{sig}/?u=...`, o '' si WPAM no puede
+ *                generar el enlace.
+ */
+function wpam_get_external_link_url( string $url, int $post_id = 0 ): string {
+	return wpam_goext_url( $url );
 }
