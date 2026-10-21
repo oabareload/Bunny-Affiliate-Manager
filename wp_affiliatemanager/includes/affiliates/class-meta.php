@@ -57,6 +57,13 @@ class Meta {
 	const KEY_RELATED_POST_ID       = '_wpam_related_post_id';
 	/** @since 1.5.0 */
 	const KEY_DEFAULT_URL           = '_wpam_default_url';
+	/**
+	 * Dynamic Default URL template (array, see URL_Template). Takes precedence
+	 * over KEY_DEFAULT_URL when configured.
+	 *
+	 * @since 1.8.14
+	 */
+	const KEY_DEFAULT_URL_TEMPLATE  = '_wpam_default_url_template';
 
 	/**
 	 * Registra los meta boxes en el CPT.

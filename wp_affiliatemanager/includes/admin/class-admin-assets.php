@@ -152,6 +152,14 @@ class Admin_Assets {
 						'factor_created'    => __( 'Factor creado.', 'wp-affiliatemanager' ),
 						'factor_updated'    => __( 'Factor actualizado.', 'wp-affiliatemanager' ),
 						'factor_deleted'    => __( 'Factor eliminado.', 'wp-affiliatemanager' ),
+						// v1.8.14: modal "Construir URL" (Default URL dinámica).
+						'urlb_err_base'     => __( 'La URL base debe ser una URL http(s) válida.', 'wp-affiliatemanager' ),
+						'urlb_err_name'     => __( 'Nombre de parámetro inválido: usa solo letras, números, "_" y "-".', 'wp-affiliatemanager' ),
+						'urlb_err_dup'      => __( 'Hay nombres de parámetro repetidos.', 'wp-affiliatemanager' ),
+						'urlb_err_value'    => __( 'Cada parámetro necesita un valor (o la clave del metadato).', 'wp-affiliatemanager' ),
+						'urlb_no_keys'      => __( 'Sin resultados. Puedes escribir la clave a mano.', 'wp-affiliatemanager' ),
+						/* translators: 1: base URL, 2: number of parameters */
+						'urlb_summary'      => __( 'Plantilla dinámica activa: %1$s — parámetros: %2$s. La URL estática se ignora.', 'wp-affiliatemanager' ),
 					),
 				)
 			);

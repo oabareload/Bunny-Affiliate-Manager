@@ -22,6 +22,7 @@ namespace WP_AffiliateManager\Posts;
 
 use WP_AffiliateManager\Affiliates\Repository;
 use WP_AffiliateManager\Affiliates\CPT;
+use WP_AffiliateManager\Affiliates\URL_Template;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -614,7 +615,7 @@ class Post_Links {
 			// ($raw_valid_count === 0) no debe generar un bloque desde cero solo
 			// porque un afiliado activo tenga Default URL. Los Default URL completan
 			// un bloque existente, no crean uno nuevo.
-			$links = $this->merge_default_links( $links, $repo, $raw_valid_count );
+			$links = $this->merge_default_links( $links, $repo, $raw_valid_count, $post_id );
 
 			/**
 			 * Filtra la lista final de links resueltos (explícitos + fallback por Default URL).
@@ -644,12 +645,15 @@ class Post_Links {
 	 * pero que sigue existiendo en el meta guardado del post.
 	 *
 	 * @since  1.5.0
+	 * @since  1.8.14 Adds $post_id so a dynamic Default URL template can be resolved
+	 *                for this post (see URL_Template).
 	 * @param  array[]    $links           Links ya resueltos (explícitos, posiblemente filtrados).
 	 * @param  Repository $repo            Instancia reutilizada de Repository.
 	 * @param  int        $raw_valid_count Total de items válidos en _wpam_links (sin filtrar).
+	 * @param  int        $post_id         Post being resolved.
 	 * @return array[] Links con los fallback añadidos al final.
 	 */
-	private function merge_default_links( array $links, Repository $repo, int $raw_valid_count ): array {
+	private function merge_default_links( array $links, Repository $repo, int $raw_valid_count, int $post_id ): array {
 		$covered = array();
 		foreach ( $links as $link ) {
 			if ( empty( $link['_orphan'] ) ) {
@@ -667,7 +671,16 @@ class Post_Links {
 				continue;
 			}
 
-			$default_url = trim( (string) ( $affiliate['default_url'] ?? '' ) );
+			// v1.8.14: a configured dynamic template replaces the static Default URL.
+			// If it can't be resolved for this post (missing required meta) the
+			// result is '' and the existing rule below applies: no fallback link.
+			// The static URL is not used as a silent substitute.
+			if ( ! empty( $affiliate['default_url_template'] ) ) {
+				$default_url = URL_Template::resolve( $affiliate['default_url_template'], $post_id );
+			} else {
+				$default_url = trim( (string) ( $affiliate['default_url'] ?? '' ) );
+			}
+
 			if ( '' === $default_url ) {
 				continue;
 			}

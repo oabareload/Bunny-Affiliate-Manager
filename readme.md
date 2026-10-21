@@ -12,20 +12,21 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Domain Path: /languages
 - License: GPLv2 or later
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **1.8.13**
+- Current version: **1.8.14**
 
 ## Requirements
 
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v1.8.13)
+## Current scope (v1.8.14)
 
 ### Affiliates
 
 - Full affiliate CRUD (create, edit, delete, activate, deactivate) via inline admin UI — no page reload, no modal.
 - Per-affiliate fields: name, slug, URL parameter, value, logo (Media Library picker), brand color, domains (used for auto-detection and redirect host allow-listing), **Default URL (fallback)**, visible flag, disclaimer settings, related post.
 - **Default URL (fallback):** an optional URL used automatically on any post that doesn't have a specific link for that affiliate. Priority is always post-specific link → Default URL → not shown. No extra toggle — setting the field is what enables the fallback.
+- **Dynamic Default URL (v1.8.14):** next to the Default URL field, the **Construir URL** button opens a modal to build the fallback from a base URL plus parameters, each either fixed text or a post meta key (picked from a searchable list of existing keys; WordPress-internal keys are hidden). Per meta parameter: **Obligatorio** — if the meta is missing/empty on a post, the dynamic URL is unavailable for that post (no fallback link, same as an empty Default URL); **Opcional** — the parameter is simply omitted. Only string/number meta values are used (arrays/objects count as empty); names and values are percent-encoded (`Hatsune Miku` → `Hatsune%20Miku`). A configured template takes precedence over the static URL (which is kept but ignored); existing static URLs keep working untouched. Stored as affiliate post meta (`_wpam_default_url_template`), resolved at runtime per post, no new tables.
 - Admin affiliate table with logo, status, parameter, value, domains, and flags columns.
 
 ### Post Affiliate Links
@@ -173,6 +174,7 @@ Bunny-Affiliate-Manager/
 │   │   │   ├── class-cpt.php
 │   │   │   ├── class-meta.php
 │   │   │   ├── class-repository.php
+│   │   │   ├── class-url-template.php        — dynamic Default URL template (v1.8.14)
 │   │   │   └── helpers-affiliates.php
 │   │   ├── analytics/
 │   │   │   └── class-score-query.php         — combined views+clicks score ranking + site-wide average

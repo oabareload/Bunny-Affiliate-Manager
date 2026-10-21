@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8.14] — Default URL dinámica basada en metadatos ("Construir URL")
+
+### Added
+
+- **Botón "Construir URL" junto a *Default URL (Fallback)*** en la edición inline de afiliados. Abre un modal (mismos estilos `.wpam-modal-*` del plugin, sin librerías) para definir una URL base y parámetros; cada parámetro es *Texto fijo* o *Metadato de la publicación*, y los metadatos son **Obligatorio** u **Opcional**.
+- **Selector de claves de metadatos con búsqueda** (`wp_ajax_wpam_search_meta_keys`, solo admin, nonce `wpam_inline_crud` + `manage_options`): una consulta agregada `DISTINCT meta_key` bajo demanda, solo claves (nunca valores), limitada a los post types soportados y excluyendo claves internas de WordPress (`_wp_*`, `_edit_*`, `_oembed_*`, `_menu_item_*`, `_thumbnail_id`, `_pingme`, `_encloseme`) y `_wpam_*`. También se puede escribir la clave a mano.
+- Nueva clase `Affiliates\URL_Template` (`sanitize()`, `resolve()`, `find_meta_keys()`) y nuevo post meta de afiliado `_wpam_default_url_template`.
+
+### Behavior
+
+- **Obligatorio:** metadato inexistente, vacío o no escalar ⇒ la URL dinámica no está disponible para ese post y no se genera el link de fallback (misma regla que un Default URL vacío).
+- **Opcional:** metadato inexistente/vacío ⇒ se omite solo ese parámetro; no se genera un parámetro vacío.
+- Solo se aceptan cadenas y números (arrays/objetos/booleanos cuentan como vacíos). Nombres y valores se codifican con `rawurlencode` (espacio → `%20`).
+- Una plantilla configurada tiene prioridad sobre la URL estática (que se conserva pero se ignora); si la plantilla no resuelve, **no** se usa la estática como sustituto. Sin plantilla, el comportamiento es exactamente el anterior.
+- Validación al guardar: URL base http(s) con host; nombres `[A-Za-z0-9_-]` (máx. 64, sin duplicados; sin `.` porque `parse_str()` los reescribiría); máx. 20 parámetros. Una plantilla inválida rechaza el guardado con un mensaje.
+
+### Notes
+
+- Integrado en el único punto de resolución del fallback (`Post_Links::merge_default_links()`); `/goa/`, el frontend y el interstitial lo heredan sin cambios. No cambia prioridad frente a links específicos, `/go/`, `/goext/` ni el mapa de tokens.
+- Sin consultas adicionales por parámetro ni por metadato: `get_post_meta()` usa la caché del post, ya cargada al leer `_wpam_links`. Sin tablas nuevas, sin dependencias, nada se carga en el frontend.
+- El meta box del CPT `wpam_affiliate` sigue mostrando solo la URL estática y no modifica la plantilla.
+
+---
+
 ## [1.8.13] — API pública de integración para enlaces externos (`wpam_get_external_link_url()`)
 
 ### Added

@@ -807,7 +807,9 @@ class Redirect_Manager {
 	 * @return void
 	 */
 	public function maybe_enqueue_external_links_script(): void {
-		if ( is_preview() || is_feed() || ! is_singular() ) {
+		// Fix: is_preview() no longer excludes. A draft can only be viewed through
+		// preview; excluding it left the draft's external links unintercepted.
+		if ( is_feed() || ! is_singular() ) {
 			return;
 		}
 
@@ -869,7 +871,15 @@ class Redirect_Manager {
 		}
 
 		$post = get_post( $post_id );
-		if ( ! $post instanceof \WP_Post || 'publish' !== $post->post_status ) {
+		if ( ! $post instanceof \WP_Post ) {
+			wp_send_json_error();
+		}
+
+		// Fix: non-published posts (draft, pending, future) may only be signed by
+		// users who can edit them. Public visitors still require 'publish'.
+		// Previously any non-published post failed here and the JS fell back
+		// (fail-open) to the raw destination, skipping the interstitial.
+		if ( 'publish' !== $post->post_status && ! current_user_can( 'edit_post', $post_id ) ) {
 			wp_send_json_error();
 		}
 

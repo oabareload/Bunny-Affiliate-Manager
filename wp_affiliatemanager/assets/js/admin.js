@@ -121,6 +121,7 @@
 					brand_color: $form.find( '.wpam-ef-color' ).val(),
 					domains:     $form.find( '.wpam-ef-domains' ).val().trim(),
 					default_url: $form.find( '.wpam-ef-default-url' ).val().trim(),
+					default_url_template: $form.find( '.wpam-ef-default-url-template' ).val(),
 					active:      $form.find( '.wpam-ef-active' ).is( ':checked' ) ? '1' : '',
 					visible:     $form.find( '.wpam-ef-visible' ).is( ':checked' ) ? '1' : '',
 					use_global_disclaimer: $form.find( '.wpam-ef-use-global-disclaimer' ).is( ':checked' ) ? '1' : '',
@@ -348,6 +349,329 @@
 	};
 
 	// =========================================================================
+	// Modal "Construir URL" — dynamic Default URL template (v1.8.14)
+	//
+	// One modal for the whole screen. It edits the JSON kept in the hidden
+	// `.wpam-ef-default-url-template` input of the affiliate row being edited;
+	// nothing is persisted until the row's own Save button is pressed, and the
+	// server re-validates everything (URL_Template::sanitize()).
+	// =========================================================================
+
+	const UrlBuilder = {
+
+		/** `.wpam-edit-field--default-url` of the row being edited. */
+		$field: null,
+
+		_suggestTimer: null,
+		_suggestSeq:   0,
+		_suggestCache: {},
+
+		init() {
+			this.$overlay = $( '#wpam-urlb-overlay' );
+			if ( ! this.$overlay.length ) { return; } // Not the Affiliates screen.
+
+			this.$params  = $( '#wpam-urlb-params' );
+			this.$error   = $( '#wpam-urlb-error' );
+			this.$base    = $( '#wpam-urlb-base' );
+			this.$preview = $( '#wpam-urlb-preview' );
+
+			$( document ).on( 'click', '.wpam-urlb-open', ( e ) => {
+				e.preventDefault();
+				this.open( $( e.currentTarget ).closest( '.wpam-edit-field--default-url' ) );
+			} );
+
+			$( '#wpam-urlb-add' ).on( 'click', () => this.addRow() );
+			$( '#wpam-urlb-apply' ).on( 'click', () => this.apply() );
+			$( '#wpam-urlb-remove-template' ).on( 'click', () => this.removeTemplate() );
+			$( '#wpam-urlb-close, #wpam-urlb-cancel' ).on( 'click', () => this.close() );
+
+			this.$overlay.on( 'click', ( e ) => {
+				if ( e.target === this.$overlay.get( 0 ) ) { this.close(); }
+			} );
+			$( document ).on( 'keydown', ( e ) => {
+				if ( 'Escape' === e.key && this.$overlay.is( ':visible' ) ) { this.close(); }
+			} );
+
+			this.$base.on( 'input', () => this.refreshPreview() );
+
+			// Parameter rows (delegated on the container; rows are cloned from a <template>).
+			this.$params.on( 'click', '.wpam-urlb-remove', ( e ) => {
+				$( e.currentTarget ).closest( '.wpam-urlb-row' ).remove();
+				this.refreshPreview();
+			} );
+			this.$params.on( 'change', '.wpam-urlb-source', ( e ) => {
+				this.applySource( $( e.currentTarget ).closest( '.wpam-urlb-row' ) );
+				this.refreshPreview();
+			} );
+			this.$params.on( 'input change', '.wpam-urlb-name, .wpam-urlb-value, .wpam-urlb-required', () => this.refreshPreview() );
+
+			// Meta-key search (only for rows whose source is "meta").
+			this.$params.on( 'input focus', '.wpam-urlb-value', ( e ) => {
+				const $row = $( e.currentTarget ).closest( '.wpam-urlb-row' );
+				if ( 'meta' !== $row.find( '.wpam-urlb-source' ).val() ) {
+					this.hideSuggest( $row );
+					return;
+				}
+				clearTimeout( this._suggestTimer );
+				this._suggestTimer = setTimeout( () => this.fetchKeys( $row ), 250 );
+			} );
+			this.$params.on( 'blur', '.wpam-urlb-value', ( e ) => {
+				const $row = $( e.currentTarget ).closest( '.wpam-urlb-row' );
+				setTimeout( () => this.hideSuggest( $row ), 150 );
+			} );
+			this.$params.on( 'keydown', '.wpam-urlb-value', ( e ) => this.onSuggestKey( e ) );
+			// mousedown (not click) so the pick lands before the input's blur hides the list.
+			this.$params.on( 'mousedown', '.wpam-urlb-suggest li[data-key]', ( e ) => {
+				e.preventDefault();
+				this.pick( $( e.currentTarget ) );
+			} );
+		},
+
+		open( $field ) {
+			this.$field = $field;
+
+			let tpl = null;
+			try {
+				tpl = JSON.parse( $field.find( '.wpam-ef-default-url-template' ).val() || 'null' );
+			} catch ( err ) {
+				tpl = null;
+			}
+
+			this.$params.empty();
+			// No template yet: start from the static URL, if there is one.
+			this.$base.val( tpl && tpl.base_url ? tpl.base_url : $field.find( '.wpam-ef-default-url' ).val().trim() );
+			( tpl && Array.isArray( tpl.params ) ? tpl.params : [] ).forEach( ( p ) => this.addRow( p ) );
+			if ( ! this.$params.children().length ) { this.addRow(); }
+
+			$( '#wpam-urlb-remove-template' ).toggle( !! ( tpl && tpl.base_url ) );
+			this.$error.hide().text( '' );
+			this.refreshPreview();
+
+			this.$overlay.css( 'display', 'flex' );
+			$( 'body' ).addClass( 'wpam-modal-open' );
+			this.$base.trigger( 'focus' );
+		},
+
+		close() {
+			this.$overlay.hide();
+			$( 'body' ).removeClass( 'wpam-modal-open' );
+			this.$params.find( '.wpam-urlb-suggest' ).prop( 'hidden', true );
+			this.$field = null;
+		},
+
+		addRow( param ) {
+			param = param || { name: '', source: 'text', value: '', required: false };
+
+			const tpl  = document.getElementById( 'wpam-urlb-row-template' );
+			const $row = $( tpl.content.firstElementChild.cloneNode( true ) );
+
+			$row.find( '.wpam-urlb-name' ).val( param.name || '' );
+			$row.find( '.wpam-urlb-source' ).val( 'meta' === param.source ? 'meta' : 'text' );
+			$row.find( '.wpam-urlb-value' ).val( param.value || '' );
+			$row.find( '.wpam-urlb-required' ).val( param.required ? '1' : '0' );
+
+			this.applySource( $row );
+			this.$params.append( $row );
+			this.refreshPreview();
+			return $row;
+		},
+
+		/** "Requisito" only applies to meta; fixed text is always "No aplica". */
+		applySource( $row ) {
+			const isMeta = 'meta' === $row.find( '.wpam-urlb-source' ).val();
+			const $req   = $row.find( '.wpam-urlb-required' );
+
+			$row.find( '.wpam-urlb-value' ).attr( 'placeholder', isMeta ? 'figure_series' : 'figure' );
+
+			if ( isMeta ) {
+				$req.prop( 'disabled', false );
+				if ( 'na' === $req.val() ) { $req.val( '1' ); }
+			} else {
+				$req.val( 'na' ).prop( 'disabled', true );
+				this.hideSuggest( $row );
+			}
+		},
+
+		collect() {
+			const params = [];
+
+			this.$params.children( '.wpam-urlb-row' ).each( ( i, el ) => {
+				const $r     = $( el );
+				const source = $r.find( '.wpam-urlb-source' ).val();
+				params.push( {
+					name:     $r.find( '.wpam-urlb-name' ).val().trim(),
+					source:   source,
+					value:    $r.find( '.wpam-urlb-value' ).val().trim(),
+					required: 'meta' === source && '1' === $r.find( '.wpam-urlb-required' ).val(),
+				} );
+			} );
+
+			return {
+				base_url: this.$base.val().trim(),
+				params:   params.filter( ( p ) => p.name || p.value ), // drop fully empty rows
+			};
+		},
+
+		/** Same rules as URL_Template::sanitize(); the server is still the authority. */
+		validate( tpl ) {
+			const i18n = data.i18n || {};
+
+			if ( ! /^https?:\/\/[^\s\/?#]+/i.test( tpl.base_url ) ) { return i18n.urlb_err_base; }
+
+			const seen = new Set();
+			for ( const p of tpl.params ) {
+				if ( ! /^[A-Za-z0-9_-]{1,64}$/.test( p.name ) ) { return i18n.urlb_err_name; }
+				if ( seen.has( p.name ) ) { return i18n.urlb_err_dup; }
+				seen.add( p.name );
+				if ( ! p.value ) { return i18n.urlb_err_value; }
+			}
+
+			return '';
+		},
+
+		apply() {
+			const tpl = this.collect();
+			const err = this.validate( tpl );
+
+			if ( err ) {
+				this.$error.text( err ).show();
+				return;
+			}
+
+			this.$field.find( '.wpam-ef-default-url-template' ).val( JSON.stringify( tpl ) );
+			this.refreshField( this.$field, tpl );
+			this.close();
+		},
+
+		removeTemplate() {
+			this.$field.find( '.wpam-ef-default-url-template' ).val( '' );
+			this.refreshField( this.$field, null );
+			this.close();
+		},
+
+		/** Summary line + enable/disable of the static input next to the button. */
+		refreshField( $field, tpl ) {
+			const $summary = $field.find( '.wpam-urlb-summary' );
+
+			$field.find( '.wpam-ef-default-url' ).prop( 'disabled', !! tpl );
+
+			if ( ! tpl ) {
+				$summary.prop( 'hidden', true ).text( '' );
+				return;
+			}
+
+			$summary
+				.text(
+					( ( data.i18n && data.i18n.urlb_summary ) || '' )
+						.replace( '%1$s', () => tpl.base_url )
+						.replace( '%2$s', () => String( tpl.params.length ) )
+				)
+				.prop( 'hidden', false );
+		},
+
+		/** Shape of the URL (not resolved values): {key} = required meta, {key}? = optional meta. */
+		refreshPreview() {
+			const tpl   = this.collect();
+			const pairs = tpl.params.filter( ( p ) => p.name ).map( ( p ) => {
+				let v = p.value;
+				if ( 'meta' === p.source ) {
+					v = '{' + ( p.value || '\u2026' ) + '}' + ( p.required ? '' : '?' );
+				}
+				return p.name + '=' + v;
+			} );
+
+			const base = tpl.base_url || 'https://\u2026';
+			if ( ! pairs.length ) {
+				this.$preview.text( base );
+				return;
+			}
+
+			const sep = -1 === base.indexOf( '?' ) ? '?' : ( /[?&]$/.test( base ) ? '' : '&' );
+			this.$preview.text( base + sep + pairs.join( '&' ) );
+		},
+
+		// ------------------------------------------------------------------
+		// Meta-key picker
+		// ------------------------------------------------------------------
+
+		fetchKeys( $row ) {
+			const term = $row.find( '.wpam-urlb-value' ).val().trim();
+
+			if ( Object.prototype.hasOwnProperty.call( this._suggestCache, term ) ) {
+				this.showSuggest( $row, this._suggestCache[ term ] );
+				return;
+			}
+
+			const seq = ++this._suggestSeq;
+
+			$.post(
+				data.ajaxUrl,
+				{ action: 'wpam_search_meta_keys', nonce: data.crudNonce, search: term },
+				( res ) => {
+					const keys = ( res && res.success && res.data && Array.isArray( res.data.keys ) ) ? res.data.keys : [];
+					this._suggestCache[ term ] = keys;
+					// A newer search superseded this one: keep the cache, skip the render.
+					if ( seq === this._suggestSeq ) { this.showSuggest( $row, keys ); }
+				}
+			);
+		},
+
+		showSuggest( $row, keys ) {
+			const $input = $row.find( '.wpam-urlb-value' );
+			if ( document.activeElement !== $input.get( 0 ) ) { return; } // user already left the field
+
+			const $list = $row.find( '.wpam-urlb-suggest' ).empty();
+
+			if ( ! keys.length ) {
+				$list.append( $( '<li class="wpam-urlb-suggest-empty">' ).text( ( data.i18n && data.i18n.urlb_no_keys ) || '' ) );
+			} else {
+				keys.forEach( ( key ) => {
+					$list.append( $( '<li role="option">' ).attr( 'data-key', key ).text( key ) );
+				} );
+			}
+
+			$list.prop( 'hidden', false );
+		},
+
+		hideSuggest( $row ) {
+			$row.find( '.wpam-urlb-suggest' ).prop( 'hidden', true );
+		},
+
+		pick( $li ) {
+			const $row = $li.closest( '.wpam-urlb-row' );
+			$row.find( '.wpam-urlb-value' ).val( $li.attr( 'data-key' ) );
+			this.hideSuggest( $row );
+			this.refreshPreview();
+		},
+
+		onSuggestKey( e ) {
+			const $row  = $( e.currentTarget ).closest( '.wpam-urlb-row' );
+			const $list = $row.find( '.wpam-urlb-suggest' );
+			if ( $list.prop( 'hidden' ) ) { return; }
+
+			if ( 'Escape' === e.key ) {
+				e.stopPropagation(); // close the list, not the modal
+				this.hideSuggest( $row );
+				return;
+			}
+
+			const $items = $list.children( 'li[data-key]' );
+			const $cur   = $items.filter( '.is-active' );
+			if ( ! $items.length ) { return; }
+
+			if ( 'ArrowDown' === e.key || 'ArrowUp' === e.key ) {
+				e.preventDefault();
+				let i = $items.index( $cur ); // -1 when nothing is highlighted
+				i = 'ArrowDown' === e.key ? ( i + 1 ) % $items.length : ( i <= 0 ? $items.length - 1 : i - 1 );
+				$items.removeClass( 'is-active' ).eq( i ).addClass( 'is-active' ).get( 0 ).scrollIntoView( { block: 'nearest' } );
+			} else if ( 'Enter' === e.key && $cur.length ) {
+				e.preventDefault();
+				this.pick( $cur );
+			}
+		},
+	};
+
+	// =========================================================================
 	// Módulo original (sin cambios relevantes)
 	// =========================================================================
 
@@ -453,6 +777,7 @@
 	$( function () {
 		WPAM_Admin.init();
 		InlineCRUD.init();
+		UrlBuilder.init();
 	} );
 
 	window.WPAM_Admin   = WPAM_Admin;

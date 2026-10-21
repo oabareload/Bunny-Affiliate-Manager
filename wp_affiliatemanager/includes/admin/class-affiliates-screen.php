@@ -17,6 +17,7 @@ namespace WP_AffiliateManager\Admin;
 
 use WP_AffiliateManager\Affiliates\Repository;
 use WP_AffiliateManager\Affiliates\CPT;
+use WP_AffiliateManager\Affiliates\URL_Template;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -113,6 +114,18 @@ class Affiliates_Screen {
 			wp_send_json_error( __( 'Affiliate name is required.', 'wp-affiliatemanager' ) );
 		}
 
+		// v1.8.14: dynamic Default URL template (JSON from the "Construir URL" modal).
+		// Only forwarded when the field is actually posted, so a stale cached admin.js
+		// that doesn't know about it can never wipe a stored template.
+		$raw_template = null;
+		if ( isset( $_POST['default_url_template'] ) && is_string( $_POST['default_url_template'] ) ) {
+			$raw_template = trim( wp_unslash( $_POST['default_url_template'] ) );
+
+			if ( '' !== $raw_template && null === URL_Template::sanitize( $raw_template ) ) {
+				wp_send_json_error( __( 'The dynamic URL template is not valid. Open "Construir URL" and review it.', 'wp-affiliatemanager' ) );
+			}
+		}
+
 		$data = array(
 			'id'          => $id,
 			'title'       => $title,
@@ -129,6 +142,10 @@ class Affiliates_Screen {
 			'custom_disclaimer'     => wp_kses_post( wp_unslash( $_POST['custom_disclaimer'] ?? '' ) ),
 			'related_post_id'       => absint( $_POST['related_post_id'] ?? 0 ),
 		);
+
+		if ( null !== $raw_template ) {
+			$data['default_url_template'] = $raw_template;
+		}
 
 		$result = $this->repository->save( $data );
 
@@ -169,6 +186,28 @@ class Affiliates_Screen {
 		$html = ob_get_clean();
 
 		wp_send_json_success( array( 'row_html' => $html ) );
+	}
+
+	/**
+	 * Handler AJAX — search meta keys for the "Construir URL" picker.
+	 * action: wpam_search_meta_keys
+	 *
+	 * Returns keys only (never values), WordPress-internal keys excluded.
+	 *
+	 * @since 1.8.14
+	 */
+	public function ajax_search_meta_keys(): void {
+		check_ajax_referer( 'wpam_inline_crud', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( __( 'Permission denied.', 'wp-affiliatemanager' ) );
+		}
+
+		$search = isset( $_POST['search'] ) && is_string( $_POST['search'] )
+			? substr( sanitize_text_field( wp_unslash( $_POST['search'] ) ), 0, 100 )
+			: '';
+
+		wp_send_json_success( array( 'keys' => URL_Template::find_meta_keys( $search ) ) );
 	}
 
 	// -------------------------------------------------------------------------
@@ -233,7 +272,85 @@ class Affiliates_Screen {
 				</table>
 			</div>
 
+			<?php $this->render_url_builder_modal(); ?>
+
 		</div>
+		<?php
+	}
+
+	/**
+	 * Single "Construir URL" modal, shared by every edit row (printed once per
+	 * page load; admin.js fills it each time it opens). Parameter rows are cloned
+	 * from the <template> below, so every label stays translatable server-side.
+	 *
+	 * @since  1.8.14
+	 * @return void
+	 */
+	private function render_url_builder_modal(): void {
+		?>
+		<div class="wpam-modal-overlay" id="wpam-urlb-overlay" style="display:none;">
+			<div class="wpam-modal wpam-urlb-modal" role="dialog" aria-modal="true" aria-labelledby="wpam-urlb-title">
+				<div class="wpam-modal-header">
+					<h3 id="wpam-urlb-title"><?php esc_html_e( 'Construir URL', 'wp-affiliatemanager' ); ?></h3>
+					<button type="button" class="wpam-modal-close" id="wpam-urlb-close" aria-label="<?php esc_attr_e( 'Cerrar', 'wp-affiliatemanager' ); ?>">&times;</button>
+				</div>
+				<div class="wpam-modal-body">
+					<div class="wpam-modal-field">
+						<label for="wpam-urlb-base"><?php esc_html_e( 'URL base', 'wp-affiliatemanager' ); ?></label>
+						<input type="url" id="wpam-urlb-base" class="wpam-input" placeholder="https://enlace.com/" />
+					</div>
+
+					<div class="wpam-modal-field" style="margin-top:14px;">
+						<label><?php esc_html_e( 'Parámetros', 'wp-affiliatemanager' ); ?></label>
+						<div class="wpam-urlb-row wpam-urlb-row--head" aria-hidden="true">
+							<span><?php esc_html_e( 'Nombre', 'wp-affiliatemanager' ); ?></span>
+							<span><?php esc_html_e( 'Origen del valor', 'wp-affiliatemanager' ); ?></span>
+							<span><?php esc_html_e( 'Valor / clave del metadato', 'wp-affiliatemanager' ); ?></span>
+							<span><?php esc_html_e( 'Requisito', 'wp-affiliatemanager' ); ?></span>
+							<span></span>
+						</div>
+						<div id="wpam-urlb-params"></div>
+						<p style="margin:10px 0 0;">
+							<button type="button" class="button" id="wpam-urlb-add">+ <?php esc_html_e( 'Añadir parámetro', 'wp-affiliatemanager' ); ?></button>
+						</p>
+					</div>
+
+					<div class="wpam-url-preview" style="margin-top:14px;">
+						<span class="wpam-url-preview-label"><?php esc_html_e( 'Forma de la URL:', 'wp-affiliatemanager' ); ?></span>
+						<code class="wpam-url-preview-code" id="wpam-urlb-preview"></code>
+					</div>
+					<p class="wpam-description">
+						<?php esc_html_e( 'Obligatorio: si el metadato no existe o está vacío, la URL dinámica no se usa en ese post. Opcional: se omite solo ese parámetro. Solo se admiten valores de texto o números. Los cambios se guardan al pulsar Save en el afiliado.', 'wp-affiliatemanager' ); ?>
+					</p>
+				</div>
+				<div class="wpam-modal-footer">
+					<span class="wpam-modal-error" id="wpam-urlb-error" style="display:none;"></span>
+					<button type="button" class="button" id="wpam-urlb-remove-template" style="display:none;"><?php esc_html_e( 'Quitar plantilla', 'wp-affiliatemanager' ); ?></button>
+					<button type="button" class="button" id="wpam-urlb-cancel"><?php esc_html_e( 'Cancelar', 'wp-affiliatemanager' ); ?></button>
+					<button type="button" class="button button-primary wpam-btn-primary" id="wpam-urlb-apply"><?php esc_html_e( 'Aplicar', 'wp-affiliatemanager' ); ?></button>
+				</div>
+			</div>
+		</div>
+
+		<template id="wpam-urlb-row-template">
+			<div class="wpam-urlb-row">
+				<input type="text" class="wpam-input wpam-urlb-name" maxlength="64" placeholder="s" autocomplete="off" />
+				<select class="wpam-input wpam-urlb-source">
+					<option value="text"><?php esc_html_e( 'Texto fijo', 'wp-affiliatemanager' ); ?></option>
+					<option value="meta"><?php esc_html_e( 'Metadato de la publicación', 'wp-affiliatemanager' ); ?></option>
+				</select>
+				<div class="wpam-urlb-value-wrap">
+					<input type="text" class="wpam-input wpam-urlb-value" maxlength="255" autocomplete="off" />
+					<ul class="wpam-urlb-suggest" role="listbox" hidden></ul>
+				</div>
+				<select class="wpam-input wpam-urlb-required">
+					<option value="1"><?php esc_html_e( 'Obligatorio', 'wp-affiliatemanager' ); ?></option>
+					<option value="0"><?php esc_html_e( 'Opcional', 'wp-affiliatemanager' ); ?></option>
+					<option value="na"><?php esc_html_e( 'No aplica', 'wp-affiliatemanager' ); ?></option>
+				</select>
+				<button type="button" class="wpam-urlb-remove" aria-label="<?php esc_attr_e( 'Eliminar parámetro', 'wp-affiliatemanager' ); ?>">&#10005;</button>
+			</div>
+		</template>
 		<?php
 	}
 
@@ -392,6 +509,8 @@ class Affiliates_Screen {
 		$visible     = $affiliate ? (bool) $affiliate['visible']  : true;
 		$domains     = $affiliate ? esc_textarea( $affiliate['domains'] ) : '';
 		$default_url = $affiliate ? esc_attr( $affiliate['default_url'] ) : '';
+		$url_template = $affiliate ? (array) $affiliate['default_url_template'] : array();
+		$has_template = ! empty( $url_template );
 		$use_global_disclaimer = $affiliate ? (bool) $affiliate['use_global_disclaimer'] : true;
 		$custom_disclaimer     = $affiliate ? esc_textarea( $affiliate['custom_disclaimer'] ) : '';
 		$related_post_id       = $affiliate ? absint( $affiliate['related_post_id'] ) : 0;
@@ -470,7 +589,22 @@ class Affiliates_Screen {
 						<!-- Default URL (fallback) -->
 						<div class="wpam-edit-field wpam-edit-field--default-url">
 							<label><?php esc_html_e( 'Default URL (Fallback)', 'wp-affiliatemanager' ); ?></label>
-							<input type="url" class="wpam-input wpam-ef-default-url" value="<?php echo $default_url; ?>" placeholder="https://example.com/store" />
+							<input type="url" class="wpam-input wpam-ef-default-url" value="<?php echo $default_url; ?>" placeholder="https://example.com/store" <?php disabled( $has_template ); ?> />
+							<!-- v1.8.14: dynamic template (JSON), edited in the "Construir URL" modal. -->
+							<input type="hidden" class="wpam-ef-default-url-template" value="<?php echo $has_template ? esc_attr( (string) wp_json_encode( $url_template ) ) : ''; ?>" />
+							<button type="button" class="button wpam-urlb-open"><?php esc_html_e( 'Construir URL', 'wp-affiliatemanager' ); ?></button>
+							<div class="wpam-urlb-summary wpam-description" <?php echo $has_template ? '' : 'hidden'; ?>>
+								<?php
+								if ( $has_template ) {
+									echo esc_html( sprintf(
+										/* translators: 1: base URL, 2: number of parameters */
+										__( 'Plantilla dinámica activa: %1$s — parámetros: %2$s. La URL estática se ignora.', 'wp-affiliatemanager' ),
+										(string) ( $url_template['base_url'] ?? '' ),
+										(string) count( (array) ( $url_template['params'] ?? array() ) )
+									) );
+								}
+								?>
+							</div>
 						</div>
 
 						<!-- Brand color -->

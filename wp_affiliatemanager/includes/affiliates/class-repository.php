@@ -188,6 +188,8 @@ class Repository {
 	 *     @type string $logo_url    URL del logo.
 	 *     @type string $brand_color Color hex de la marca.
 	 *     @type bool   $active      Estado activo.
+	 *     @type string|array $default_url_template Optional. Dynamic Default URL template
+	 *                                  (JSON string or array, see URL_Template::sanitize()).
 	 * }
 	 * @return int|\WP_Error ID del post creado/actualizado o WP_Error.
 	 */
@@ -242,6 +244,20 @@ class Repository {
 			update_post_meta( $post_id, Meta::KEY_DEFAULT_URL, esc_url_raw( $raw_default_url ) );
 		}
 
+		// Dynamic Default URL template (v1.8.14). Only touched when the key is sent.
+		// Invalid input (null) keeps the stored value, same as an invalid static URL;
+		// an empty template removes it.
+		if ( array_key_exists( 'default_url_template', $data ) ) {
+			$template = URL_Template::sanitize( $data['default_url_template'] );
+			if ( null !== $template ) {
+				if ( empty( $template ) ) {
+					delete_post_meta( $post_id, Meta::KEY_DEFAULT_URL_TEMPLATE );
+				} else {
+					update_post_meta( $post_id, Meta::KEY_DEFAULT_URL_TEMPLATE, $template );
+				}
+			}
+		}
+
 		return $post_id;
 	}
 
@@ -290,6 +306,7 @@ class Repository {
 	public function normalize( \WP_Post $post ): array {
 		$is_active = get_post_meta( $post->ID, Meta::KEY_ACTIVE, true );
 		$use_global_disclaimer = get_post_meta( $post->ID, Meta::KEY_USE_GLOBAL_DISCLAIMER, true );
+		$default_url_template  = get_post_meta( $post->ID, Meta::KEY_DEFAULT_URL_TEMPLATE, true );
 
 		return array(
 			'id'          => $post->ID,
@@ -306,6 +323,8 @@ class Repository {
 			'custom_disclaimer'     => get_post_meta( $post->ID, Meta::KEY_CUSTOM_DISCLAIMER, true ) ?: '',
 			'related_post_id'       => absint( get_post_meta( $post->ID, Meta::KEY_RELATED_POST_ID, true ) ),
 			'default_url' => get_post_meta( $post->ID, Meta::KEY_DEFAULT_URL, true ) ?: '',
+			// v1.8.14: dynamic template (array) or empty array when not configured.
+			'default_url_template' => is_array( $default_url_template ) ? $default_url_template : array(),
 			'edit_url'    => get_edit_post_link( $post->ID, 'raw' ),
 			'created_at'  => $post->post_date,
 		);

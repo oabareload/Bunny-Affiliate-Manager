@@ -1537,3 +1537,88 @@ body.wpam-modal-open {
 	height: 280px;
 }
 
+/* ==========================================================================
+   Affiliates — "Construir URL" modal (dynamic Default URL, v1.8.14)
+   Reuses .wpam-modal-* / .wpam-input / .wpam-url-preview from above.
+   ========================================================================== */
+
+.wpam-edit-field--default-url { grid-column: span 2; }
+.wpam-edit-field--default-url .wpam-urlb-open { margin-top: 6px; }
+.wpam-urlb-summary { margin-top: 6px; word-break: break-all; }
+
+.wpam-urlb-modal { max-width: 860px; }
+
+.wpam-urlb-row {
+	display: grid;
+	grid-template-columns: 110px 170px minmax(0, 1fr) 130px 28px;
+	gap: 8px;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.wpam-urlb-row--head {
+	margin-bottom: 4px;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--wpam-gray-400);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.wpam-urlb-value-wrap { position: relative; }
+
+.wpam-urlb-suggest {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 100%;
+	z-index: 5;
+	margin: 2px 0 0;
+	padding: 4px 0;
+	list-style: none;
+	max-height: 200px;
+	overflow-y: auto;
+	background: #fff;
+	border: 1px solid var(--wpam-gray-200);
+	border-radius: var(--wpam-radius-sm);
+	box-shadow: var(--wpam-shadow-hover);
+}
+
+.wpam-urlb-suggest[hidden] { display: none; }
+
+.wpam-urlb-suggest li {
+	margin: 0;
+	padding: 6px 12px;
+	font: 12px/1.4 monospace;
+	cursor: pointer;
+}
+
+.wpam-urlb-suggest li[data-key]:hover,
+.wpam-urlb-suggest li.is-active {
+	background: var(--wpam-primary-light);
+	color: var(--wpam-primary-dark);
+}
+
+.wpam-urlb-suggest .wpam-urlb-suggest-empty {
+	color: var(--wpam-gray-400);
+	font-family: inherit;
+	cursor: default;
+}
+
+.wpam-urlb-remove {
+	background: none;
+	border: none;
+	cursor: pointer;
+	color: var(--wpam-gray-400);
+	font-size: 13px;
+	line-height: 1;
+	padding: 4px;
+}
+
+.wpam-urlb-remove:hover { color: var(--wpam-danger); }
+
+@media screen and (max-width: 782px) {
+	.wpam-urlb-row { grid-template-columns: 1fr 1fr; }
+	.wpam-urlb-row--head { display: none; }
+}
+

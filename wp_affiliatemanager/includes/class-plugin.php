@@ -30,6 +30,7 @@ require_once WPAM_PLUGIN_PATH . 'includes/api/class-api.php';
 require_once WPAM_PLUGIN_PATH . 'includes/affiliates/class-cpt.php';
 require_once WPAM_PLUGIN_PATH . 'includes/affiliates/class-meta.php';
 require_once WPAM_PLUGIN_PATH . 'includes/affiliates/class-repository.php';
+require_once WPAM_PLUGIN_PATH . 'includes/affiliates/class-url-template.php';
 require_once WPAM_PLUGIN_PATH . 'includes/affiliates/class-affiliates.php';
 require_once WPAM_PLUGIN_PATH . 'includes/affiliates/helpers-affiliates.php';
 require_once WPAM_PLUGIN_PATH . 'includes/admin/class-affiliates-screen.php';
@@ -269,6 +270,8 @@ final class Plugin {
 		// 0.0.6 — AJAX handlers para inline CRUD.
 		$this->loader->add_action( 'wp_ajax_wpam_save_affiliate',    $affiliates_screen, 'ajax_save' );
 		$this->loader->add_action( 'wp_ajax_wpam_get_edit_row',      $affiliates_screen, 'ajax_get_edit_row' );
+		// v1.8.14 — meta-key search for the "Construir URL" modal (admin-only).
+		$this->loader->add_action( 'wp_ajax_wpam_search_meta_keys',  $affiliates_screen, 'ajax_search_meta_keys' );
 
 		// v0.1.0 — Post Affiliates board.
 		$post_affiliates_screen = new Admin\Post_Affiliates_Screen();
