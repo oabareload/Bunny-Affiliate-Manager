@@ -5,6 +5,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8.16] — Bloque de afiliados: enlaces específicos y enlaces generados por plantillas, en dos grupos
+
+### Added
+
+- **Dos grupos dentro del bloque de afiliados** (Card vertical/horizontal y Showcase, vía `Button_Row`): primero los enlaces específicos de la publicación, con el diseño de siempre y sin títulos nuevos; después los generados desde las plantillas de Default URL de los afiliados. La clasificación usa el origen efectivo del link (`_wpam_is_default`), no ninguna comprobación de disponibilidad: un link de plantilla es una búsqueda en tienda, no una confirmación de stock.
+- **Ajuste «Texto para enlaces generados por plantillas»** en *Ajustes → Apariencia* (`appearance.template_links_text`): texto plano, máx. 200 caracteres, sanitizado con `sanitize_text_field()` al guardar y escapado con `esc_html()` al mostrar. Por defecto «También puedes buscar esta figura en estas tiendas:» (si no hay valor guardado); guardado vacío = sin texto.
+- Separador discreto (`.wpam-links-divider`, en `frontend.css`): línea tenue + texto cuando hay ambos grupos; solo texto cuando únicamente hay links de plantilla; nada si no los hay o si el grupo no genera ningún link válido.
+
+### Notes
+
+- Se conserva el orden actual (alfabético o el del post, según *Orden en frontend*) dentro de cada grupo: se particiona después de ordenar, sin reordenar.
+- Un afiliado con link específico en el post no vuelve a aparecer como link de plantilla (ya lo garantizaba `Post_Links::merge_default_links()`).
+- Sin cambios en resolución de URL, prioridades, `/go/`, `/goa/`, `/goext/`, seguimiento de clics, atributos de los links, reporte de enlaces rotos ni administración de afiliados/plantillas. Sin consultas nuevas ni assets nuevos.
+
+---
+
+## [1.8.15] — Tabla de afiliados simplificada, Default URL solo con plantillas, corrección de valores percent-encoded
+
+### Changed
+
+- **Tabla de afiliados:** se elimina la columna de visibilidad ("Flags", el icono visible/oculto) y su CSS exclusivo; el flag *Visible* sigue existiendo en el formulario de edición. En su lugar hay una columna **Default URL** con `YES` / `NO`: `YES` si el afiliado tiene una plantilla configurada y estructuralmente válida (`URL_Template::is_configured()`), `NO` si no existe o es inválida. Solo informa de la **configuración** del afiliado: no resuelve la plantilla ni lee metadatos de ningún post. La acción *Deactivate* y el sistema de activación no cambian.
+- **Default URL (Fallback) usa exclusivamente plantillas dinámicas.** Se retira el campo de URL estática de la pantalla de afiliados y del meta box del CPT, y `Post_Links::merge_default_links()` deja de consultar `_wpam_default_url`. Sin plantilla, o con una plantilla que no resuelve para ese post (metadato obligatorio ausente/vacío), no se genera link de fallback y nada lo sustituye. Prioridad frente a links específicos y resto de reglas del fallback, sin cambios.
+- Guardar un afiliado ya no escribe `_wpam_default_url` y no toca `_wpam_default_url_template` salvo que se envíe explícitamente.
+
+### Fixed
+
+- **Valores percent-encoded en texto fijo.** `sanitize_text_field()` elimina a propósito toda secuencia `%XX`, por lo que `n%3A20940159011` se guardaba como `n20940159011` y el parámetro `rh` de Amazon dejaba de funcionar. Ahora los `%XX` válidos se protegen durante la sanitización (el resto de la limpieza se mantiene) y el valor se guarda tal como se escribió.
+- **Codificación coherente al construir la URL.** En texto fijo se conservan los `%XX` válidos sin recodificarlos (nunca `%253A`) y se codifica todo lo demás (espacios, `&`, `=`, `#`, `/`, Unicode; un `%` suelto pasa a `%25`). Los valores de metadatos se codifican siempre como datos (`100%` → `100%25`). No se decodifica nada. Nombres de parámetro, URL base y validaciones, sin cambios.
+- La plantilla se guarda con `wp_slash()`: `update_post_meta()` aplica `wp_unslash()` y se comía las barras invertidas de los valores.
+
+### Notes
+
+- Sin migración ni borrado: los `_wpam_default_url` antiguos quedan en la base de datos, sin uso. La constante `Meta::KEY_DEFAULT_URL` se marca como obsoleta.
+- Consecuencia de la regla de codificación: para obtener un `%25` literal en un texto fijo hay que escribir `%2525`.
+
+---
+
 ## [1.8.14] — Default URL dinámica basada en metadatos ("Construir URL")
 
 ### Added

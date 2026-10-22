@@ -82,6 +82,30 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Separador del grupo de links generados por plantillas (v1.8.16)
+   Va dentro del contenedor flex de Button_Row (Card vertical/horizontal y
+   Showcase): width:100% fuerza su propia línea también en filas con wrap.
+   Con links específicos delante dibuja una línea tenue; sin ellos
+   (--text-only) solo queda el texto.
+   --------------------------------------------------------------------------- */
+.wpam-links-divider {
+	width: 100%;
+	box-sizing: border-box;
+	margin-top: 0.4rem;
+}
+
+.wpam-links-divider:not(.wpam-links-divider--text-only) {
+	padding-top: 0.8rem;
+	border-top: 1px solid var(--wpam-color-border);
+}
+
+.wpam-links-divider-text {
+	margin: 0;
+	font-size: 0.85em;
+	color: var(--wpam-color-subtext);
+}
+
+/* ---------------------------------------------------------------------------
    Link item — ahora es un <a> (card completamente clicable)
    --------------------------------------------------------------------------- */
 .wpam-link-item {

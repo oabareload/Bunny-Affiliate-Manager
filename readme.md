@@ -12,22 +12,24 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Domain Path: /languages
 - License: GPLv2 or later
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **1.8.14**
+- Current version: **1.8.16**
 
 ## Requirements
 
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v1.8.14)
+## Current scope (v1.8.16)
 
 ### Affiliates
 
 - Full affiliate CRUD (create, edit, delete, activate, deactivate) via inline admin UI — no page reload, no modal.
-- Per-affiliate fields: name, slug, URL parameter, value, logo (Media Library picker), brand color, domains (used for auto-detection and redirect host allow-listing), **Default URL (fallback)**, visible flag, disclaimer settings, related post.
-- **Default URL (fallback):** an optional URL used automatically on any post that doesn't have a specific link for that affiliate. Priority is always post-specific link → Default URL → not shown. No extra toggle — setting the field is what enables the fallback.
-- **Dynamic Default URL (v1.8.14):** next to the Default URL field, the **Construir URL** button opens a modal to build the fallback from a base URL plus parameters, each either fixed text or a post meta key (picked from a searchable list of existing keys; WordPress-internal keys are hidden). Per meta parameter: **Obligatorio** — if the meta is missing/empty on a post, the dynamic URL is unavailable for that post (no fallback link, same as an empty Default URL); **Opcional** — the parameter is simply omitted. Only string/number meta values are used (arrays/objects count as empty); names and values are percent-encoded (`Hatsune Miku` → `Hatsune%20Miku`). A configured template takes precedence over the static URL (which is kept but ignored); existing static URLs keep working untouched. Stored as affiliate post meta (`_wpam_default_url_template`), resolved at runtime per post, no new tables.
-- Admin affiliate table with logo, status, parameter, value, domains, and flags columns.
+- Per-affiliate fields: name, slug, URL parameter, value, logo (Media Library picker), brand color, domains (used for auto-detection and redirect host allow-listing), **Default URL (fallback)** template, visible flag, disclaimer settings, related post.
+- **Default URL (fallback) — dynamic templates only (v1.8.15):** an optional template used automatically on any post that doesn't have a specific link for that affiliate. Priority is always post-specific link → Default URL → not shown. It is configured exclusively with the **Construir URL** button, which opens a modal to build the URL from a base URL plus parameters, each either fixed text or a post meta key (picked from a searchable list of existing keys; WordPress-internal keys are hidden). The old static URL field (`_wpam_default_url`) was removed: it is no longer shown, read or written, there is no migration, and any leftover value is simply ignored (and never used as a substitute when a template can't be resolved).
+  - **Obligatorio** meta: if it is missing/empty on a post, the dynamic URL is unavailable for that post (no fallback link). **Opcional** meta: that parameter is simply omitted. Only string/number meta values are used (arrays/objects count as empty).
+  - **Encoding:** parameter names are percent-encoded. Meta values are encoded as plain data (`100%` → `100%25`). Fixed-text values keep their valid `%XX` sequences as typed (`n%3A20940159011` → `rh=n%3A20940159011`, not `%253A`) while every other character is encoded (`Good Smile Company` → `Good%20Smile%20Company`, `A&B` → `A%26B`, `niño` → `ni%C3%B1o`, a lone `%` → `%25`). To get a literal `%25` in a fixed text, type `%2525`.
+  - Stored as affiliate post meta (`_wpam_default_url_template`), resolved at runtime per post, no new tables.
+- Admin affiliate table with logo, name, parameter, value, domains, a **Default URL** column (`YES` = a valid template is configured, `NO` = none; it reports the affiliate's configuration, not whether a URL resolves for a given post), status, and actions.
 
 ### Post Affiliate Links
 
@@ -45,6 +47,7 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Layouts are implemented behind a small `Layout_Interface` contract and a `Layout_Registry`, extensible via the `wpam_render_layouts` filter — adding a future layout doesn't require touching `Render_Engine`.
 - Button-display options (logo/name, CTA text, hide CTA, frontend order) are shared by both Layouts — configured once, not duplicated per Layout. Settings only shows the fields relevant to the currently selected Layout.
 - An optional **section heading** (enable/disable, text, HTML tag H1–H6 or `div`, default H2) is shared across every Layout and rendered once, above the block, regardless of which Layout is active.
+- **Two link groups (v1.8.16):** inside the block (both Layouts), links specific to the post come first with the existing design, followed by the links generated from affiliate Default URL templates (each is a store search, not a confirmation that the product is in stock). The origin is the effective one (`_wpam_is_default`), the current order is kept inside each group, and an affiliate with a specific link on the post never also shows its template link. When both groups exist a faint divider and a configurable line of text (**Settings → Appearance → Texto para enlaces generados por plantillas**, default «También puedes buscar esta figura en estas tiendas:», plain text, can be left empty) separate them; if only template links exist, only the text is shown (no divider); with no template links the block looks exactly as before.
 - Showcase's image/title/description can each be sourced independently: Featured Image or a custom URL; the post title, custom text, or hidden; the post's manual excerpt, custom text, or hidden. Like the interstitial's related-post excerpt, **only the manual `post_excerpt` field is ever used — content is never auto-trimmed.**
 
 ### Redirect & Click Tracking
@@ -174,7 +177,7 @@ Bunny-Affiliate-Manager/
 │   │   │   ├── class-cpt.php
 │   │   │   ├── class-meta.php
 │   │   │   ├── class-repository.php
-│   │   │   ├── class-url-template.php        — dynamic Default URL template (v1.8.14)
+│   │   │   ├── class-url-template.php        — dynamic Default URL template (v1.8.14, encoding fix v1.8.15)
 │   │   │   └── helpers-affiliates.php
 │   │   ├── analytics/
 │   │   │   └── class-score-query.php         — combined views+clicks score ranking + site-wide average

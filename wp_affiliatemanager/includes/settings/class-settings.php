@@ -11,6 +11,7 @@
 namespace WP_AffiliateManager\Settings;
 
 use WP_AffiliateManager\Frontend\Layouts\Layout_Registry;
+use WP_AffiliateManager\Frontend\Components\Button_Row;
 use WP_AffiliateManager\Views\Resource_Resolver;
 use WP_AffiliateManager\Views\Views;
 
@@ -457,6 +458,14 @@ class Settings {
 			'wpam_field_frontend_order',
 			__( 'Orden en frontend', 'wp-affiliatemanager' ),
 			array( $this, 'render_field_frontend_order' ),
+			self::PAGE_SLUG,
+			'wpam_section_appearance'
+		);
+
+		add_settings_field(
+			'wpam_field_template_links_text',
+			__( 'Texto para enlaces generados por plantillas', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_template_links_text' ),
 			self::PAGE_SLUG,
 			'wpam_section_appearance'
 		);
@@ -1558,6 +1567,34 @@ class Settings {
 	}
 
 	/**
+	 * Renderiza el campo 'template_links_text'.
+	 *
+	 * Texto (plano, sin editor enriquecido) que aparece antes del grupo de links
+	 * generados mediante plantillas de afiliado. Compartido por todos los Layouts.
+	 * Sin valor guardado se muestra el texto por defecto; guardado vacío = sin texto.
+	 *
+	 * @since  1.8.16
+	 * @return void
+	 */
+	public function render_field_template_links_text(): void {
+		$options    = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$appearance = $options['appearance'] ?? array();
+		$value      = array_key_exists( 'template_links_text', $appearance )
+			? (string) $appearance['template_links_text']
+			: Button_Row::default_template_links_text();
+		?>
+		<input
+			type="text"
+			name="<?php echo esc_attr( self::OPTION_NAME . '[appearance][template_links_text]' ); ?>"
+			value="<?php echo esc_attr( $value ); ?>"
+			class="large-text"
+			maxlength="200"
+		/>
+		<p class="description"><?php esc_html_e( 'Se muestra antes de los enlaces generados automáticamente con las plantillas de los afiliados (búsquedas en tienda), separados de los enlaces específicos de la publicación. Déjalo vacío para mostrar solo la separación, sin texto.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
 	 * Renderiza el campo 'frontend_order'.
 	 *
 	 * Controla el orden visual de las cards en el frontend:
@@ -1834,6 +1871,17 @@ class Settings {
 					array( 'preserve_post_order', 'alphabetical' ),
 					true
 				) ? $input['appearance']['frontend_order'] : 'preserve_post_order';
+			}
+
+			// template_links_text: texto plano; se permite vacío (= sin texto). Solo se
+			// toca si el campo viene en el POST, para no pisar el valor guardado.
+			if ( isset( $input['appearance']['template_links_text'] ) ) {
+				$sanitized['appearance']['template_links_text'] = mb_substr(
+					sanitize_text_field( (string) $input['appearance']['template_links_text'] ),
+					0,
+					200,
+					'UTF-8'
+				);
 			}
 		}
 

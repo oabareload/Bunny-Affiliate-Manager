@@ -137,7 +137,6 @@ class Affiliates_Screen {
 			'active'      => ! empty( $_POST['active'] ),
 			'visible'     => ! empty( $_POST['visible'] ),
 			'domains'     => sanitize_textarea_field( wp_unslash( $_POST['domains'] ?? '' ) ),
-			'default_url' => sanitize_text_field( wp_unslash( $_POST['default_url'] ?? '' ) ),
 			'use_global_disclaimer' => ! empty( $_POST['use_global_disclaimer'] ),
 			'custom_disclaimer'     => wp_kses_post( wp_unslash( $_POST['custom_disclaimer'] ?? '' ) ),
 			'related_post_id'       => absint( $_POST['related_post_id'] ?? 0 ),
@@ -251,7 +250,7 @@ class Affiliates_Screen {
 							<th class="wpam-col-param"><?php esc_html_e( 'Param', 'wp-affiliatemanager' ); ?></th>
 							<th class="wpam-col-value"><?php esc_html_e( 'Value', 'wp-affiliatemanager' ); ?></th>
 							<th class="wpam-col-domains"><?php esc_html_e( 'Domains', 'wp-affiliatemanager' ); ?></th>
-							<th class="wpam-col-flags"><?php esc_html_e( 'Flags', 'wp-affiliatemanager' ); ?></th>
+							<th class="wpam-col-default-url"><?php esc_html_e( 'Default URL', 'wp-affiliatemanager' ); ?></th>
 							<th class="wpam-col-status"><?php esc_html_e( 'Status', 'wp-affiliatemanager' ); ?></th>
 							<th class="wpam-col-actions"><?php esc_html_e( 'Actions', 'wp-affiliatemanager' ); ?></th>
 						</tr>
@@ -320,7 +319,7 @@ class Affiliates_Screen {
 						<code class="wpam-url-preview-code" id="wpam-urlb-preview"></code>
 					</div>
 					<p class="wpam-description">
-						<?php esc_html_e( 'Obligatorio: si el metadato no existe o está vacío, la URL dinámica no se usa en ese post. Opcional: se omite solo ese parámetro. Solo se admiten valores de texto o números. Los cambios se guardan al pulsar Save en el afiliado.', 'wp-affiliatemanager' ); ?>
+						<?php esc_html_e( 'Obligatorio: si el metadato no existe o está vacío, la URL dinámica no se usa en ese post. Opcional: se omite solo ese parámetro. Solo se admiten valores de texto o números. En "Texto fijo" las secuencias %XX válidas (p. ej. %3A) se conservan tal cual y el resto de caracteres se codifica; los metadatos se codifican siempre como datos. Los cambios se guardan al pulsar Save en el afiliado.', 'wp-affiliatemanager' ); ?>
 					</p>
 				</div>
 				<div class="wpam-modal-footer">
@@ -370,8 +369,10 @@ class Affiliates_Screen {
 	public function get_affiliate_row_html( array $affiliate ): string {
 		$id          = (int) $affiliate['id'];
 		$is_active   = (bool) $affiliate['active'];
-		$is_visible  = (bool) $affiliate['visible'];
 		$brand_color = esc_attr( $affiliate['brand_color'] );
+
+		// Configuration state only: no template resolution, no post meta reads.
+		$has_default_url = URL_Template::is_configured( $affiliate['default_url_template'] ?? array() );
 
 		$toggle_action = $is_active ? 'deactivate' : 'activate';
 		$nonce         = wp_create_nonce( 'wpam_affiliate_action_' . $id );
@@ -445,10 +446,13 @@ class Affiliates_Screen {
 				<?php endif; ?>
 			</td>
 
-			<!-- Flags: visible -->
-			<td class="wpam-col-flags">
-				<span class="wpam-flag-badge <?php echo $is_visible ? 'wpam-flag--on' : 'wpam-flag--off'; ?>" title="<?php echo $is_visible ? esc_attr__( 'Visible', 'wp-affiliatemanager' ) : esc_attr__( 'Hidden', 'wp-affiliatemanager' ); ?>">
-					<?php echo $is_visible ? '👁️' : '🙈'; ?>
+			<!-- Default URL: is a template configured? (not whether it resolves for a given post) -->
+			<td class="wpam-col-default-url">
+				<span
+					class="wpam-status-badge wpam-status-badge--<?php echo $has_default_url ? 'active' : 'inactive'; ?>"
+					title="<?php echo $has_default_url ? esc_attr__( 'A Default URL template is configured', 'wp-affiliatemanager' ) : esc_attr__( 'No Default URL template configured', 'wp-affiliatemanager' ); ?>"
+				>
+					<?php echo $has_default_url ? esc_html__( 'Yes', 'wp-affiliatemanager' ) : esc_html__( 'No', 'wp-affiliatemanager' ); ?>
 				</span>
 			</td>
 
@@ -508,7 +512,6 @@ class Affiliates_Screen {
 		$active      = $affiliate ? (bool) $affiliate['active']   : true;
 		$visible     = $affiliate ? (bool) $affiliate['visible']  : true;
 		$domains     = $affiliate ? esc_textarea( $affiliate['domains'] ) : '';
-		$default_url = $affiliate ? esc_attr( $affiliate['default_url'] ) : '';
 		$url_template = $affiliate ? (array) $affiliate['default_url_template'] : array();
 		$has_template = ! empty( $url_template );
 		$use_global_disclaimer = $affiliate ? (bool) $affiliate['use_global_disclaimer'] : true;
@@ -586,11 +589,10 @@ class Affiliates_Screen {
 							<input type="text" class="wpam-input wpam-ef-value" value="<?php echo $value; ?>" placeholder="bunny-20" />
 						</div>
 
-						<!-- Default URL (fallback) -->
+						<!-- Default URL (fallback): defined only through the dynamic template (v1.8.15) -->
 						<div class="wpam-edit-field wpam-edit-field--default-url">
 							<label><?php esc_html_e( 'Default URL (Fallback)', 'wp-affiliatemanager' ); ?></label>
-							<input type="url" class="wpam-input wpam-ef-default-url" value="<?php echo $default_url; ?>" placeholder="https://example.com/store" <?php disabled( $has_template ); ?> />
-							<!-- v1.8.14: dynamic template (JSON), edited in the "Construir URL" modal. -->
+							<!-- Template (JSON), edited in the "Construir URL" modal. -->
 							<input type="hidden" class="wpam-ef-default-url-template" value="<?php echo $has_template ? esc_attr( (string) wp_json_encode( $url_template ) ) : ''; ?>" />
 							<button type="button" class="button wpam-urlb-open"><?php esc_html_e( 'Construir URL', 'wp-affiliatemanager' ); ?></button>
 							<div class="wpam-urlb-summary wpam-description" <?php echo $has_template ? '' : 'hidden'; ?>>
@@ -598,7 +600,7 @@ class Affiliates_Screen {
 								if ( $has_template ) {
 									echo esc_html( sprintf(
 										/* translators: 1: base URL, 2: number of parameters */
-										__( 'Plantilla dinámica activa: %1$s — parámetros: %2$s. La URL estática se ignora.', 'wp-affiliatemanager' ),
+										__( 'Plantilla dinámica activa: %1$s — parámetros: %2$s.', 'wp-affiliatemanager' ),
 										(string) ( $url_template['base_url'] ?? '' ),
 										(string) count( (array) ( $url_template['params'] ?? array() ) )
 									) );

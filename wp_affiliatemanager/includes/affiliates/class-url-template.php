@@ -3,7 +3,9 @@
  * Dynamic Default URL template — sanitize, resolve and meta-key lookup.
  *
  * A template is a small array stored in the affiliate's post meta
- * (`Meta::KEY_DEFAULT_URL_TEMPLATE`) next to the static Default URL:
+ * (`Meta::KEY_DEFAULT_URL_TEMPLATE`). Since 1.8.15 it is the ONLY way an
+ * affiliate's Default URL (fallback) is defined; the old static URL
+ * (`_wpam_default_url`) is no longer read or written.
  *
  *   array(
  *     'base_url' => 'https://example.com/',
@@ -123,7 +125,7 @@ class URL_Template {
 				}
 				$required = filter_var( $row['required'] ?? false, FILTER_VALIDATE_BOOLEAN );
 			} elseif ( 'text' === $source ) {
-				$value = sanitize_text_field( $value );
+				$value = self::sanitize_text_value( $value );
 				if ( '' === $value ) {
 					return null;
 				}
@@ -166,6 +168,32 @@ class URL_Template {
 	}
 
 	/**
+	 * Sanitizes a fixed-text value WITHOUT losing percent-encoded sequences.
+	 *
+	 * sanitize_text_field() deliberately strips every `%XX` octet
+	 * (`_sanitize_text_fields()`: "Remove percent-encoded characters"), so
+	 * `n%3A20940159011` would be saved as `n20940159011`. Valid `%XX` triplets are
+	 * therefore shielded behind a per-call random token while sanitize_text_field()
+	 * runs (tags, invalid UTF-8, whitespace and control characters are still
+	 * cleaned as usual) and restored afterwards. The value is stored exactly as the
+	 * user typed it; encoding happens only when the URL is built (see
+	 * encode_text_value()).
+	 *
+	 * @since  1.8.15
+	 * @param  string $value Raw, already trimmed value.
+	 * @return string Sanitized value, '' when nothing is left.
+	 */
+	private static function sanitize_text_value( string $value ): string {
+		// 'wpampct' starts with a non-hex letter so a lone "%" in front of the
+		// token can never be read as a "%XX" octet.
+		$token     = 'wpampct' . bin2hex( random_bytes( 6 ) );
+		$protected = preg_replace( '/%([0-9A-Fa-f]{2})/', $token . '$1', $value );
+		$clean     = sanitize_text_field( (string) $protected );
+
+		return (string) preg_replace( '/' . $token . '([0-9A-Fa-f]{2})/', '%$1', $clean );
+	}
+
+	/**
 	 * Trimmed string for scalar input, '' for anything else (arrays, objects, null).
 	 *
 	 * @param  mixed $value Raw value.
@@ -192,7 +220,9 @@ class URL_Template {
 	 *    booleans count as "empty". Values are trimmed; "" is empty ("0" is not).
 	 *  - Required meta empty → the whole template is unavailable ('').
 	 *  - Optional meta empty → that parameter is omitted.
-	 *  - Names and values are RFC 3986 percent-encoded (space → %20).
+	 *  - Names and values are RFC 3986 percent-encoded (space → %20). Post meta
+	 *    values are encoded as plain data; fixed-text values keep their valid
+	 *    `%XX` sequences (see encode_text_value()).
 	 *
 	 * @since  1.8.14
 	 * @param  array $template Stored template (see class docblock).
@@ -228,14 +258,20 @@ class URL_Template {
 					}
 					continue;
 				}
+
+				// Post meta is plain data: every reserved character is encoded,
+				// including a literal "%" ("100%" => "100%25").
+				$encoded = rawurlencode( $value );
 			} else {
 				$value = self::scalar_string( $param['value'] ?? '' );
 				if ( '' === $value ) {
 					continue;
 				}
+
+				$encoded = self::encode_text_value( $value );
 			}
 
-			$pairs[] = rawurlencode( $name ) . '=' . rawurlencode( $value );
+			$pairs[] = rawurlencode( $name ) . '=' . $encoded;
 		}
 
 		if ( empty( $pairs ) ) {
@@ -262,6 +298,34 @@ class URL_Template {
 	}
 
 	/**
+	 * Encodes a fixed-text value for the query string.
+	 *
+	 * What the user types is read as "URL-encoded where it says so": valid `%XX`
+	 * triplets (e.g. `%3A`, `%2F`, `%26`, `%3D`) keep their meaning and are NOT
+	 * encoded again (no `%253A`); every other character is percent-encoded, so
+	 * `&`, `=`, `#`, `/`, spaces and Unicode become part of the value and a lone
+	 * `%` (not followed by two hex digits) becomes `%25`. Nothing is decoded.
+	 *
+	 * Consequence: a fixed text that should contain a literal "%25" must be typed
+	 * as `%2525`.
+	 *
+	 * @since  1.8.15
+	 * @param  string $value Stored fixed-text value.
+	 * @return string
+	 */
+	private static function encode_text_value( string $value ): string {
+		// With DELIM_CAPTURE the odd indexes are the matched %XX triplets.
+		$parts   = preg_split( '/(%[0-9A-Fa-f]{2})/', $value, -1, PREG_SPLIT_DELIM_CAPTURE );
+		$encoded = '';
+
+		foreach ( (array) $parts as $i => $part ) {
+			$encoded .= ( 1 === $i % 2 ) ? strtoupper( $part ) : rawurlencode( $part );
+		}
+
+		return $encoded;
+	}
+
+	/**
 	 * Scalar meta value of a post as a trimmed string ('' when missing/empty/non-scalar).
 	 *
 	 * @param  int    $post_id Post ID.
@@ -280,6 +344,31 @@ class URL_Template {
 		}
 
 		return is_string( $raw ) ? trim( $raw ) : '';
+	}
+
+	// -------------------------------------------------------------------------
+	// Configuration state (admin table) — no resolution, no post meta reads
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Whether a stored template is configured and structurally valid.
+	 *
+	 * Reports the affiliate's CONFIGURATION only. It never resolves the template,
+	 * so it says nothing about whether a URL is available for a given post (that
+	 * depends on each post's meta) and it reads no post meta.
+	 *
+	 * @since  1.8.15
+	 * @param  mixed $template Stored template (as returned by Repository::normalize()).
+	 * @return bool True when the template has a valid base URL and valid parameters.
+	 */
+	public static function is_configured( mixed $template ): bool {
+		if ( ! is_array( $template ) || empty( $template ) ) {
+			return false;
+		}
+
+		$clean = self::sanitize( $template );
+
+		return is_array( $clean ) && ! empty( $clean );
 	}
 
 	// -------------------------------------------------------------------------

@@ -35,10 +35,13 @@ class Button_Row {
 	 * orphans/URLs vacías, mismas variables pasadas al template link-item.
 	 *
 	 * @since  1.6.0
+	 * @since  1.8.16 Separa los links específicos de los generados por plantilla
+	 *                (`_wpam_is_default`) en dos grupos; ver `template_links_text`.
 	 * @param  int     $post_id      ID del post (para wpam_go_url()/wpam_go_default_url()).
 	 * @param  array[] $links        Links ya resueltos y normalizados.
 	 * @param  array   $button_opts  Subconjunto de `appearance`: 'display_content',
 	 *                                'cta_text', 'cta_hidden', 'frontend_order',
+	 *                                'template_links_text',
 	 *                                más 'link_target'/'nofollow' desde `general`.
 	 * @return string HTML concatenado (sin wrapper), o '' si no hay items válidos.
 	 */
@@ -65,7 +68,106 @@ class Button_Row {
 			);
 		}
 
+		// Origen EFECTIVO de cada link, tal como lo dejó Post_Links::get_links():
+		// los links específicos del post no llevan marca y los generados desde la
+		// plantilla de un afiliado llevan `_wpam_is_default` (ver merge_default_links(),
+		// que ya omite la plantilla de un afiliado que tiene link específico, así que
+		// una tienda nunca aparece en ambos grupos). Se particiona DESPUÉS del orden
+		// anterior sin reordenar: dentro de cada grupo se conserva el orden actual
+		// (alfabético o el del post, según `frontend_order`).
+		$specific  = array();
+		$generated = array();
+		foreach ( $links as $link ) {
+			if ( ! empty( $link['_wpam_is_default'] ) ) {
+				$generated[] = $link;
+			} else {
+				$specific[] = $link;
+			}
+		}
+
 		$template_engine = new \WP_AffiliateManager\Templates\Templates();
+		$item_opts       = array(
+			'link_target'     => $link_target,
+			'rel'             => $rel,
+			'display_content' => $display_content,
+			'cta_text'        => $cta_text,
+			'cta_hidden'      => $cta_hidden,
+		);
+
+		// Los grupos se miden por lo que REALMENTE se renderiza (un link orphan, sin
+		// URL o sin template no cuenta), para no mostrar separadores huérfanos.
+		$specific_html  = $this->render_items( $post_id, $specific, $template_engine, $item_opts );
+		$generated_html = $this->render_items( $post_id, $generated, $template_engine, $item_opts );
+
+		if ( '' === $generated_html ) {
+			return $specific_html; // Sin grupo de plantillas: apariencia de siempre.
+		}
+
+		$text = array_key_exists( 'template_links_text', $button_opts )
+			? trim( (string) $button_opts['template_links_text'] )
+			: self::default_template_links_text();
+
+		return $specific_html . $this->render_generated_intro( '' !== $specific_html, $text ) . $generated_html;
+	}
+
+	/**
+	 * Texto por defecto que precede al grupo de links generados por plantillas.
+	 *
+	 * Única fuente del valor por defecto: lo usan este componente (cuando la opción
+	 * `appearance.template_links_text` aún no se guardó) y el campo de Settings.
+	 * Una opción guardada como cadena vacía es válida y significa "sin texto".
+	 *
+	 * @since  1.8.16
+	 * @return string
+	 */
+	public static function default_template_links_text(): string {
+		return __( 'También puedes buscar esta figura en estas tiendas:', 'wp-affiliatemanager' );
+	}
+
+	/**
+	 * Separador discreto + texto antes del grupo de links de plantilla.
+	 *
+	 *  - Con links específicos delante: línea tenue (+ texto si lo hay).
+	 *  - Sin links específicos: solo el texto, sin línea que no separaría nada;
+	 *    y si tampoco hay texto, no se emite nada.
+	 *
+	 * El texto se escapa aquí, en el momento de mostrarlo.
+	 *
+	 * @since  1.8.16
+	 * @param  bool   $has_specific Si hay links específicos renderizados antes.
+	 * @param  string $text         Texto ya recortado ('' = sin texto).
+	 * @return string HTML o ''.
+	 */
+	private function render_generated_intro( bool $has_specific, string $text ): string {
+		if ( ! $has_specific && '' === $text ) {
+			return '';
+		}
+
+		$class = 'wpam-links-divider' . ( $has_specific ? '' : ' wpam-links-divider--text-only' );
+		$inner = '' !== $text
+			? '<p class="wpam-links-divider-text">' . esc_html( $text ) . '</p>'
+			: '';
+
+		return '<div class="' . esc_attr( $class ) . '">' . $inner . '</div>';
+	}
+
+	/**
+	 * Renderiza una lista de links como link-item (bucle original, sin cambios de
+	 * lógica; solo se extrajo para poder renderizar cada grupo por separado).
+	 *
+	 * @since  1.8.16
+	 * @param  int                                     $post_id         ID del post.
+	 * @param  array[]                                 $links           Links del grupo, ya ordenados.
+	 * @param  \WP_AffiliateManager\Templates\Templates $template_engine Motor de templates.
+	 * @param  array                                   $item_opts       link_target, rel, display_content, cta_text, cta_hidden.
+	 * @return string HTML concatenado o ''.
+	 */
+	private function render_items( int $post_id, array $links, \WP_AffiliateManager\Templates\Templates $template_engine, array $item_opts ): string {
+		$link_target     = $item_opts['link_target'];
+		$rel             = $item_opts['rel'];
+		$display_content = $item_opts['display_content'];
+		$cta_text        = $item_opts['cta_text'];
+		$cta_hidden      = $item_opts['cta_hidden'];
 		$items_html      = '';
 
 		foreach ( $links as $link ) {

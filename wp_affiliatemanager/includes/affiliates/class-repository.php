@@ -238,22 +238,22 @@ class Repository {
 		}
 		update_post_meta( $post_id, Meta::KEY_RELATED_POST_ID, $related_post_id );
 
-		// Default URL (fallback): debe ser una URL válida o estar vacía.
-		$raw_default_url = trim( (string) ( $data['default_url'] ?? '' ) );
-		if ( '' === $raw_default_url || false !== filter_var( $raw_default_url, FILTER_VALIDATE_URL ) ) {
-			update_post_meta( $post_id, Meta::KEY_DEFAULT_URL, esc_url_raw( $raw_default_url ) );
-		}
+		// Default URL (fallback): since 1.8.15 it is defined ONLY by the dynamic template
+		// below. The legacy static `_wpam_default_url` meta is neither read nor written
+		// (and is left untouched in the database).
 
-		// Dynamic Default URL template (v1.8.14). Only touched when the key is sent.
-		// Invalid input (null) keeps the stored value, same as an invalid static URL;
-		// an empty template removes it.
+		// Dynamic Default URL template. Only touched when the key is sent, so saving an
+		// affiliate without it never wipes a stored template. Invalid input (null) keeps
+		// the stored value; an empty template removes it.
 		if ( array_key_exists( 'default_url_template', $data ) ) {
 			$template = URL_Template::sanitize( $data['default_url_template'] );
 			if ( null !== $template ) {
 				if ( empty( $template ) ) {
 					delete_post_meta( $post_id, Meta::KEY_DEFAULT_URL_TEMPLATE );
 				} else {
-					update_post_meta( $post_id, Meta::KEY_DEFAULT_URL_TEMPLATE, $template );
+					// update_post_meta() runs wp_unslash() on its input, so the value is
+					// slashed first; otherwise a backslash in a fixed text would be lost.
+					update_post_meta( $post_id, Meta::KEY_DEFAULT_URL_TEMPLATE, wp_slash( $template ) );
 				}
 			}
 		}
@@ -322,8 +322,8 @@ class Repository {
 			'use_global_disclaimer' => '' === $use_global_disclaimer ? true : '1' === $use_global_disclaimer,
 			'custom_disclaimer'     => get_post_meta( $post->ID, Meta::KEY_CUSTOM_DISCLAIMER, true ) ?: '',
 			'related_post_id'       => absint( get_post_meta( $post->ID, Meta::KEY_RELATED_POST_ID, true ) ),
-			'default_url' => get_post_meta( $post->ID, Meta::KEY_DEFAULT_URL, true ) ?: '',
-			// v1.8.14: dynamic template (array) or empty array when not configured.
+			// Dynamic template (array) or empty array when not configured. Since 1.8.15
+			// this is the only Default URL source; the legacy static meta is not exposed.
 			'default_url_template' => is_array( $default_url_template ) ? $default_url_template : array(),
 			'edit_url'    => get_edit_post_link( $post->ID, 'raw' ),
 			'created_at'  => $post->post_date,

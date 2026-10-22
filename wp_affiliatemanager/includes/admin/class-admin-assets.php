@@ -159,7 +159,7 @@ class Admin_Assets {
 						'urlb_err_value'    => __( 'Cada parámetro necesita un valor (o la clave del metadato).', 'wp-affiliatemanager' ),
 						'urlb_no_keys'      => __( 'Sin resultados. Puedes escribir la clave a mano.', 'wp-affiliatemanager' ),
 						/* translators: 1: base URL, 2: number of parameters */
-						'urlb_summary'      => __( 'Plantilla dinámica activa: %1$s — parámetros: %2$s. La URL estática se ignora.', 'wp-affiliatemanager' ),
+						'urlb_summary'      => __( 'Plantilla dinámica activa: %1$s — parámetros: %2$s.', 'wp-affiliatemanager' ),
 					),
 				)
 			);

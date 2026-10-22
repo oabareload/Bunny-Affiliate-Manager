@@ -55,11 +55,19 @@ class Meta {
 	const KEY_CUSTOM_DISCLAIMER     = '_wpam_custom_disclaimer';
 	/** @since 0.2.5 */
 	const KEY_RELATED_POST_ID       = '_wpam_related_post_id';
-	/** @since 1.5.0 */
+	/**
+	 * Legacy static Default URL. Deprecated since 1.8.15: no longer read, written or
+	 * shown anywhere (the dynamic template is the only Default URL). The constant is
+	 * kept so the name of the leftover meta stays documented; existing values are
+	 * left untouched in the database.
+	 *
+	 * @since      1.5.0
+	 * @deprecated 1.8.15
+	 */
 	const KEY_DEFAULT_URL           = '_wpam_default_url';
 	/**
-	 * Dynamic Default URL template (array, see URL_Template). Takes precedence
-	 * over KEY_DEFAULT_URL when configured.
+	 * Dynamic Default URL template (array, see URL_Template). The only source of an
+	 * affiliate's Default URL since 1.8.15.
 	 *
 	 * @since 1.8.14
 	 */
@@ -123,7 +131,6 @@ class Meta {
 		$slug         = get_post_meta( $post->ID, self::KEY_SLUG,  true );
 		$param        = get_post_meta( $post->ID, self::KEY_PARAM, true );
 		$value        = get_post_meta( $post->ID, self::KEY_VALUE, true );
-		$default_url  = get_post_meta( $post->ID, self::KEY_DEFAULT_URL, true );
 
 		// Parámetros comunes sugeridos.
 		$common_params = array( 'tag', 'ref', 'aff', 'affiliate', 'partner', 'via', 'utm_source' );
@@ -176,18 +183,7 @@ class Meta {
 				</div>
 			</div>
 
-			<div class="wpam-field-row">
-				<label for="wpam_default_url"><?php esc_html_e( 'Default URL (Fallback)', 'wp-affiliatemanager' ); ?></label>
-				<input
-					type="url"
-					id="wpam_default_url"
-					name="wpam_default_url"
-					value="<?php echo esc_url( $default_url ); ?>"
-					placeholder="https://example.com/store"
-					class="wpam-input"
-				/>
-				<p class="wpam-description"><?php esc_html_e( 'Used automatically on posts that do not have a specific link for this affiliate. Leave empty to disable the fallback.', 'wp-affiliatemanager' ); ?></p>
-			</div>
+			<?php // Default URL (Fallback) is managed only from Affiliates → "Construir URL" (v1.8.15). ?>
 
 			<?php if ( $param && $value ) : ?>
 				<div class="wpam-url-preview">
@@ -443,13 +439,8 @@ class Meta {
 			}
 		}
 
-		// Default URL (fallback): debe ser una URL válida o estar vacía.
-		if ( isset( $_POST['wpam_default_url'] ) ) {
-			$raw_default_url = trim( (string) wp_unslash( $_POST['wpam_default_url'] ) );
-			if ( '' === $raw_default_url || false !== filter_var( $raw_default_url, FILTER_VALIDATE_URL ) ) {
-				update_post_meta( $post_id, self::KEY_DEFAULT_URL, esc_url_raw( $raw_default_url ) );
-			}
-		}
+		// Default URL (fallback): no longer saved from here. Since 1.8.15 it is defined
+		// only by the dynamic template, edited from the Affiliates screen.
 
 		// Estado activo: checkbox (presente = 1, ausente = 0).
 		$is_active = isset( $_POST['wpam_active'] ) ? '1' : '0';

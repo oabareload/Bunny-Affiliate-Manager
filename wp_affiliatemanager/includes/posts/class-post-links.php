@@ -647,6 +647,8 @@ class Post_Links {
 	 * @since  1.5.0
 	 * @since  1.8.14 Adds $post_id so a dynamic Default URL template can be resolved
 	 *                for this post (see URL_Template).
+	 * @since  1.8.15 The dynamic template is the only Default URL source (the static
+	 *                `_wpam_default_url` is no longer used).
 	 * @param  array[]    $links           Links ya resueltos (explícitos, posiblemente filtrados).
 	 * @param  Repository $repo            Instancia reutilizada de Repository.
 	 * @param  int        $raw_valid_count Total de items válidos en _wpam_links (sin filtrar).
@@ -671,16 +673,16 @@ class Post_Links {
 				continue;
 			}
 
-			// v1.8.14: a configured dynamic template replaces the static Default URL.
-			// If it can't be resolved for this post (missing required meta) the
-			// result is '' and the existing rule below applies: no fallback link.
-			// The static URL is not used as a silent substitute.
-			if ( ! empty( $affiliate['default_url_template'] ) ) {
-				$default_url = URL_Template::resolve( $affiliate['default_url_template'], $post_id );
-			} else {
-				$default_url = trim( (string) ( $affiliate['default_url'] ?? '' ) );
+			// Since 1.8.15 the Default URL comes ONLY from the affiliate's dynamic
+			// template; the legacy static `_wpam_default_url` is never consulted. No
+			// template, or a template that can't be resolved for this post (missing
+			// required meta), means no fallback link — nothing replaces it.
+			$template = $affiliate['default_url_template'] ?? array();
+			if ( empty( $template ) ) {
+				continue;
 			}
 
+			$default_url = URL_Template::resolve( $template, $post_id );
 			if ( '' === $default_url ) {
 				continue;
 			}

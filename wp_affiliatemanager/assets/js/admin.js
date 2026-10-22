@@ -120,7 +120,6 @@
 					logo_url:    $form.find( '.wpam-ef-logo' ).val().trim(),
 					brand_color: $form.find( '.wpam-ef-color' ).val(),
 					domains:     $form.find( '.wpam-ef-domains' ).val().trim(),
-					default_url: $form.find( '.wpam-ef-default-url' ).val().trim(),
 					default_url_template: $form.find( '.wpam-ef-default-url-template' ).val(),
 					active:      $form.find( '.wpam-ef-active' ).is( ':checked' ) ? '1' : '',
 					visible:     $form.find( '.wpam-ef-visible' ).is( ':checked' ) ? '1' : '',
@@ -438,8 +437,7 @@
 			}
 
 			this.$params.empty();
-			// No template yet: start from the static URL, if there is one.
-			this.$base.val( tpl && tpl.base_url ? tpl.base_url : $field.find( '.wpam-ef-default-url' ).val().trim() );
+			this.$base.val( tpl && tpl.base_url ? tpl.base_url : '' );
 			( tpl && Array.isArray( tpl.params ) ? tpl.params : [] ).forEach( ( p ) => this.addRow( p ) );
 			if ( ! this.$params.children().length ) { this.addRow(); }
 
@@ -549,11 +547,9 @@
 			this.close();
 		},
 
-		/** Summary line + enable/disable of the static input next to the button. */
+		/** Summary line shown next to the "Construir URL" button. */
 		refreshField( $field, tpl ) {
 			const $summary = $field.find( '.wpam-urlb-summary' );
-
-			$field.find( '.wpam-ef-default-url' ).prop( 'disabled', !! tpl );
 
 			if ( ! tpl ) {
 				$summary.prop( 'hidden', true ).text( '' );
