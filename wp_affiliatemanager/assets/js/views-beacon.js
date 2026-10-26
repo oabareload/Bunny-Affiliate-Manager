@@ -29,7 +29,28 @@
 		return;
 	}
 
-	var config = window.wpamViews;
+	var config   = window.wpamViews;
+	var dedupKey = config.resourceType + ':' + ( config.resourceId || 0 );
+
+	// Comprobación de deduplicación en el cliente: si el navegador ya cuenta con la clave en
+	// la cookie 'wpam_v' para el período actual, no enviamos la petición a admin-ajax.php,
+	// ya que el servidor la descartaría de todas formas (counted: false).
+	// La cookie expira a medianoche del timezone del sitio (WordPress), por lo que visitas en días
+	// posteriores se vuelven a contabilizar con normalidad.
+	if ( document.cookie && document.cookie.indexOf( 'wpam_v=' ) !== -1 ) {
+		var match = document.cookie.match( /(?:^|;\s*)wpam_v=([^;]+)/ );
+		if ( match ) {
+			try {
+				var ids = decodeURIComponent( match[1] ).split( ',' );
+				for ( var i = 0; i < ids.length; i++ ) {
+					if ( ids[i].trim() === dedupKey ) {
+						return;
+					}
+				}
+			} catch ( e ) {}
+		}
+	}
+
 	var params = {
 		action:        config.action,
 		resource_type: config.resourceType,
@@ -57,7 +78,5 @@
 		credentials: 'same-origin',
 		body: body,
 		keepalive: true
-	} ).catch( function () {
-		// Silencioso: un fallo al registrar una vista no debe afectar al visitante.
-	} );
+	} ).catch( function () {} );
 } )();

@@ -51,7 +51,7 @@ class Views {
 	 *
 	 * @since 1.2.0
 	 */
-	const COOKIE_MAX_ENTRIES = 300;
+	const COOKIE_MAX_ENTRIES = 100;
 
 	/**
 	 * Nombre de la acción del nonce / AJAX.
@@ -518,8 +518,10 @@ class Views {
 			return;
 		}
 
-		$ids   = self::get_cookie_ids();
-		$ids[] = $dedup_key;
+		$ids = self::get_cookie_ids();
+		if ( ! in_array( $dedup_key, $ids, true ) ) {
+			$ids[] = $dedup_key;
+		}
 
 		// Limitar tamaño para no dejar crecer la cookie sin límite.
 		if ( count( $ids ) > self::COOKIE_MAX_ENTRIES ) {
@@ -533,7 +535,7 @@ class Views {
 
 		$value = implode( ',', $ids );
 		if ( function_exists( 'wp_set_cookie' ) ) {
-			wp_set_cookie( self::COOKIE_NAME, $value, 'statistics', $expire, '/', '', is_ssl(), true );
+			wp_set_cookie( self::COOKIE_NAME, $value, 'statistics', $expire, '/', '', is_ssl(), false );
 			return;
 		}
 
@@ -544,7 +546,7 @@ class Views {
 				'expires'  => $expire,
 				'path'     => '/',
 				'secure'   => is_ssl(),
-				'httponly' => true,
+				'httponly' => false,
 				'samesite' => 'Lax',
 			)
 		);

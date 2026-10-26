@@ -57,7 +57,7 @@ class Admin {
 		// instalaciones ya activas no la registran hasta que se hace flush.
 		$stored_version = get_option( 'wpam_version', '' );
 		if ( $stored_version !== WPAM_VERSION ) {
-			flush_rewrite_rules();
+			flush_rewrite_rules( false );
 
 			// v1.8.9: crear la tabla auxiliar wpam_views_utm en sitios ya
 			// migrados a v1.8.0 (donde migrate_legacy_schema() ya no vuelve a

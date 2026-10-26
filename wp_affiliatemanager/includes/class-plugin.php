@@ -282,6 +282,7 @@ final class Plugin {
 		$meta = new Affiliates\Meta();
 		$this->loader->add_action( 'add_meta_boxes', $meta, 'register_meta_boxes' );
 		$this->loader->add_action( 'save_post_' . Affiliates\CPT::POST_TYPE, $meta, 'save' );
+		$this->loader->add_action( 'wp_ajax_wpam_search_posts', $meta, 'ajax_search_posts' );
 
 		// FASE 3 — Meta box "Affiliate Links" en posts.
 		$post_links = new Posts\Post_Links();

@@ -12,19 +12,19 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Domain Path: /languages
 - License: GPLv2 or later
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **1.8.16**
+- Current version: **1.8.18**
 
 ## Requirements
 
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v1.8.16)
+## Current scope (v1.8.18)
 
 ### Affiliates
 
 - Full affiliate CRUD (create, edit, delete, activate, deactivate) via inline admin UI — no page reload, no modal.
-- Per-affiliate fields: name, slug, URL parameter, value, logo (Media Library picker), brand color, domains (used for auto-detection and redirect host allow-listing), **Default URL (fallback)** template, visible flag, disclaimer settings, related post.
+- Per-affiliate fields: name, slug, URL parameter, value, logo (Media Library picker), brand color, domains (used for auto-detection and redirect host allow-listing), **Default URL (fallback)** template, visible flag, disclaimer settings, **Related Post** (with on-demand AJAX search limited to published posts).
 - **Default URL (fallback) — dynamic templates only (v1.8.15):** an optional template used automatically on any post that doesn't have a specific link for that affiliate. Priority is always post-specific link → Default URL → not shown. It is configured exclusively with the **Construir URL** button, which opens a modal to build the URL from a base URL plus parameters, each either fixed text or a post meta key (picked from a searchable list of existing keys; WordPress-internal keys are hidden). The old static URL field (`_wpam_default_url`) was removed: it is no longer shown, read or written, there is no migration, and any leftover value is simply ignored (and never used as a substitute when a template can't be resolved).
   - **Obligatorio** meta: if it is missing/empty on a post, the dynamic URL is unavailable for that post (no fallback link). **Opcional** meta: that parameter is simply omitted. Only string/number meta values are used (arrays/objects count as empty).
   - **Encoding:** parameter names are percent-encoded. Meta values are encoded as plain data (`100%` → `100%25`). Fixed-text values keep their valid `%XX` sequences as typed (`n%3A20940159011` → `rh=n%3A20940159011`, not `%253A`) while every other character is encoded (`Good Smile Company` → `Good%20Smile%20Company`, `A&B` → `A%26B`, `niño` → `ni%C3%B1o`, a lone `%` → `%25`). To get a literal `%25` in a fixed text, type `%2525`.
@@ -69,7 +69,7 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Search and 404 additionally keep a small aggregated context table each (`wpam_views_search_terms`, `wpam_views_404`) — normalized, HTML-stripped, length-capped, one row per unique term/path per day, never per visit.
 - **Enabled per resource type in Settings → Views Tracking → Track Views For.** Posts is on by default (preserves pre-1.8.0 behavior); the other 6 types are off until explicitly enabled.
 - Tracked via a lightweight AJAX beacon (native `Fetch` API, config injected with `wp_add_inline_script()`, never `wp_localize_script()`) — fully compatible with full-page caching, since the count happens after the cached HTML is served.
-- Deduplicated per visitor per day via an HttpOnly cookie (`wpam_v`, keyed `"{resource_type}:{resource_id}"`) — the server, never the client, decides whether a view already counted.
+- Deduplicated per visitor per day via the `wpam_v` cookie (keyed `"{resource_type}:{resource_id}"`) — evaluated by the client-side beacon to prevent redundant AJAX requests, with authoritative validation and enforcement on the server.
 - Eligibility rules (which resource types are tracked, bot filtering, whether to count admins, whether to count logged-in users) are governed by **Settings → Views** and evaluated through a single source of truth (`Views::is_eligible()`), used both when deciding whether to enqueue the beacon and when validating the AJAX request server-side.
 - **Bunny Score and its Analytics tab remain strictly Posts-only** — `Score_Query` hardcodes `resource_type = 'post'` in every query, unaffected by the other 6 types being tracked.
 - **One-time importer** from the *Post Views Counter* plugin (**Settings → Maintenance → Import Views**): additive upsert (adds to existing counts, never overwrites), never modifies the source table, and can only run once per site.

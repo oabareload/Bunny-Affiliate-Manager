@@ -233,7 +233,7 @@ class Repository {
 		update_post_meta( $post_id, Meta::KEY_CUSTOM_DISCLAIMER,     wp_kses_post( $data['custom_disclaimer'] ?? '' ) );
 
 		$related_post_id = absint( $data['related_post_id'] ?? 0 );
-		if ( $related_post_id > 0 && 'post' !== get_post_type( $related_post_id ) ) {
+		if ( $related_post_id > 0 && ( 'post' !== get_post_type( $related_post_id ) || 'publish' !== get_post_status( $related_post_id ) ) ) {
 			$related_post_id = 0;
 		}
 		update_post_meta( $post_id, Meta::KEY_RELATED_POST_ID, $related_post_id );

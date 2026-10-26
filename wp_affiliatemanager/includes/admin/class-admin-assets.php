@@ -127,6 +127,7 @@ class Admin_Assets {
 						'cancel'           => __( 'Cancel', 'wp-affiliatemanager' ),
 						'loading'          => __( 'Loading...', 'wp-affiliatemanager' ),
 						'not_available'    => __( 'Not available', 'wp-affiliatemanager' ),
+						'no_posts_found'   => __( 'No posts found.', 'wp-affiliatemanager' ),
 						'total_posts'      => __( 'Posts scored:', 'wp-affiliatemanager' ),
 						'total_percent_add' => __( 'Total bonus:', 'wp-affiliatemanager' ),
 						'final_bunny_score' => __( 'Bunny Score obtenido:', 'wp-affiliatemanager' ),

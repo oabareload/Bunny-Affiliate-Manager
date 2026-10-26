@@ -678,6 +678,7 @@
 			this.bindMediaUpload();
 			this.bindColorSync();
 			this.bindToggleStatusText();
+			this.bindRelatedPostSearch();
 			this.initNotices();
 		},
 
@@ -742,6 +743,167 @@
 			$( document ).on( 'change', '#wpam_active', function () {
 				const $text = $( this ).closest( '.wpam-toggle-label' ).find( '.wpam-toggle-text' );
 				$text.text( this.checked ? data.i18n.active : data.i18n.inactive );
+			} );
+		},
+
+		bindRelatedPostSearch() {
+			let searchTimer = null;
+			let currentSeq  = 0;
+			const cache     = {};
+
+			function getControl( $el ) {
+				const $container = $el.closest( '.wpam-related-post-control, .wpam-related-post-row, .wpam-edit-field--related-post' );
+				return {
+					$container:   $container,
+					$hiddenInput: $container.find( '.wpam-ef-related-post, .wpam-related-post-id-input, #wpam_related_post_id' ),
+					$searchInput: $container.find( '.wpam-related-post-input, #wpam_related_post_search' ),
+					$resultsList: $container.find( '.wpam-related-post-results' ),
+					$selectedBox: $container.find( '.wpam-related-post-selected' ),
+					$searchWrap:  $container.find( '.wpam-related-post-search-wrap' ),
+					$titleSpan:   $container.find( '.wpam-related-post-title, #wpam-related-post-current-title' ),
+					$spinner:     $container.find( '.wpam-related-post-spinner' ),
+				};
+			}
+
+			function renderResults( $resultsList, posts ) {
+				$resultsList.empty();
+
+				if ( ! posts.length ) {
+					$resultsList.append(
+						$( '<li class="wpam-related-post-no-results">' ).text(
+							( data.i18n && data.i18n.no_posts_found ) || 'No posts found.'
+						)
+					);
+				} else {
+					posts.forEach( function ( p ) {
+						const $li = $( '<li role="option">' )
+							.attr( 'data-id', p.id )
+							.attr( 'data-title', p.title )
+							.append( $( '<span class="wpam-post-title">' ).text( p.title ) )
+							.append( $( '<span class="wpam-post-id-tag">' ).text( '#' + p.id ) );
+						$resultsList.append( $li );
+					} );
+				}
+
+				$resultsList.prop( 'hidden', false );
+			}
+
+			function fetchPosts( ctrl, query ) {
+				const $spinner     = ctrl.$spinner;
+				const $resultsList = ctrl.$resultsList;
+
+				if ( Object.prototype.hasOwnProperty.call( cache, query ) ) {
+					renderResults( $resultsList, cache[ query ] );
+					return;
+				}
+
+				const seq = ++currentSeq;
+				$spinner.addClass( 'is-active' );
+
+				WPAM_Admin.ajax(
+					'search_posts',
+					{ search: query },
+					function ( err, responseData ) {
+						if ( seq !== currentSeq ) {
+							return;
+						}
+						$spinner.removeClass( 'is-active' );
+
+						if ( err || ! responseData || ! Array.isArray( responseData.posts ) ) {
+							renderResults( $resultsList, [] );
+							return;
+						}
+
+						cache[ query ] = responseData.posts;
+						renderResults( $resultsList, responseData.posts );
+					}
+				);
+			}
+
+			// Entrada de búsqueda por título
+			$( document ).on( 'input focus', '.wpam-related-post-input, #wpam_related_post_search', function () {
+				const ctrl  = getControl( $( this ) );
+				const query = $( this ).val().trim();
+
+				clearTimeout( searchTimer );
+				searchTimer = setTimeout( function () {
+					fetchPosts( ctrl, query );
+				}, 250 );
+			} );
+
+			// Selección de una publicación en la lista
+			$( document ).on( 'click', '.wpam-related-post-results li[data-id]', function ( e ) {
+				e.stopPropagation();
+				const $li   = $( this );
+				const ctrl  = getControl( $li );
+				const id    = $li.attr( 'data-id' );
+				const title = $li.attr( 'data-title' );
+
+				ctrl.$hiddenInput.val( id ).trigger( 'change' );
+				ctrl.$titleSpan.text( title );
+				ctrl.$resultsList.prop( 'hidden', true ).empty();
+				ctrl.$searchInput.val( '' );
+				ctrl.$searchWrap.hide();
+				ctrl.$selectedBox.show();
+			} );
+
+			// Eliminación de la publicación asociada
+			$( document ).on( 'click', '.wpam-related-post-clear', function ( e ) {
+				e.preventDefault();
+				const ctrl = getControl( $( this ) );
+
+				ctrl.$hiddenInput.val( '0' ).trigger( 'change' );
+				ctrl.$titleSpan.text( '' );
+				ctrl.$selectedBox.hide();
+				ctrl.$searchWrap.show();
+				ctrl.$searchInput.val( '' ).trigger( 'focus' );
+			} );
+
+			// Navegación por teclado en resultados
+			$( document ).on( 'keydown', '.wpam-related-post-input, #wpam_related_post_search', function ( e ) {
+				const ctrl         = getControl( $( this ) );
+				const $resultsList = ctrl.$resultsList;
+
+				if ( $resultsList.prop( 'hidden' ) ) {
+					return;
+				}
+
+				const $items = $resultsList.children( 'li[data-id]' );
+				const $cur   = $items.filter( '.is-active' );
+
+				if ( 'Escape' === e.key ) {
+					$resultsList.prop( 'hidden', true );
+					return;
+				}
+
+				if ( ! $items.length ) {
+					return;
+				}
+
+				if ( 'ArrowDown' === e.key || 'ArrowUp' === e.key ) {
+					e.preventDefault();
+					let idx = $items.index( $cur );
+					if ( 'ArrowDown' === e.key ) {
+						idx = ( idx + 1 ) % $items.length;
+					} else {
+						idx = ( idx <= 0 ) ? $items.length - 1 : idx - 1;
+					}
+					$items.removeClass( 'is-active' );
+					const $next = $items.eq( idx ).addClass( 'is-active' );
+					if ( $next.length && $next[0].scrollIntoView ) {
+						$next[0].scrollIntoView( { block: 'nearest' } );
+					}
+				} else if ( 'Enter' === e.key && $cur.length ) {
+					e.preventDefault();
+					$cur.trigger( 'click' );
+				}
+			} );
+
+			// Cerrar lista al hacer clic fuera del control
+			$( document ).on( 'click', function ( e ) {
+				if ( ! $( e.target ).closest( '.wpam-related-post-search-wrap, .wpam-related-post-results' ).length ) {
+					$( '.wpam-related-post-results' ).prop( 'hidden', true );
+				}
 			} );
 		},
 

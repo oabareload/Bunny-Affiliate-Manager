@@ -283,15 +283,17 @@ class Meta {
 			$use_global = '1';
 		}
 
-		$custom_disclaimer = get_post_meta( $post->ID, self::KEY_CUSTOM_DISCLAIMER, true );
-		$related_post_id   = absint( get_post_meta( $post->ID, self::KEY_RELATED_POST_ID, true ) );
-		$posts             = get_posts( array(
-			'post_type'      => 'post',
-			'post_status'    => 'publish',
-			'posts_per_page' => -1,
-			'orderby'        => 'title',
-			'order'          => 'ASC',
-		) );
+		$custom_disclaimer  = get_post_meta( $post->ID, self::KEY_CUSTOM_DISCLAIMER, true );
+		$related_post_id    = absint( get_post_meta( $post->ID, self::KEY_RELATED_POST_ID, true ) );
+		$related_post_title = '';
+		if ( $related_post_id > 0 ) {
+			$related_post = get_post( $related_post_id );
+			if ( $related_post instanceof \WP_Post && 'post' === $related_post->post_type && 'publish' === $related_post->post_status ) {
+				$related_post_title = $related_post->post_title;
+			} else {
+				$related_post_id = 0;
+			}
+		}
 		?>
 		<div class="wpam-meta-box">
 			<div class="wpam-field-row">
@@ -319,20 +321,90 @@ class Meta {
 				<p class="wpam-description"><?php esc_html_e( 'Used only when Use Global Disclaimer is disabled. Basic HTML is allowed.', 'wp-affiliatemanager' ); ?></p>
 			</div>
 
-			<div class="wpam-field-row">
-				<label for="wpam_related_post_id"><?php esc_html_e( 'Related Post', 'wp-affiliatemanager' ); ?></label>
-				<select id="wpam_related_post_id" name="wpam_related_post_id" class="wpam-input">
-					<option value="0"><?php esc_html_e( 'None', 'wp-affiliatemanager' ); ?></option>
-					<?php foreach ( $posts as $related_post ) : ?>
-						<option value="<?php echo esc_attr( (string) $related_post->ID ); ?>" <?php selected( $related_post_id, $related_post->ID ); ?>>
-							<?php echo esc_html( $related_post->post_title ); ?>
-						</option>
-					<?php endforeach; ?>
-				</select>
+			<div class="wpam-field-row wpam-related-post-row wpam-related-post-control" id="wpam-related-post-row">
+				<label for="wpam_related_post_search"><?php esc_html_e( 'Related Post', 'wp-affiliatemanager' ); ?></label>
+
+				<input
+					type="hidden"
+					id="wpam_related_post_id"
+					name="wpam_related_post_id"
+					value="<?php echo esc_attr( (string) $related_post_id ); ?>"
+				/>
+
+				<div class="wpam-related-post-selected" id="wpam-related-post-selected" style="<?php echo $related_post_id > 0 ? '' : 'display:none;'; ?>">
+					<div class="wpam-related-post-badge">
+						<span class="wpam-related-post-title" id="wpam-related-post-current-title"><?php echo esc_html( $related_post_title ); ?></span>
+						<button type="button" class="wpam-related-post-clear button-link" id="wpam-related-post-clear" title="<?php esc_attr_e( 'Remove related post', 'wp-affiliatemanager' ); ?>">
+							&times; <?php esc_html_e( 'Remove', 'wp-affiliatemanager' ); ?>
+						</button>
+					</div>
+				</div>
+
+				<div class="wpam-related-post-search-wrap" id="wpam-related-post-search-wrap" style="<?php echo $related_post_id > 0 ? 'display:none;' : ''; ?>">
+					<div class="wpam-related-post-input-container">
+						<input
+							type="text"
+							id="wpam_related_post_search"
+							class="wpam-input wpam-related-post-input"
+							placeholder="<?php esc_attr_e( 'Type to search published posts…', 'wp-affiliatemanager' ); ?>"
+							autocomplete="off"
+						/>
+						<span class="wpam-related-post-spinner spinner"></span>
+					</div>
+					<ul class="wpam-related-post-results" id="wpam-related-post-results" hidden></ul>
+				</div>
+
 				<p class="wpam-description"><?php esc_html_e( 'Optional article shown on the interstitial page for this affiliate.', 'wp-affiliatemanager' ); ?></p>
 			</div>
 		</div>
 		<?php
+	}
+
+	/**
+	 * AJAX handler para buscar posts por título para el campo Related Post.
+	 *
+	 * Hook: wp_ajax_wpam_search_posts
+	 *
+	 * @since  2.0.0
+	 * @return void
+	 */
+	public function ajax_search_posts(): void {
+		if ( ! check_ajax_referer( 'wpam_admin_nonce', 'nonce', false ) && ! check_ajax_referer( 'wpam_inline_crud', 'nonce', false ) ) {
+			wp_send_json_error( __( 'Invalid nonce.', 'wp-affiliatemanager' ), 403 );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( __( 'Permission denied.', 'wp-affiliatemanager' ), 403 );
+		}
+
+		$search = isset( $_POST['search'] ) && is_string( $_POST['search'] )
+			? sanitize_text_field( wp_unslash( $_POST['search'] ) )
+			: '';
+
+		$query_args = array(
+			'post_type'      => 'post',
+			'post_status'    => 'publish',
+			'posts_per_page' => 20,
+			'orderby'        => 'title',
+			'order'          => 'ASC',
+			'no_found_rows'  => true,
+		);
+
+		if ( '' !== $search ) {
+			$query_args['s'] = $search;
+		}
+
+		$posts   = get_posts( $query_args );
+		$results = array();
+
+		foreach ( $posts as $p ) {
+			$results[] = array(
+				'id'    => $p->ID,
+				'title' => html_entity_decode( $p->post_title, ENT_QUOTES, 'UTF-8' ),
+			);
+		}
+
+		wp_send_json_success( array( 'posts' => $results ) );
 	}
 
 	/**
@@ -455,7 +527,7 @@ class Meta {
 		}
 
 		$related_post_id = absint( $_POST['wpam_related_post_id'] ?? 0 );
-		if ( $related_post_id > 0 && 'post' !== get_post_type( $related_post_id ) ) {
+		if ( $related_post_id > 0 && ( 'post' !== get_post_type( $related_post_id ) || 'publish' !== get_post_status( $related_post_id ) ) ) {
 			$related_post_id = 0;
 		}
 		update_post_meta( $post_id, self::KEY_RELATED_POST_ID, $related_post_id );

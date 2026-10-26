@@ -133,12 +133,12 @@ class Bunny_Score_Stats_Generator {
                 'generated_at' => time(),
                 'total_posts'  => $n,
                 'avg'          => $avg,
-                'median'       => self::percentile_value( $scores, 50 ),
+                'median'       => $percentiles['p50'] ?? self::percentile_value( $scores, 50 ),
                 'stddev'       => $stddev,
                 'min'          => $scores[0],
                 'max'          => $scores[ $n - 1 ],
                 'percentiles'  => $percentiles,
-                'distribution' => self::build_distribution( $scores ),
+                'distribution' => self::build_distribution( $scores, $percentiles ),
                 'scores'       => $scores,
             ),
             false
@@ -334,9 +334,10 @@ class Bunny_Score_Stats_Generator {
      *
      * @since 1.7.5
      * @param float[] $sorted
+     * @param array   $percentiles Puntos de percentil ya calculados (opcional).
      * @return array<int, array{from:float, to:float, count:int}>
      */
-    private static function build_distribution( array $sorted ): array {
+    private static function build_distribution( array $sorted, array $percentiles = array() ): array {
         $n = count( $sorted );
         $min = $sorted[0];
         $max = $sorted[ $n - 1 ];
@@ -352,7 +353,7 @@ class Bunny_Score_Stats_Generator {
             );
         }
 
-        $bins = self::calculate_bin_count( $sorted, $range );
+        $bins = self::calculate_bin_count( $sorted, $range, $percentiles['p25'] ?? null, $percentiles['p75'] ?? null );
         $width = $range / $bins;
 
         $buckets = array_fill( 0, $bins, 0 );
@@ -383,14 +384,16 @@ class Bunny_Score_Stats_Generator {
      * Fallback a Sturges (ceil(log2(n) + 1)) si el IQR es 0.
      *
      * @since 1.7.5
-     * @param float[] $sorted
-     * @param float   $range
+     * @param float[]    $sorted
+     * @param float      $range
+     * @param float|null $q1 P25 precalculado si está disponible.
+     * @param float|null $q3 P75 precalculado si está disponible.
      * @return int
      */
-    private static function calculate_bin_count( array $sorted, float $range ): int {
+    private static function calculate_bin_count( array $sorted, float $range, ?float $q1 = null, ?float $q3 = null ): int {
         $n = count( $sorted );
-        $q1 = self::percentile_value( $sorted, 25 );
-        $q3 = self::percentile_value( $sorted, 75 );
+        $q1 = null !== $q1 ? $q1 : self::percentile_value( $sorted, 25 );
+        $q3 = null !== $q3 ? $q3 : self::percentile_value( $sorted, 75 );
         $iqr = $q3 - $q1;
 
         $bins = 0;

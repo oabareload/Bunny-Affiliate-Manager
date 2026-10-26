@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8.18] — 2026-10-26 — Búsqueda dinámica de publicaciones relacionadas, optimización de seguimiento de visitas y ajustes de rendimiento
+
+### Added
+
+- **Búsqueda dinámica AJAX para «Related Post» en la edición de afiliados:** sustitución de la carga completa de entradas (`posts_per_page => -1`) tanto en la pantalla de gestión con edición inline (`Affiliates_Screen`) como en el metabox CPT (`Meta`) por un buscador dinámico bajo demanda (`wp_ajax_wpam_search_posts`) con límite de 20 resultados ordenados por título, validación de nonce (`wpam_admin_nonce` / `wpam_inline_crud`) y comprobación de permisos (`manage_options`).
+- **Botón de desvinculación para la publicación relacionada:** permite remover la asociación existente dejando el campo en limpio sin necesidad de seleccionar una entrada en blanco.
+
+### Changed
+
+- **Validación reforzada de publicación relacionada:** al guardar el afiliado (tanto en el guardado del CPT `Meta::save()` como en el guardado inline `Repository::save()`), se valida que el ID asignado pertenezca a una entrada de tipo `post` y que tenga estado `publish`. De no cumplirse, el campo se restablece automáticamente a 0.
+- **Seguimiento de visitas (Views) optimizado en el cliente:** el script `views-beacon.js` comprueba la presencia del recurso actual en la cookie `wpam_v` antes de despachar la petición a `admin-ajax.php`. Si el recurso ya fue contabilizado en el período actual, la petición se omite de inmediato, evitando llamadas HTTP redundantes al servidor.
+- **Eliminación de `sessionStorage` en el seguimiento de visitas:** se retira la dependencia de almacenamiento de sesión en `views-beacon.js` para evitar que pestañas abiertas durante múltiples días o restauradas por el navegador bloqueen indebidamente el registro de visitas legítimas en días posteriores. La deduplicación recae exclusivamente en la cookie `wpam_v`, que expira automáticamente a medianoche del huso horario de WordPress.
+- **Límite de entradas en cookie de deduplicación:** se reduce `Views::COOKIE_MAX_ENTRIES` de 300 a 100 y se añade verificación previa de no duplicidad en `mark_viewed_today()`, manteniendo el tamaño de la cabecera HTTP por debajo de 1.5 KB para prevenir exceder los límites de cabeceras en navegadores y servidores web (límite estándar de 4 KB).
+- **Reglas de reescritura con *soft flush*:** `Admin::init()` utiliza `flush_rewrite_rules(false)` durante las actualizaciones de versión, regenerando las reglas internas del plugin en la base de datos sin escribir innecesariamente en el archivo físico `.htaccess` ni forzar purgas de caché a nivel de servidor web.
+
+### Performance
+
+- **Consulta de Bunny Score (`Score_Query::get_all_scores()`):** se mantiene sin `ORDER BY` en la consulta SQL para evitar un *filesort* no indexado sobre la columna agregada en la base de datos, delegando la ordenación estrictamente al consumidor PHP (`Bunny_Score_Stats_Generator`), que ya realiza `sort($scores, SORT_NUMERIC)`.
+- **Generación de estadísticas de Bunny Score:** se reutilizan los percentiles ya calculados (P25 y P75) en el cálculo del rango intercuartílico (IQR) y la distribución, evitando recalcular percentiles repetidos en `Bunny_Score_Stats_Generator`.
+
+---
+
 ## [1.8.16] — Bloque de afiliados: enlaces específicos y enlaces generados por plantillas, en dos grupos
 
 ### Added
