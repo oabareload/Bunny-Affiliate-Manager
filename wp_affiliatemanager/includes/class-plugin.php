@@ -258,6 +258,7 @@ final class Plugin {
 		// Settings.
 		$settings = new Settings\Settings();
 		$this->loader->add_action( 'admin_init', $settings, 'register_settings' );
+		$this->loader->add_action( 'wp_ajax_wpam_search_protection_terms', $settings, 'ajax_search_protection_terms' );
 
 		// Bunny Score.
 		$bunny_score_admin = new \WP_AffiliateManager\Bunny_Score\Bunny_Score_Admin();

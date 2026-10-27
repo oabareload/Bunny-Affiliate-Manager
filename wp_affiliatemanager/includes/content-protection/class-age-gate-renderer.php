@@ -2,8 +2,8 @@
 /**
  * Renderer for the NSFW Age Gate confirmation screen.
  *
- * Emits an isolated, accessible age verification card without exposing
- * any post metadata (title, excerpt, content, featured image).
+ * Emits an isolated, accessible age verification card. It shows the original
+ * post title as the heading while keeping excerpt, content and featured media hidden.
  *
  * @package WP_AffiliateManager\Content_Protection
  * @since   2.1.0
@@ -28,7 +28,7 @@ class Age_Gate_Renderer {
 	 *
 	 *     @type string $action_url   URL to submit the form (current post permalink).
 	 *     @type string $nonce        Security nonce tied to the action and post ID.
-	 *     @type string $title        Card headline.
+	 *     @type string $title        Original post title used as the card headline.
 	 *     @type string $message      Card body message.
 	 *     @type string $confirm_text Confirm button label (18+).
 	 *     @type string $reject_text  Reject button label (under 18 / SFW fallback).
@@ -36,13 +36,16 @@ class Age_Gate_Renderer {
 	 * @return void
 	 */
 	public function render( array $data ): void {
-		$site_name    = get_bloginfo( 'name' );
 		$action_url   = esc_url( $data['action_url'] ?? home_url( '/' ) );
 		$nonce        = esc_attr( $data['nonce'] ?? '' );
-		$title        = esc_html( $data['title'] ?? __( 'Contenido para mayores de 18 años', 'wp-affiliatemanager' ) );
-		$message      = esc_html( $data['message'] ?? __( 'Esta publicación contiene material clasificado para adultos. Debes ser mayor de edad para acceder.', 'wp-affiliatemanager' ) );
-		$confirm_text = esc_html( $data['confirm_text'] ?? __( 'Tengo 18 años o más — Entrar', 'wp-affiliatemanager' ) );
-		$reject_text  = esc_html( $data['reject_text'] ?? __( 'Soy menor de 18 años — Salir a contenido seguro', 'wp-affiliatemanager' ) );
+		$title        = esc_html( $data['title'] ?? '' );
+		$message      = isset( $data['message'] ) ? trim( (string) $data['message'] ) : '';
+		$confirm_text = isset( $data['confirm_text'] ) ? trim( (string) $data['confirm_text'] ) : '';
+		$reject_text  = isset( $data['reject_text'] ) ? trim( (string) $data['reject_text'] ) : '';
+
+		$message      = esc_html( '' !== $message ? $message : __( 'Esta publicación contiene material clasificado para adultos. Debes ser mayor de edad para acceder.', 'wp-affiliatemanager' ) );
+		$confirm_text = esc_html( '' !== $confirm_text ? $confirm_text : __( 'Tengo 18 años o más — Entrar', 'wp-affiliatemanager' ) );
+		$reject_text  = esc_html( '' !== $reject_text ? $reject_text : __( 'Soy menor de 18 años — Salir a contenido seguro', 'wp-affiliatemanager' ) );
 
 		$css_url = defined( 'WPAM_PLUGIN_URL' )
 			? WPAM_PLUGIN_URL . 'assets/css/interstitial.css?v=' . WPAM_VERSION
@@ -53,8 +56,16 @@ class Age_Gate_Renderer {
 <head>
 <meta charset="<?php bloginfo( 'charset' ); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow, noarchive">
-<title><?php echo esc_html( sprintf( '%s — %s', $title, $site_name ) ); ?></title>
+<?php
+		ob_start();
+		wp_head();
+		$head_output = ob_get_clean();
+
+		if ( ! preg_match( '/<title\b/i', $head_output ) ) {
+			echo '<title>' . esc_html( wp_get_document_title() ) . '</title>' . "\n";
+		}
+		echo $head_output;
+		?>
 <?php if ( $css_url ) : ?>
 <link rel="stylesheet" href="<?php echo esc_url( $css_url ); ?>">
 <?php endif; ?>

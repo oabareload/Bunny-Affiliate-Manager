@@ -67,6 +67,15 @@ class Admin_Assets {
 			);
 		}
 
+		if ( 'bunny-affiliates_page_wpam-interstitial' === $hook_suffix ) {
+			wp_enqueue_style(
+				'wpam-age-gate-selectors',
+				WPAM_PLUGIN_URL . 'assets/css/age-gate-selectors.css',
+				array( 'wpam-settings-styles' ),
+				$this->version
+			);
+		}
+
 		if ( $this->is_supported_post_screen( $hook_suffix ) ) {
 			wp_enqueue_style(
 				'wpam-post-links-styles',
@@ -233,6 +242,30 @@ class Admin_Assets {
 					array(),
 					$this->version,
 					true
+				);
+			}
+
+			if ( 'bunny-affiliates_page_wpam-interstitial' === $hook_suffix ) {
+				wp_enqueue_script(
+					'wpam-age-gate-selectors',
+					WPAM_PLUGIN_URL . 'assets/js/age-gate-selectors.js',
+					array( 'jquery', 'jquery-ui-autocomplete' ),
+					$this->version,
+					true
+				);
+
+				wp_localize_script(
+					'wpam-age-gate-selectors',
+					'wpamAgeGateSelectors',
+					array(
+						'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+						'nonce'   => wp_create_nonce( 'wpam_protection_terms' ),
+						'i18n'    => array(
+							'remove'    => __( 'Eliminar %s', 'wp-affiliatemanager' ),
+							'noResults' => __( 'No se encontraron términos.', 'wp-affiliatemanager' ),
+							'error'     => __( 'No se pudieron cargar las sugerencias. Inténtalo de nuevo.', 'wp-affiliatemanager' ),
+						),
+					)
 				);
 			}
 

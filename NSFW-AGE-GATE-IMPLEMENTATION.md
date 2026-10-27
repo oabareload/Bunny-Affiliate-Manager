@@ -4,7 +4,7 @@
 
 Este documento define el plan para incorporar una confirmación de mayoría de edad a publicaciones protegidas de BunnyChase desde el plugin **Bunny Affiliate Manager** (BAM).
 
-**Fase actual:** Fase 5 (Validación y preparación de versión) completada. Todas las fases 1 a 5 implementadas, auditadas y validadas en suite unitaria y de aislamiento (54 pruebas superadas). Pendiente checklist de verificación en instalación WordPress en vivo y CDN real previo a release.
+**Fase actual:** versión v1.9.3. Los selectores, la corrección SEO y los valores predeterminados del Age Gate están implementados; queda pendiente la validación en instalación WordPress en vivo, con plugin SEO activo y CDN real antes de cualquier release.
 
 El objetivo es impedir, en el servidor y antes de que se renderice la plantilla normal, que una publicación protegida entregue su contenido a visitantes sin una autorización de edad válida.
 
@@ -14,7 +14,7 @@ El objetivo es impedir, en el servidor y antes de que se renderice la plantilla 
 
 ### 1.1 Bootstrap y convenciones del plugin
 
-- El plugin declara actualmente la versión `1.9.0` en `wp_affiliatemanager.php` mediante `WPAM_VERSION`.
+- El plugin declara la versión `1.9.3` en `wp_affiliatemanager.php` mediante `WPAM_VERSION`.
 - La opción principal del plugin es `wpam_settings` (`WPAM_OPTION_KEY`).
 - `includes/class-plugin.php` carga los módulos, registra los hooks y crea `Redirect\Redirect_Manager`.
 - El manager de redirects registra sus rutas en `init` y procesa `/go`, `/goa` y `/goext` mediante `template_redirect`.
@@ -583,7 +583,7 @@ Estas son recomendaciones de arquitectura, no componentes implementados.
   - **Feeds:** Exclusión de publicaciones protegidas en consultas públicas de feed vía `pre_get_posts` (`tax_query` con `NOT IN`). Redacción preventiva mediante filtros `the_content_feed` y `the_excerpt_rss`.
   - **oEmbed:** Denegación de oEmbed vía `oembed_response_data` (devuelve `false` generando HTTP 404 a consumidores externos) y bloqueo de plantilla iframe oEmbed (`is_embed()`) con HTTP 403 y `noindex`.
   - **Previsualizaciones:** Bypass autorizado para editores/autores (`is_preview() && current_user_can('edit_post')`). Visitantes no autorizados no obtienen bypass.
-  - **Caché y LiteSpeed:** Emisión de cabeceras estrictas `Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0`, `Pragma: no-cache` y `X-Robots-Tag: noindex, nofollow, noarchive` en la pantalla de verificación. En publicaciones autorizadas se envía `Cache-Control: private, must-revalidate`. Emisión de hook `do_action('litespeed_control_set_nocache')` en gate, previews y vistas autorizadas. Purga de LiteSpeed (`litespeed_purge_all`) al guardar ajustes de protección.
+  - **Caché y LiteSpeed:** Emisión de cabeceras estrictas `Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0` y `Pragma: no-cache` en la pantalla de verificación; ya no se añade una directiva X-Robots-Tag propia ni se sustituye el título/metadatos de la publicación. En publicaciones autorizadas se envía `Cache-Control: private, must-revalidate`. Emisión de hook `do_action('litespeed_control_set_nocache')` en gate, previews y vistas autorizadas. Guardar ajustes de interstitial/Protección no activa una purga global; la invalidación se limita al marcado de no caché de las respuestas dinámicas que lo necesitan.
 - **Fase 4 (Administración):** IMPLEMENTADA Y VERIFICADA.
   - **Página de administración dedicada:** Se registró el submenú `wpam-interstitial` (*Interstitial & Protection*) con capability `manage_options` en `includes/admin/class-admin-menu.php`.
   - **Navegación por pestañas:** Se añadió `wpam-interstitial` a las pestañas compartidas de administración (`render_admin_nav()`).
@@ -618,6 +618,11 @@ Estas son recomendaciones de arquitectura, no componentes implementados.
     - oEmbed deniega la entrega devolviendo `false` (HTTP 404 a consumidores externos) y bloquea el iframe de embed con HTTP 403 y `noindex`.
   - **E. Caché compartida (LiteSpeed y Cloudflare):**
     - Se confirma que las cabeceras PHP por sí solas no pueden impedir que un CDN externo con reglas de "Cache Everything" entregue una respuesta en caché. Se documenta la configuración externa indispensable para el Edge.
+- **Mejora v1.9.1 (selectores Age Gate):** IMPLEMENTADA.
+  - Los selectores completos de etiquetas y categorías se reemplazaron por campos de búsqueda con autocompletado nativo de jQuery UI (incluido por WordPress), sugerencias AJAX limitadas a 20 y chips removibles.
+  - El endpoint AJAX requiere `manage_options` y nonce, acepta únicamente `post_tag` o `category` y devuelve solo ID/nombre. El saneamiento de `wpam_settings` vuelve a comprobar existencia y taxonomía de cada ID, deduplica valores y acepta selecciones vacías.
+  - Se mantienen `content_protection.tag_ids` y `content_protection.category_ids`; el Age Gate y la lógica OR de criterios no cambian.
+  - Los archivos JS/CSS del selector solo se encolan en `wpam-interstitial`. La validación interactiva en WordPress y frontend/CDN en vivo queda pendiente en el entorno de despliegue.
 
 ### Archivos creados y modificados
 
@@ -698,8 +703,8 @@ Una vez disponible la instalación de WordPress de staging/producción con base 
   - Guardar cambios en `wpam-settings` y comprobar que no se borran los términos de `content_protection`.
 - [ ] **2. Comprobación en navegador (Flujo 18+):**
   - Abrir una ventana de incógnito y acceder a un post con tag NSFW.
-  - Verificar que se muestra la pantalla de confirmación con HTTP 200 y cabeceras `no-cache` / `noindex`.
-  - Comprobar que en el código fuente HTML no aparece el título, contenido, extracto ni imagen destacada del post protegido.
+  - Verificar que se muestra la pantalla de confirmación con HTTP 200 y cabeceras `no-cache`, conservando la identidad SEO original de la publicación.
+  - Comprobar que el HTML `<title>` y el H1 muestran el título real, que la descripción/canonical/OG proceden de la publicación y que no aparecen contenido, extracto ni imagen destacada protegidos sin confirmación.
   - Hacer clic en "Tengo 18 años o más": verificar redirección 303 y emisión de la cookie configurada con flags `HttpOnly` y `SameSite=Lax`.
   - En la recarga, confirmar que el post protegido se visualiza normalmente.
 - [ ] **3. Comprobación de rechazo (Flujo SFW):**
@@ -711,6 +716,5 @@ Una vez disponible la instalación de WordPress de staging/producción con base 
   - Verificar cabecera `X-LiteSpeed-Cache: miss` o `nocache` en visitas no autorizadas a publicaciones protegidas.
   - Verificar que Cloudflare devuelve `BYPASS` o `DYNAMIC` para peticiones a posts protegidos sin la cookie de autorización.
 - [ ] **6. Preparación de versión y release:**
-  - Actualizar versión en `wp_affiliatemanager.php` (`WPAM_VERSION` y cabecera de plugin) según las políticas de versionado del proyecto.
+  - Versión actualizada a `1.9.1` en `wp_affiliatemanager.php` (`WPAM_VERSION` y cabecera de plugin); confirmar con la validación del release.
   - Generar el tag o release correspondiente cuando el checklist haya sido validado en vivo.
-

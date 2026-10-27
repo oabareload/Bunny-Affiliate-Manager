@@ -292,15 +292,19 @@ class Age_Gate {
 		$options = get_option( WPAM_OPTION_KEY, array() );
 		$cp      = $options['content_protection'] ?? array();
 
+		$message      = isset( $cp['gate_message'] ) ? trim( (string) $cp['gate_message'] ) : '';
+		$confirm_text = isset( $cp['confirm_button_text'] ) ? trim( (string) $cp['confirm_button_text'] ) : '';
+		$reject_text  = isset( $cp['reject_button_text'] ) ? trim( (string) $cp['reject_button_text'] ) : '';
+
 		$renderer = new Age_Gate_Renderer();
 		$renderer->render(
 			array(
 				'action_url'   => get_permalink( $post_id ),
 				'nonce'        => wp_create_nonce( 'wpam_age_gate_' . $post_id ),
-				'title'        => $cp['gate_title'] ?? __( 'Contenido para mayores de 18 años', 'wp-affiliatemanager' ),
-				'message'      => $cp['gate_message'] ?? __( 'Esta publicación contiene material clasificado para adultos. Debes ser mayor de edad para acceder.', 'wp-affiliatemanager' ),
-				'confirm_text' => $cp['confirm_button_text'] ?? __( 'Tengo 18 años o más — Entrar', 'wp-affiliatemanager' ),
-				'reject_text'  => $cp['reject_button_text'] ?? __( 'Soy menor de 18 años — Salir a contenido seguro', 'wp-affiliatemanager' ),
+				'title'        => get_the_title( $post_id ),
+				'message'      => '' !== $message ? $message : __( 'Esta publicación contiene material clasificado para adultos. Debes ser mayor de edad para acceder.', 'wp-affiliatemanager' ),
+				'confirm_text' => '' !== $confirm_text ? $confirm_text : __( 'Tengo 18 años o más — Entrar', 'wp-affiliatemanager' ),
+				'reject_text'  => '' !== $reject_text ? $reject_text : __( 'Soy menor de 18 años — Salir a contenido seguro', 'wp-affiliatemanager' ),
 			)
 		);
 		exit;
@@ -539,7 +543,6 @@ class Age_Gate {
 		if ( ! headers_sent() ) {
 			header( 'Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0', true );
 			header( 'Pragma: no-cache', true );
-			header( 'X-Robots-Tag: noindex, nofollow, noarchive', true );
 		}
 	}
 

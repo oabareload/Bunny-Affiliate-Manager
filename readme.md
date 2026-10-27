@@ -12,14 +12,14 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Domain Path: /languages
 - License: GPLv2 or later
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **1.9.0**
+- Current version: **1.9.3**
 
 ## Requirements
 
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v1.9.0)
+## Current scope (v1.9.3)
 
 ### Affiliates
 
@@ -89,16 +89,17 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Reports are stored in a single option (`wpam_broken_link_reports`), no custom table required.
 - Reviewed and cleared from the dedicated **Broken Reports** admin page.
 
-### NSFW Content Protection & Age Gate (v1.9.0)
+### NSFW Content Protection & Age Gate (v1.9.3)
 
 - **Server-side pre-render interception:** single post requests with active NSFW criteria (configured `post_tag` or `category` terms) are intercepted early during `template_redirect` (priority 1) before template rendering begins.
-- **Isolated Age Gate screen:** clean, centered 18+ verification card that does not expose post title, content, excerpt, or media in the deliverable HTML payload. Served with HTTP 200 and strict no-cache/noindex headers (`Cache-Control: private, no-store...`, `X-Robots-Tag: noindex, nofollow, noarchive`).
+- **Isolated Age Gate screen:** clean, centered 18+ verification card that shows the original publication title as the H1 while keeping content, excerpt, and featured media hidden. WordPress and active SEO plugins retain the original HTML title and available metadata through `wp_head()`; the screen is served with HTTP 200 and strict cache-control headers, without automatic `noindex`, `nofollow`, or `rating=adult` directives. Empty custom message and button text fields fall back to translated defaults, while saving settings does not trigger a global LiteSpeed cache purge.
 - **Cryptographic HMAC SHA-256 cookie:** upon confirmation via POST + nonce, issues a signed cookie (`v1|{expires}|{hmac}`) using `wp_salt('auth')` and constant-time `hash_equals()` verification. Supports configurable cookie name and duration (minimum 300s, default 30 days).
 - **Intelligent SFW fallback:** rejecting the verification prompts an HTTP 303 redirect to a random safe (SFW) post matching `NOT IN` taxonomy criteria, or falls back safely to the site homepage (`home_url('/')`).
 - **Secondary vector defense:**
   - **REST API:** single post requests (`/wp/v2/posts/<id>`) return HTTP 403 `WP_Error` for unauthorized visitors; collections (`/wp/v2/posts`) redact content/excerpt and zero out `featured_media`.
   - **Feeds:** protected posts are excluded from public queries via `pre_get_posts` with fallback content redaction.
   - **oEmbed:** external responses are denied (`false` -> 404) and iframe embeds are blocked with HTTP 403.
+- **Searchable tag and category selectors:** filter terms by name, select multiple tags/categories as removable chips, and keep the saved taxonomy IDs separate. Suggestions are loaded only as searched and the selectors' assets are enqueued only on `wpam-interstitial`.
 - **Dedicated admin panel:** managed under **Bunny Affiliates → Interstitial & Protection** (`wpam-interstitial`), integrating existing affiliate interstitial settings alongside Age Gate controls without storage fragmentation.
 
 ### Top Posts / Top Viewed Posts / Top Scored Posts
@@ -199,7 +200,7 @@ Bunny-Affiliate-Manager/
 │   │   │   ├── class-bunny-score-manager.php  — calculation orchestrator (no persistence)
 │   │   │   ├── class-bunny-score-factors.php  — manual factor percent computation
 │   │   │   └── class-bunny-score-stats-generator.php — weekly historical distribution (WP-Cron)
-│   │   ├── content-protection/               — NSFW Age Gate (v1.9.0)
+│   │   ├── content-protection/               — NSFW Age Gate (v1.9.3)
 │   │   │   ├── class-age-gate.php            — orchestrator, criteria & HMAC cookie
 │   │   │   └── class-age-gate-renderer.php   — isolated 18+ verification card
 │   │   ├── api/

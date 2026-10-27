@@ -5,6 +5,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.9.3] — 2026-10-27 — Corrección de textos y caché del Age Gate
+
+### Fixed
+
+- **Textos predeterminados del interstitial:** los campos vacíos o compuestos solo por espacios de mensaje, botón de confirmación y botón de rechazo utilizan ahora sus textos predeterminados traducidos; los textos personalizados siguen teniendo prioridad.
+- **Purga global innecesaria:** guardar los ajustes del interstitial ya no ejecuta `litespeed_purge_all`, evitando una invalidación global al cambiar configuración no relacionada con el almacenamiento de caché completa.
+
+### Changed
+
+- Se mantienen las cabeceras dinámicas de no caché, `Cache-Control`, `Pragma` y la señal `litespeed_control_set_nocache()` necesarias para impedir que el interstitial quede almacenado incorrectamente.
+
+---
+
+## [1.9.2] — 2026-10-27 — Corrección de metadatos SEO del Age Gate
+
+### Fixed
+
+- **Identidad SEO de publicaciones protegidas:** el interstitial conserva el título HTML generado por WordPress o el plugin SEO activo y ya no sustituye todas las páginas protegidas por el título configurable genérico del Age Gate.
+- **H1 y metadatos originales:** el encabezado visible muestra el título real de la publicación y la descripción, canonical, Open Graph, robots, imagen destacada y demás metadatos se delegan a la pipeline existente de WordPress mediante `wp_head()`.
+
+### Changed
+
+- Se eliminó la sustitución manual del elemento `<title>` basada en el título genérico del Age Gate.
+- Se eliminó la directiva propia `X-Robots-Tag` de la pantalla de verificación.
+- No se añaden automáticamente etiquetas `noindex`, `nofollow`, `rating=adult` ni metadatos canónicos/OG duplicados.
+- El ajuste heredado `gate_title` conserva su valor y compatibilidad, pero ya no controla el título HTML ni el H1.
+
+---
+
+## [1.9.1] — 2026-10-27 — Selectores buscables de etiquetas y categorías para Age Gate
+
+### Improved
+
+- **Selectores de términos de Age Gate:** reemplazo de las listas completas por búsqueda AJAX con sugerencias limitadas a 20 términos, chips removibles y selección múltiple para `post_tag` y `category`.
+- **Seguridad y compatibilidad:** la búsqueda se limita a administradores con nonce, valida la taxonomía y devuelve solo ID/nombre. Al guardar, se eliminan IDs duplicados, inexistentes o pertenecientes a otra taxonomía sin cambiar las claves ni la estructura de `wpam_settings`.
+- **Carga de recursos:** el selector reutiliza jQuery UI Autocomplete incluido con WordPress y sus assets se cargan únicamente en la pantalla `wpam-interstitial`.
+
+### Changed
+
+- **Metadatos SEO del Age Gate:** el interstitial conserva el título original y el HTML `<title>` generado por WordPress o el plugin SEO activo, mostrando ese mismo título como H1. Se delega en `wp_head()` la descripción, canonical, Open Graph, robots y imagen disponibles, sin generar metadatos duplicados ni añadir `noindex`, `nofollow` o `rating=adult` automáticamente. El ajuste heredado `gate_title` ya no sustituye el título de la publicación.
+
+---
+
 ## [1.9.0] — 2026-10-27 — Protección de contenido sensible (Age Gate 18+) y panel administrativo dedicado de Interstitial & Protection
 
 ### Added

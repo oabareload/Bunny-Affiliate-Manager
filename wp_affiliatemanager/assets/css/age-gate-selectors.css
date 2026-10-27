@@ -1,0 +1,81 @@
+.wpam-age-gate-picker {
+	max-width: 520px;
+}
+
+.wpam-age-gate-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0 0 8px;
+}
+
+.wpam-age-gate-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	max-width: 100%;
+	padding: 3px 6px 3px 10px;
+	border: 1px solid #c3c4c7;
+	border-radius: 16px;
+	background: #f6f7f7;
+	color: #1d2327;
+}
+
+.wpam-age-gate-chip-name {
+	overflow-wrap: anywhere;
+}
+
+.wpam-age-gate-chip-remove {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	color: #50575e;
+	font-size: 18px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.wpam-age-gate-chip-remove:hover,
+.wpam-age-gate-chip-remove:focus {
+	background: #dcdcde;
+	color: #1d2327;
+}
+
+.wpam-age-gate-picker .wpam-age-gate-search {
+	width: 100%;
+	max-width: 420px;
+}
+
+.wpam-age-gate-search-status:not(:empty) {
+	margin: 4px 0;
+	color: #646970;
+}
+
+.ui-autocomplete.wpam-age-gate-suggestions {
+	z-index: 100000;
+	max-height: 240px;
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding: 4px;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, .12);
+}
+
+.ui-autocomplete.wpam-age-gate-suggestions .ui-menu-item-wrapper {
+	padding: 6px 8px;
+	cursor: pointer;
+}
+
+.ui-autocomplete.wpam-age-gate-suggestions .ui-state-active {
+	margin: 0;
+	border: 0;
+	background: #2271b1;
+	color: #fff;
+}

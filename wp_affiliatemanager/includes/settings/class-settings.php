@@ -533,6 +533,66 @@ class Settings {
 
 	}
 
+	/**
+	 * Searches terms for the Age Gate selector.
+	 *
+	 * @return void
+	 */
+	public function ajax_search_protection_terms(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'No tienes permiso para realizar esta búsqueda.', 'wp-affiliatemanager' ) ), 403 );
+		}
+
+		if ( ! check_ajax_referer( 'wpam_protection_terms', 'nonce', false ) ) {
+			wp_send_json_error( array( 'message' => __( 'La sesión ha caducado. Recarga la página e inténtalo de nuevo.', 'wp-affiliatemanager' ) ), 403 );
+		}
+
+		$raw_taxonomy = wp_unslash( $_GET['taxonomy'] ?? '' );
+		if ( ! is_string( $raw_taxonomy ) ) {
+			wp_send_json_error( array( 'message' => __( 'Taxonomía no válida.', 'wp-affiliatemanager' ) ), 400 );
+		}
+
+		$taxonomy = sanitize_key( $raw_taxonomy );
+		if ( ! in_array( $taxonomy, array( 'post_tag', 'category' ), true ) || ! taxonomy_exists( $taxonomy ) ) {
+			wp_send_json_error( array( 'message' => __( 'Taxonomía no válida.', 'wp-affiliatemanager' ) ), 400 );
+		}
+
+		$raw_search = wp_unslash( $_GET['term'] ?? '' );
+		if ( ! is_string( $raw_search ) ) {
+			wp_send_json_error( array( 'message' => __( 'Búsqueda no válida.', 'wp-affiliatemanager' ) ), 400 );
+		}
+
+		$search = sanitize_text_field( $raw_search );
+		if ( strlen( $search ) < 2 ) {
+			wp_send_json_success( array() );
+		}
+
+		$terms = get_terms(
+			array(
+				'taxonomy'   => $taxonomy,
+				'hide_empty' => false,
+				'search'     => $search,
+				'number'     => 20,
+				'orderby'    => 'name',
+				'order'      => 'ASC',
+			)
+		);
+
+		if ( is_wp_error( $terms ) ) {
+			wp_send_json_error( array( 'message' => __( 'No se pudieron buscar los términos.', 'wp-affiliatemanager' ) ), 500 );
+		}
+
+		$results = array();
+		foreach ( $terms as $term ) {
+			$results[] = array(
+				'id'   => (int) $term->term_id,
+				'name' => $term->name,
+			);
+		}
+
+		wp_send_json_success( $results );
+	}
+
 	// ---------------------------------------------------------------------------
 	// Callbacks de secciones
 	// ---------------------------------------------------------------------------
@@ -625,11 +685,6 @@ class Settings {
 		$options      = get_option( self::OPTION_NAME, $this->get_defaults() );
 		$tags_enabled = ! empty( $options['content_protection']['tags_enabled'] );
 		$selected_ids = array_map( 'absint', (array) ( $options['content_protection']['tag_ids'] ?? array() ) );
-
-		$tags = get_terms( array(
-			'taxonomy'   => 'post_tag',
-			'hide_empty' => false,
-		) );
 		?>
 		<p style="margin-bottom:8px;">
 			<label>
@@ -637,19 +692,14 @@ class Settings {
 				<strong><?php esc_html_e( 'Habilitar criterio por etiquetas (Tags)', 'wp-affiliatemanager' ); ?></strong>
 			</label>
 		</p>
-		<?php if ( ! empty( $tags ) && ! is_wp_error( $tags ) ) : ?>
-			<select name="<?php echo esc_attr( self::OPTION_NAME . '[content_protection][tag_ids][]' ); ?>" multiple size="6" style="width:100%; max-width:420px;">
-				<?php foreach ( $tags as $tag ) : ?>
-					<option value="<?php echo esc_attr( (string) $tag->term_id ); ?>" <?php selected( in_array( (int) $tag->term_id, $selected_ids, true ) ); ?>>
-						<?php echo esc_html( $tag->name . ' (' . $tag->count . ')' ); ?>
-					</option>
-				<?php endforeach; ?>
-			</select>
-			<p class="description"><?php esc_html_e( 'Mantén presionada la tecla Ctrl (Cmd en Mac) para seleccionar o deseleccionar varias etiquetas.', 'wp-affiliatemanager' ); ?></p>
-		<?php else : ?>
-			<p class="description"><?php esc_html_e( 'No hay etiquetas registradas en este sitio.', 'wp-affiliatemanager' ); ?></p>
-		<?php endif; ?>
 		<?php
+		$this->render_cp_term_picker(
+			'post_tag',
+			self::OPTION_NAME . '[content_protection][tag_ids][]',
+			$selected_ids,
+			__( 'Buscar etiquetas…', 'wp-affiliatemanager' ),
+			__( 'Busca por nombre y selecciona una o varias etiquetas. Deja el campo vacío para no proteger por etiquetas.', 'wp-affiliatemanager' )
+		);
 	}
 
 	/**
@@ -662,11 +712,6 @@ class Settings {
 		$options      = get_option( self::OPTION_NAME, $this->get_defaults() );
 		$cats_enabled = ! empty( $options['content_protection']['categories_enabled'] );
 		$selected_ids = array_map( 'absint', (array) ( $options['content_protection']['category_ids'] ?? array() ) );
-
-		$categories = get_terms( array(
-			'taxonomy'   => 'category',
-			'hide_empty' => false,
-		) );
 		?>
 		<p style="margin-bottom:8px;">
 			<label>
@@ -674,18 +719,71 @@ class Settings {
 				<strong><?php esc_html_e( 'Habilitar criterio por categorías (Categories)', 'wp-affiliatemanager' ); ?></strong>
 			</label>
 		</p>
-		<?php if ( ! empty( $categories ) && ! is_wp_error( $categories ) ) : ?>
-			<select name="<?php echo esc_attr( self::OPTION_NAME . '[content_protection][category_ids][]' ); ?>" multiple size="6" style="width:100%; max-width:420px;">
-				<?php foreach ( $categories as $cat ) : ?>
-					<option value="<?php echo esc_attr( (string) $cat->term_id ); ?>" <?php selected( in_array( (int) $cat->term_id, $selected_ids, true ) ); ?>>
-						<?php echo esc_html( $cat->name . ' (' . $cat->count . ')' ); ?>
-					</option>
+		<?php
+		$this->render_cp_term_picker(
+			'category',
+			self::OPTION_NAME . '[content_protection][category_ids][]',
+			$selected_ids,
+			__( 'Buscar categorías…', 'wp-affiliatemanager' ),
+			__( 'Busca por nombre y selecciona una o varias categorías. Deja el campo vacío para no proteger por categorías.', 'wp-affiliatemanager' )
+		);
+	}
+
+	/**
+	 * Renders a searchable, multiple-term Age Gate picker.
+	 *
+	 * @param string $taxonomy     Term taxonomy.
+	 * @param string $field_name   Existing settings field name.
+	 * @param int[]  $selected_ids Saved term IDs.
+	 * @param string $placeholder  Search input placeholder.
+	 * @param string $description  Picker description.
+	 * @return void
+	 */
+	private function render_cp_term_picker( string $taxonomy, string $field_name, array $selected_ids, string $placeholder, string $description ): void {
+		$selected_ids = array_values( array_unique( array_filter( array_map( 'absint', $selected_ids ) ) ) );
+		$terms        = array();
+
+		if ( ! empty( $selected_ids ) ) {
+			$found_terms = get_terms(
+				array(
+					'taxonomy'   => $taxonomy,
+					'hide_empty' => false,
+					'include'    => $selected_ids,
+					'number'     => count( $selected_ids ),
+				)
+			);
+
+			if ( is_wp_error( $found_terms ) ) {
+				add_settings_error(
+					self::OPTION_NAME,
+					'wpam_age_gate_terms_load_failed',
+					__( 'No se pudieron cargar los términos seleccionados del Age Gate.', 'wp-affiliatemanager' ),
+					'error'
+				);
+			} else {
+				foreach ( $found_terms as $term ) {
+					$terms[ (int) $term->term_id ] = $term;
+				}
+			}
+		}
+		?>
+		<div class="wpam-age-gate-picker" data-taxonomy="<?php echo esc_attr( $taxonomy ); ?>" data-field-name="<?php echo esc_attr( $field_name ); ?>">
+			<div class="wpam-age-gate-chips" aria-live="polite">
+				<?php foreach ( $selected_ids as $term_id ) : ?>
+					<?php if ( isset( $terms[ $term_id ] ) ) : ?>
+						<span class="wpam-age-gate-chip" data-term-id="<?php echo esc_attr( (string) $term_id ); ?>">
+							<span class="wpam-age-gate-chip-name"><?php echo esc_html( $terms[ $term_id ]->name ); ?></span>
+							<input type="hidden" name="<?php echo esc_attr( $field_name ); ?>" value="<?php echo esc_attr( (string) $term_id ); ?>">
+							<button type="button" class="wpam-age-gate-chip-remove" aria-label="<?php echo esc_attr( sprintf( __( 'Eliminar %s', 'wp-affiliatemanager' ), $terms[ $term_id ]->name ) ); ?>">&times;</button>
+						</span>
+					<?php endif; ?>
 				<?php endforeach; ?>
-			</select>
-			<p class="description"><?php esc_html_e( 'Mantén presionada la tecla Ctrl (Cmd en Mac) para seleccionar o deseleccionar varias categorías.', 'wp-affiliatemanager' ); ?></p>
-		<?php else : ?>
-			<p class="description"><?php esc_html_e( 'No hay categorías registradas en este sitio.', 'wp-affiliatemanager' ); ?></p>
-		<?php endif; ?>
+			</div>
+			<label class="screen-reader-text" for="wpam-age-gate-search-<?php echo esc_attr( $taxonomy ); ?>"><?php echo esc_html( $placeholder ); ?></label>
+			<input type="search" id="wpam-age-gate-search-<?php echo esc_attr( $taxonomy ); ?>" class="wpam-age-gate-search regular-text" placeholder="<?php echo esc_attr( $placeholder ); ?>" autocomplete="off">
+			<p class="description"><?php echo esc_html( $description ); ?></p>
+			<p class="wpam-age-gate-search-status" role="status" aria-live="polite"></p>
+		</div>
 		<?php
 	}
 
@@ -729,8 +827,9 @@ class Settings {
 		$reject_text  = $options['content_protection']['reject_button_text'] ?? '';
 		?>
 		<p>
-			<label for="wpam_cp_gate_title"><strong><?php esc_html_e( 'Título de la tarjeta:', 'wp-affiliatemanager' ); ?></strong></label><br>
+			<label for="wpam_cp_gate_title"><strong><?php esc_html_e( 'Título heredado de la tarjeta (sin uso en el título/H1):', 'wp-affiliatemanager' ); ?></strong></label><br>
 			<input type="text" id="wpam_cp_gate_title" name="<?php echo esc_attr( self::OPTION_NAME . '[content_protection][gate_title]' ); ?>" value="<?php echo esc_attr( $gate_title ); ?>" class="regular-text" placeholder="<?php esc_attr_e( 'Contenido para mayores de 18 años', 'wp-affiliatemanager' ); ?>">
+			<p class="description"><?php esc_html_e( 'El HTML y el encabezado muestran ahora el título real de la publicación. Este ajuste se conserva por compatibilidad y ya no sustituye el título.', 'wp-affiliatemanager' ); ?></p>
 		</p>
 
 		<p style="margin-top:12px;">
@@ -2125,15 +2224,15 @@ class Settings {
 			$raw_duration = (int) ( $cp_input['cookie_duration'] ?? ( DAY_IN_SECONDS * 30 ) );
 			$sanitized['content_protection']['cookie_duration'] = $raw_duration >= 300 ? $raw_duration : ( DAY_IN_SECONDS * 30 );
 
-			// tag_ids
-			$sanitized['content_protection']['tag_ids'] = isset( $cp_input['tag_ids'] ) && is_array( $cp_input['tag_ids'] )
-				? array_values( array_filter( array_map( 'absint', $cp_input['tag_ids'] ) ) )
-				: array();
+			$tag_ids = $this->sanitize_protection_term_ids( $cp_input['tag_ids'] ?? array(), 'post_tag' );
+			if ( null !== $tag_ids ) {
+				$sanitized['content_protection']['tag_ids'] = $tag_ids;
+			}
 
-			// category_ids
-			$sanitized['content_protection']['category_ids'] = isset( $cp_input['category_ids'] ) && is_array( $cp_input['category_ids'] )
-				? array_values( array_filter( array_map( 'absint', $cp_input['category_ids'] ) ) )
-				: array();
+			$category_ids = $this->sanitize_protection_term_ids( $cp_input['category_ids'] ?? array(), 'category' );
+			if ( null !== $category_ids ) {
+				$sanitized['content_protection']['category_ids'] = $category_ids;
+			}
 
 			$sanitized['content_protection']['gate_title']           = sanitize_text_field( $cp_input['gate_title'] ?? '' );
 			$sanitized['content_protection']['gate_message']         = sanitize_textarea_field( $cp_input['gate_message'] ?? '' );
@@ -2141,11 +2240,65 @@ class Settings {
 			$sanitized['content_protection']['reject_button_text']   = sanitize_text_field( $cp_input['reject_button_text'] ?? '' );
 			$sanitized['content_protection']['fallback_post_id']     = absint( $cp_input['fallback_post_id'] ?? 0 );
 
-			// Purgar LiteSpeed Cache si está disponible al actualizar criterios.
-			do_action( 'litespeed_purge_all', 'WPAM content protection updated' );
 		}
 
 		return $sanitized;
+	}
+
+	/**
+	 * Sanitizes selected Age Gate IDs and keeps only terms of the requested taxonomy.
+	 *
+	 * @param mixed  $raw_ids  Submitted term IDs.
+	 * @param string $taxonomy Expected taxonomy.
+	 * @return int[]|null Null if WordPress could not validate terms.
+	 */
+	private function sanitize_protection_term_ids( mixed $raw_ids, string $taxonomy ): ?array {
+		if ( ! is_array( $raw_ids ) || ! in_array( $taxonomy, array( 'post_tag', 'category' ), true ) ) {
+			return array();
+		}
+
+		$ids = array();
+		foreach ( $raw_ids as $raw_id ) {
+			if ( ! is_int( $raw_id ) && ! is_string( $raw_id ) ) {
+				continue;
+			}
+
+			$term_id = filter_var( $raw_id, FILTER_VALIDATE_INT, array( 'options' => array( 'min_range' => 1 ) ) );
+			if ( false !== $term_id ) {
+				$ids[ $term_id ] = $term_id;
+			}
+		}
+		$ids = array_values( $ids );
+		if ( empty( $ids ) ) {
+			return array();
+		}
+
+		$valid_ids = get_terms(
+			array(
+				'taxonomy'   => $taxonomy,
+				'hide_empty' => false,
+				'include'    => $ids,
+				'fields'     => 'ids',
+				'number'     => count( $ids ),
+			)
+		);
+
+		if ( is_wp_error( $valid_ids ) ) {
+			add_settings_error(
+				self::OPTION_NAME,
+				'wpam_age_gate_term_validation_failed',
+				__( 'No se pudieron validar los términos del Age Gate. Se conservaron las selecciones existentes.', 'wp-affiliatemanager' ),
+				'error'
+			);
+			return null;
+		}
+
+		if ( ! is_array( $valid_ids ) ) {
+			return array();
+		}
+
+		$valid_lookup = array_fill_keys( array_map( 'intval', $valid_ids ), true );
+		return array_values( array_filter( $ids, static fn( int $term_id ): bool => isset( $valid_lookup[ $term_id ] ) ) );
 	}
 
 	/**
