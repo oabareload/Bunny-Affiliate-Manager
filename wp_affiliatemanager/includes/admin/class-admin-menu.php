@@ -91,6 +91,15 @@ class Admin_Menu {
 
 		add_submenu_page(
 			self::PARENT_SLUG,
+			__( 'Interstitial & Protection — Bunny Affiliate Manager', 'wp-affiliatemanager' ),
+			__( 'Interstitial & Protection', 'wp-affiliatemanager' ),
+			self::CAPABILITY,
+			'wpam-interstitial',
+			array( $this, 'render_interstitial_page' )
+		);
+
+		add_submenu_page(
+			self::PARENT_SLUG,
 			__( 'Settings — Bunny Affiliate Manager', 'wp-affiliatemanager' ),
 			__( 'Settings', 'wp-affiliatemanager' ),
 			self::CAPABILITY,
@@ -448,6 +457,26 @@ class Admin_Menu {
 		$this->render_admin_footer();
 	}
 
+	public function render_interstitial_page(): void {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'No tienes permisos para acceder a esta página.', 'wp-affiliatemanager' ) );
+		}
+
+		$this->render_admin_header( __( 'Interstitial & Content Protection', 'wp-affiliatemanager' ) );
+		?>
+		<div class="bunny-page-content wpam-settings-page">
+			<form method="post" action="options.php">
+				<?php
+				settings_fields( 'wpam_settings_group' );
+				do_settings_sections( 'wpam-interstitial' );
+				submit_button( __( 'Save Settings', 'wp-affiliatemanager' ) );
+				?>
+			</form>
+		</div>
+		<?php
+		$this->render_admin_footer();
+	}
+
 	// -------------------------------------------------------------------------
 	// Broken Reports — página propia (v1.4.0)
 	// -------------------------------------------------------------------------
@@ -506,6 +535,7 @@ class Admin_Menu {
 			'wpam-affiliates'      => __( 'Affiliates', 'wp-affiliatemanager' ),
 			'wpam-post-affiliates' => __( 'Post Affiliates', 'wp-affiliatemanager' ),
 			'wpam-broken-reports'  => __( 'Broken Reports', 'wp-affiliatemanager' ),
+			'wpam-interstitial'    => __( 'Interstitial & Protection', 'wp-affiliatemanager' ),
 			'wpam-settings'        => __( 'Settings', 'wp-affiliatemanager' ),
 			'wpam-maintenance'     => __( 'Maintenance', 'wp-affiliatemanager' ),
 			'wpam-bunny-score'     => __( 'Bunny Score', 'wp-affiliatemanager' ),

@@ -56,6 +56,14 @@ class Settings {
 	const PAGE_SLUG = 'wpam-settings';
 
 	/**
+	 * Slug de la página de interstitial y protección de contenido.
+	 *
+	 * @since 2.1.0
+	 * @var   string
+	 */
+	const INTERSTITIAL_PAGE_SLUG = 'wpam-interstitial';
+
+	/**
 	 * Registra settings, secciones y campos en WordPress.
 	 * Se ejecuta en 'admin_init'.
 	 *
@@ -168,40 +176,6 @@ class Settings {
 		);
 
 		// ---------------------------------------------------------------------------
-		// Sección: Google reCAPTCHA — v2 Checkbox
-		// ---------------------------------------------------------------------------
-		add_settings_section(
-			'wpam_section_recaptcha',
-			__( 'Google reCAPTCHA', 'wp-affiliatemanager' ),
-			array( $this, 'render_section_recaptcha' ),
-			self::PAGE_SLUG
-		);
-
-		add_settings_field(
-			'wpam_field_recaptcha_enabled',
-			__( 'Enable reCAPTCHA protection', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_recaptcha_enabled' ),
-			self::PAGE_SLUG,
-			'wpam_section_recaptcha'
-		);
-
-		add_settings_field(
-			'wpam_field_recaptcha_site_key',
-			__( 'Site Key', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_recaptcha_site_key' ),
-			self::PAGE_SLUG,
-			'wpam_section_recaptcha'
-		);
-
-		add_settings_field(
-			'wpam_field_recaptcha_secret_key',
-			__( 'Secret Key', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_recaptcha_secret_key' ),
-			self::PAGE_SLUG,
-			'wpam_section_recaptcha'
-		);
-
-		// ---------------------------------------------------------------------------
 		// Sección: Recently Viewed Posts — v1.3.0
 		// ---------------------------------------------------------------------------
 		add_settings_section(
@@ -245,131 +219,6 @@ class Settings {
 			array( $this, 'render_field_rv_title' ),
 			self::PAGE_SLUG,
 			'wpam_section_recently_viewed'
-		);
-
-		// ---------------------------------------------------------------------------
-		// Sección: Redirect / Interstitial — v0.2.0-alpha2
-		// ---------------------------------------------------------------------------
-		add_settings_section(
-			'wpam_section_redirect',
-			__( 'Redirect / Interstitial', 'wp-affiliatemanager' ),
-			array( $this, 'render_section_redirect' ),
-			self::PAGE_SLUG
-		);
-
-		add_settings_field(
-			'wpam_field_enable_interstitial',
-			__( 'Habilitar página interstitial', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_enable_interstitial' ),
-			self::PAGE_SLUG,
-			'wpam_section_redirect'
-		);
-
-		add_settings_field(
-			'wpam_field_redirect_delay',
-			__( 'Delay de redirect (segundos)', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_redirect_delay' ),
-			self::PAGE_SLUG,
-			'wpam_section_redirect'
-		);
-
-		add_settings_field(
-			'wpam_field_disclaimer_text',
-			__( 'Texto de disclaimer', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_disclaimer_text' ),
-			self::PAGE_SLUG,
-			'wpam_section_redirect'
-		);
-
-		add_settings_field(
-			'wpam_field_interstitial_title',
-			__( 'Título del interstitial', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_interstitial_title' ),
-			self::PAGE_SLUG,
-			'wpam_section_redirect'
-		);
-
-		add_settings_field(
-			'wpam_field_interstitial_countdown_text',
-			__( 'Texto del countdown', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_interstitial_countdown_text' ),
-			self::PAGE_SLUG,
-			'wpam_section_redirect'
-		);
-
-		add_settings_field(
-			'wpam_field_interstitial_button_text',
-			__( 'Texto del botón continuar', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_interstitial_button_text' ),
-			self::PAGE_SLUG,
-			'wpam_section_redirect'
-		);
-
-		add_settings_field(
-			'wpam_field_show_related_post_excerpt',
-			__( 'Show Related Post Excerpt', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_show_related_post_excerpt' ),
-			self::PAGE_SLUG,
-			'wpam_section_redirect'
-		);
-
-		add_settings_field(
-			'wpam_field_interstitial_width',
-			__( 'Interstitial Width', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_interstitial_width' ),
-			self::PAGE_SLUG,
-			'wpam_section_redirect'
-		);
-
-		// v1.8.11: utm_source configurable para destinos externos (/go, /goa, /goext).
-		add_settings_field(
-			'wpam_field_outbound_utm_source',
-			__( 'Outbound UTM Source', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_outbound_utm_source' ),
-			self::PAGE_SLUG,
-			'wpam_section_redirect'
-		);
-
-		// ---------------------------------------------------------------------------
-		// Sección: Interstitial — Content Slots
-		// ---------------------------------------------------------------------------
-		add_settings_section(
-			'wpam_section_content_slots',
-			__( 'Interstitial — Content Slot', 'wp-affiliatemanager' ),
-			array( $this, 'render_section_content_slots' ),
-			self::PAGE_SLUG
-		);
-
-		add_settings_field(
-			'wpam_field_slot0_type',
-			__( 'Slot Type', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_slot0_type' ),
-			self::PAGE_SLUG,
-			'wpam_section_content_slots'
-		);
-
-		add_settings_field(
-			'wpam_field_slot0_position',
-			__( 'Slot Position', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_slot0_position' ),
-			self::PAGE_SLUG,
-			'wpam_section_content_slots'
-		);
-
-		add_settings_field(
-			'wpam_field_slot0_html',
-			__( 'Custom HTML', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_slot0_html' ),
-			self::PAGE_SLUG,
-			'wpam_section_content_slots'
-		);
-
-		add_settings_field(
-			'wpam_field_slot0_image',
-			__( 'Image + Link', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_slot0_image' ),
-			self::PAGE_SLUG,
-			'wpam_section_content_slots'
 		);
 
 		// ---------------------------------------------------------------------------
@@ -470,6 +319,218 @@ class Settings {
 			'wpam_section_appearance'
 		);
 
+		// ===========================================================================
+		// PÁGINA DEDICADA: Interstitial & Content Protection (wpam-interstitial)
+		// ===========================================================================
+
+		// ---------------------------------------------------------------------------
+		// 1. Sección: Protección de Contenido y Edad (NSFW) — v2.1.0
+		// ---------------------------------------------------------------------------
+		add_settings_section(
+			'wpam_section_content_protection',
+			__( 'Protección de Contenido y Edad (NSFW)', 'wp-affiliatemanager' ),
+			array( $this, 'render_section_content_protection' ),
+			self::INTERSTITIAL_PAGE_SLUG
+		);
+
+		add_settings_field(
+			'wpam_field_cp_enabled',
+			__( 'Estado del Age Gate', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_cp_enabled' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_content_protection'
+		);
+
+		add_settings_field(
+			'wpam_field_cp_tags',
+			__( 'Etiquetas (Tags)', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_cp_tags' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_content_protection'
+		);
+
+		add_settings_field(
+			'wpam_field_cp_categories',
+			__( 'Categorías (Categories)', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_cp_categories' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_content_protection'
+		);
+
+		add_settings_field(
+			'wpam_field_cp_cookie',
+			__( 'Configuración de Cookie', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_cp_cookie' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_content_protection'
+		);
+
+		add_settings_field(
+			'wpam_field_cp_texts',
+			__( 'Textos de Verificación', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_cp_texts' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_content_protection'
+		);
+
+		// ---------------------------------------------------------------------------
+		// 2. Sección: Redirect / Interstitial — v0.2.0-alpha2
+		// ---------------------------------------------------------------------------
+		add_settings_section(
+			'wpam_section_redirect',
+			__( 'Interstitial de afiliados', 'wp-affiliatemanager' ),
+			array( $this, 'render_section_redirect' ),
+			self::INTERSTITIAL_PAGE_SLUG
+		);
+
+		add_settings_field(
+			'wpam_field_enable_interstitial',
+			__( 'Habilitar página interstitial', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_enable_interstitial' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		add_settings_field(
+			'wpam_field_redirect_delay',
+			__( 'Delay de redirect (segundos)', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_redirect_delay' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		add_settings_field(
+			'wpam_field_disclaimer_text',
+			__( 'Texto de disclaimer', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_disclaimer_text' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		add_settings_field(
+			'wpam_field_interstitial_title',
+			__( 'Título del interstitial', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_interstitial_title' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		add_settings_field(
+			'wpam_field_interstitial_countdown_text',
+			__( 'Texto del countdown', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_interstitial_countdown_text' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		add_settings_field(
+			'wpam_field_interstitial_button_text',
+			__( 'Texto del botón continuar', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_interstitial_button_text' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		add_settings_field(
+			'wpam_field_show_related_post_excerpt',
+			__( 'Show Related Post Excerpt', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_show_related_post_excerpt' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		add_settings_field(
+			'wpam_field_interstitial_width',
+			__( 'Interstitial Width', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_interstitial_width' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		add_settings_field(
+			'wpam_field_outbound_utm_source',
+			__( 'Outbound UTM Source', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_outbound_utm_source' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_redirect'
+		);
+
+		// ---------------------------------------------------------------------------
+		// 3. Sección: Interstitial — Content Slots
+		// ---------------------------------------------------------------------------
+		add_settings_section(
+			'wpam_section_content_slots',
+			__( 'Interstitial — Content Slot', 'wp-affiliatemanager' ),
+			array( $this, 'render_section_content_slots' ),
+			self::INTERSTITIAL_PAGE_SLUG
+		);
+
+		add_settings_field(
+			'wpam_field_slot0_type',
+			__( 'Slot Type', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_slot0_type' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_content_slots'
+		);
+
+		add_settings_field(
+			'wpam_field_slot0_position',
+			__( 'Slot Position', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_slot0_position' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_content_slots'
+		);
+
+		add_settings_field(
+			'wpam_field_slot0_html',
+			__( 'Custom HTML', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_slot0_html' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_content_slots'
+		);
+
+		add_settings_field(
+			'wpam_field_slot0_image',
+			__( 'Image + Link', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_slot0_image' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_content_slots'
+		);
+
+		// ---------------------------------------------------------------------------
+		// 4. Sección: Google reCAPTCHA — v2 Checkbox
+		// ---------------------------------------------------------------------------
+		add_settings_section(
+			'wpam_section_recaptcha',
+			__( 'Google reCAPTCHA', 'wp-affiliatemanager' ),
+			array( $this, 'render_section_recaptcha' ),
+			self::INTERSTITIAL_PAGE_SLUG
+		);
+
+		add_settings_field(
+			'wpam_field_recaptcha_enabled',
+			__( 'Enable reCAPTCHA protection', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_recaptcha_enabled' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_recaptcha'
+		);
+
+		add_settings_field(
+			'wpam_field_recaptcha_site_key',
+			__( 'Site Key', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_recaptcha_site_key' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_recaptcha'
+		);
+
+		add_settings_field(
+			'wpam_field_recaptcha_secret_key',
+			__( 'Secret Key', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_recaptcha_secret_key' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_recaptcha'
+		);
+
 	}
 
 	// ---------------------------------------------------------------------------
@@ -527,11 +588,169 @@ class Settings {
 	}
 
 	/**
-	 * Renderiza el campo enable_interstitial.
+	 * Renderiza la descripción de la sección de Protección de Contenido y Edad.
 	 *
-	 * @since  0.2.0-alpha2
+	 * @since  2.1.0
 	 * @return void
 	 */
+	public function render_section_content_protection(): void {
+		echo '<p>' . esc_html__( 'Configura la protección de mayoría de edad (Age Gate) para publicaciones con contenido sensible o NSFW. Cuando una publicación coincida con alguna de las etiquetas o categorías activadas, se interceptará en el servidor y se solicitará confirmación al usuario antes de renderizar el artículo.', 'wp-affiliatemanager' ) . '</p>';
+	}
+
+	/**
+	 * Renderiza el switch general de activación del Age Gate.
+	 *
+	 * @since  2.1.0
+	 * @return void
+	 */
+	public function render_field_cp_enabled(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = ! empty( $options['content_protection']['enabled'] );
+		?>
+		<label>
+			<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME . '[content_protection][enabled]' ); ?>" value="1" <?php checked( $value ); ?>>
+			<?php esc_html_e( 'Activar protección de mayoría de edad (Age Gate)', 'wp-affiliatemanager' ); ?>
+		</label>
+		<p class="description"><?php esc_html_e( 'Si está desactivado, ninguna publicación será interceptada por el Age Gate.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * Renderiza el control de activación y selección de etiquetas (post_tag).
+	 *
+	 * @since  2.1.0
+	 * @return void
+	 */
+	public function render_field_cp_tags(): void {
+		$options      = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$tags_enabled = ! empty( $options['content_protection']['tags_enabled'] );
+		$selected_ids = array_map( 'absint', (array) ( $options['content_protection']['tag_ids'] ?? array() ) );
+
+		$tags = get_terms( array(
+			'taxonomy'   => 'post_tag',
+			'hide_empty' => false,
+		) );
+		?>
+		<p style="margin-bottom:8px;">
+			<label>
+				<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME . '[content_protection][tags_enabled]' ); ?>" value="1" <?php checked( $tags_enabled ); ?>>
+				<strong><?php esc_html_e( 'Habilitar criterio por etiquetas (Tags)', 'wp-affiliatemanager' ); ?></strong>
+			</label>
+		</p>
+		<?php if ( ! empty( $tags ) && ! is_wp_error( $tags ) ) : ?>
+			<select name="<?php echo esc_attr( self::OPTION_NAME . '[content_protection][tag_ids][]' ); ?>" multiple size="6" style="width:100%; max-width:420px;">
+				<?php foreach ( $tags as $tag ) : ?>
+					<option value="<?php echo esc_attr( (string) $tag->term_id ); ?>" <?php selected( in_array( (int) $tag->term_id, $selected_ids, true ) ); ?>>
+						<?php echo esc_html( $tag->name . ' (' . $tag->count . ')' ); ?>
+					</option>
+				<?php endforeach; ?>
+			</select>
+			<p class="description"><?php esc_html_e( 'Mantén presionada la tecla Ctrl (Cmd en Mac) para seleccionar o deseleccionar varias etiquetas.', 'wp-affiliatemanager' ); ?></p>
+		<?php else : ?>
+			<p class="description"><?php esc_html_e( 'No hay etiquetas registradas en este sitio.', 'wp-affiliatemanager' ); ?></p>
+		<?php endif; ?>
+		<?php
+	}
+
+	/**
+	 * Renderiza el control de activación y selección de categorías (category).
+	 *
+	 * @since  2.1.0
+	 * @return void
+	 */
+	public function render_field_cp_categories(): void {
+		$options      = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$cats_enabled = ! empty( $options['content_protection']['categories_enabled'] );
+		$selected_ids = array_map( 'absint', (array) ( $options['content_protection']['category_ids'] ?? array() ) );
+
+		$categories = get_terms( array(
+			'taxonomy'   => 'category',
+			'hide_empty' => false,
+		) );
+		?>
+		<p style="margin-bottom:8px;">
+			<label>
+				<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME . '[content_protection][categories_enabled]' ); ?>" value="1" <?php checked( $cats_enabled ); ?>>
+				<strong><?php esc_html_e( 'Habilitar criterio por categorías (Categories)', 'wp-affiliatemanager' ); ?></strong>
+			</label>
+		</p>
+		<?php if ( ! empty( $categories ) && ! is_wp_error( $categories ) ) : ?>
+			<select name="<?php echo esc_attr( self::OPTION_NAME . '[content_protection][category_ids][]' ); ?>" multiple size="6" style="width:100%; max-width:420px;">
+				<?php foreach ( $categories as $cat ) : ?>
+					<option value="<?php echo esc_attr( (string) $cat->term_id ); ?>" <?php selected( in_array( (int) $cat->term_id, $selected_ids, true ) ); ?>>
+						<?php echo esc_html( $cat->name . ' (' . $cat->count . ')' ); ?>
+					</option>
+				<?php endforeach; ?>
+			</select>
+			<p class="description"><?php esc_html_e( 'Mantén presionada la tecla Ctrl (Cmd en Mac) para seleccionar o deseleccionar varias categorías.', 'wp-affiliatemanager' ); ?></p>
+		<?php else : ?>
+			<p class="description"><?php esc_html_e( 'No hay categorías registradas en este sitio.', 'wp-affiliatemanager' ); ?></p>
+		<?php endif; ?>
+		<?php
+	}
+
+	/**
+	 * Renderiza la configuración de cookie de autorización.
+	 *
+	 * @since  2.1.0
+	 * @return void
+	 */
+	public function render_field_cp_cookie(): void {
+		$options  = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$name     = sanitize_key( $options['content_protection']['cookie_name'] ?? 'wpam_age_gate' );
+		$duration = absint( $options['content_protection']['cookie_duration'] ?? ( DAY_IN_SECONDS * 30 ) );
+		$days     = round( $duration / DAY_IN_SECONDS, 1 );
+		?>
+		<p>
+			<label for="wpam_cp_cookie_name"><strong><?php esc_html_e( 'Nombre de la cookie:', 'wp-affiliatemanager' ); ?></strong></label><br>
+			<input type="text" id="wpam_cp_cookie_name" name="<?php echo esc_attr( self::OPTION_NAME . '[content_protection][cookie_name]' ); ?>" value="<?php echo esc_attr( $name ); ?>" class="regular-text" pattern="[a-zA-Z0-9_\-]+">
+		</p>
+		<p class="description"><?php esc_html_e( 'Nombre de la cookie almacenada en el navegador. Cambiar el nombre invalidará las autorizaciones previas y requerirá nueva verificación.', 'wp-affiliatemanager' ); ?></p>
+
+		<p style="margin-top:12px;">
+			<label for="wpam_cp_cookie_duration"><strong><?php esc_html_e( 'Duración de la cookie (segundos):', 'wp-affiliatemanager' ); ?></strong></label><br>
+			<input type="number" id="wpam_cp_cookie_duration" name="<?php echo esc_attr( self::OPTION_NAME . '[content_protection][cookie_duration]' ); ?>" value="<?php echo esc_attr( (string) $duration ); ?>" class="small-text" min="300" step="3600">
+			<span class="description"><?php printf( esc_html__( '(Aprox. %s días)', 'wp-affiliatemanager' ), esc_html( (string) $days ) ); ?></span>
+		</p>
+		<?php
+	}
+
+	/**
+	 * Renderiza los campos de textos personalizables del Age Gate.
+	 *
+	 * @since  2.1.0
+	 * @return void
+	 */
+	public function render_field_cp_texts(): void {
+		$options      = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$gate_title   = $options['content_protection']['gate_title'] ?? '';
+		$gate_msg     = $options['content_protection']['gate_message'] ?? '';
+		$confirm_text = $options['content_protection']['confirm_button_text'] ?? '';
+		$reject_text  = $options['content_protection']['reject_button_text'] ?? '';
+		?>
+		<p>
+			<label for="wpam_cp_gate_title"><strong><?php esc_html_e( 'Título de la tarjeta:', 'wp-affiliatemanager' ); ?></strong></label><br>
+			<input type="text" id="wpam_cp_gate_title" name="<?php echo esc_attr( self::OPTION_NAME . '[content_protection][gate_title]' ); ?>" value="<?php echo esc_attr( $gate_title ); ?>" class="regular-text" placeholder="<?php esc_attr_e( 'Contenido para mayores de 18 años', 'wp-affiliatemanager' ); ?>">
+		</p>
+
+		<p style="margin-top:12px;">
+			<label for="wpam_cp_gate_message"><strong><?php esc_html_e( 'Mensaje explicativo:', 'wp-affiliatemanager' ); ?></strong></label><br>
+			<textarea id="wpam_cp_gate_message" name="<?php echo esc_attr( self::OPTION_NAME . '[content_protection][gate_message]' ); ?>" rows="3" class="large-text" placeholder="<?php esc_attr_e( 'Esta publicación contiene material clasificado para adultos. Debes ser mayor de edad para acceder.', 'wp-affiliatemanager' ); ?>"><?php echo esc_textarea( $gate_msg ); ?></textarea>
+		</p>
+
+		<p style="margin-top:12px;">
+			<label for="wpam_cp_confirm_btn"><strong><?php esc_html_e( 'Texto botón confirmación (18+):', 'wp-affiliatemanager' ); ?></strong></label><br>
+			<input type="text" id="wpam_cp_confirm_btn" name="<?php echo esc_attr( self::OPTION_NAME . '[content_protection][confirm_button_text]' ); ?>" value="<?php echo esc_attr( $confirm_text ); ?>" class="regular-text" placeholder="<?php esc_attr_e( 'Tengo 18 años o más — Entrar', 'wp-affiliatemanager' ); ?>">
+		</p>
+
+		<p style="margin-top:12px;">
+			<label for="wpam_cp_reject_btn"><strong><?php esc_html_e( 'Texto botón rechazo / salida SFW:', 'wp-affiliatemanager' ); ?></strong></label><br>
+			<input type="text" id="wpam_cp_reject_btn" name="<?php echo esc_attr( self::OPTION_NAME . '[content_protection][reject_button_text]' ); ?>" value="<?php echo esc_attr( $reject_text ); ?>" class="regular-text" placeholder="<?php esc_attr_e( 'Soy menor de 18 años — Salir a contenido seguro', 'wp-affiliatemanager' ); ?>">
+		</p>
+		<p class="description"><?php esc_html_e( 'Deja los campos vacíos para utilizar los textos por defecto del sistema.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
 	/**
 	 * Renderiza el campo enable_interstitial.
 	 *
@@ -1892,6 +2111,40 @@ class Settings {
 		// una rama `bunny_score` aquí — eso fue exactamente lo que causó el bug
 		// de persistencia que motivó separar la opción en primer lugar.
 
+		// Content Protection (NSFW Age Gate — Fase 2 / Fase 3).
+		if ( isset( $input['content_protection'] ) && is_array( $input['content_protection'] ) ) {
+			$cp_input = $input['content_protection'];
+
+			$sanitized['content_protection']['enabled']            = ! empty( $cp_input['enabled'] );
+			$sanitized['content_protection']['tags_enabled']       = ! empty( $cp_input['tags_enabled'] );
+			$sanitized['content_protection']['categories_enabled'] = ! empty( $cp_input['categories_enabled'] );
+
+			$cookie_name = sanitize_key( $cp_input['cookie_name'] ?? 'wpam_age_gate' );
+			$sanitized['content_protection']['cookie_name'] = ! empty( $cookie_name ) ? $cookie_name : 'wpam_age_gate';
+
+			$raw_duration = (int) ( $cp_input['cookie_duration'] ?? ( DAY_IN_SECONDS * 30 ) );
+			$sanitized['content_protection']['cookie_duration'] = $raw_duration >= 300 ? $raw_duration : ( DAY_IN_SECONDS * 30 );
+
+			// tag_ids
+			$sanitized['content_protection']['tag_ids'] = isset( $cp_input['tag_ids'] ) && is_array( $cp_input['tag_ids'] )
+				? array_values( array_filter( array_map( 'absint', $cp_input['tag_ids'] ) ) )
+				: array();
+
+			// category_ids
+			$sanitized['content_protection']['category_ids'] = isset( $cp_input['category_ids'] ) && is_array( $cp_input['category_ids'] )
+				? array_values( array_filter( array_map( 'absint', $cp_input['category_ids'] ) ) )
+				: array();
+
+			$sanitized['content_protection']['gate_title']           = sanitize_text_field( $cp_input['gate_title'] ?? '' );
+			$sanitized['content_protection']['gate_message']         = sanitize_textarea_field( $cp_input['gate_message'] ?? '' );
+			$sanitized['content_protection']['confirm_button_text']  = sanitize_text_field( $cp_input['confirm_button_text'] ?? '' );
+			$sanitized['content_protection']['reject_button_text']   = sanitize_text_field( $cp_input['reject_button_text'] ?? '' );
+			$sanitized['content_protection']['fallback_post_id']     = absint( $cp_input['fallback_post_id'] ?? 0 );
+
+			// Purgar LiteSpeed Cache si está disponible al actualizar criterios.
+			do_action( 'litespeed_purge_all', 'WPAM content protection updated' );
+		}
+
 		return $sanitized;
 	}
 
@@ -1958,6 +2211,20 @@ class Settings {
 					'desc_source'  => 'excerpt',
 					'desc_text'    => '',
 				),
+			),
+			'content_protection' => array(
+				'enabled'             => false,
+				'cookie_name'         => 'wpam_age_gate',
+				'cookie_duration'     => DAY_IN_SECONDS * 30,
+				'tags_enabled'        => true,
+				'categories_enabled'  => true,
+				'tag_ids'             => array(),
+				'category_ids'        => array(),
+				'gate_title'          => '',
+				'gate_message'        => '',
+				'confirm_button_text' => '',
+				'reject_button_text'  => '',
+				'fallback_post_id'    => 0,
 			),
 		);
 	}

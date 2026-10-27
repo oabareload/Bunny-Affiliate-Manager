@@ -27,6 +27,7 @@ class Admin_Assets {
 		'bunny-affiliates_page_wpam-affiliates',
 		'bunny-affiliates_page_wpam-post-affiliates',
 		'bunny-affiliates_page_wpam-broken-reports',
+		'bunny-affiliates_page_wpam-interstitial',
 		'bunny-affiliates_page_wpam-settings',
 		'bunny-affiliates_page_wpam-maintenance',
 		'bunny-affiliates_page_wpam-bunny-score',
@@ -57,7 +58,7 @@ class Admin_Assets {
 			);
 		}
 
-		if ( 'bunny-affiliates_page_wpam-settings' === $hook_suffix ) {
+		if ( 'bunny-affiliates_page_wpam-settings' === $hook_suffix || 'bunny-affiliates_page_wpam-interstitial' === $hook_suffix ) {
 			wp_enqueue_style(
 				'wpam-settings-styles',
 				WPAM_PLUGIN_URL . 'assets/css/settings.css',

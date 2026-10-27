@@ -98,6 +98,10 @@ require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-stats-ge
 require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-admin.php';
 require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-screen.php';
 
+// --- NSFW Age Gate & Content Protection ---
+require_once WPAM_PLUGIN_PATH . 'includes/content-protection/class-age-gate-renderer.php';
+require_once WPAM_PLUGIN_PATH . 'includes/content-protection/class-age-gate.php';
+
 /**
  * Class Plugin
  *
@@ -197,6 +201,15 @@ final class Plugin {
 		// atarlo en el patrón hook-por-objeto del Loader.
 		add_filter( 'cron_schedules', array( __CLASS__, 'register_weekly_cron_schedule' ) ); // phpcs:ignore WordPress.WP.CronInterval.CronSchedulesInterval
 		add_action( 'wpam_bunny_score_stats_weekly', array( '\WP_AffiliateManager\Bunny_Score\Bunny_Score_Stats_Generator', 'generate' ) );
+
+		// Content Protection: NSFW Age Gate, feeds, REST API, oEmbed.
+		$age_gate = new Content_Protection\Age_Gate();
+		$this->loader->add_action( 'template_redirect',    $age_gate, 'handle', 1 );
+		$this->loader->add_action( 'pre_get_posts',         $age_gate, 'filter_feed_queries' );
+		$this->loader->add_filter( 'the_content_feed',      $age_gate, 'filter_feed_content' );
+		$this->loader->add_filter( 'the_excerpt_rss',       $age_gate, 'filter_feed_content' );
+		$this->loader->add_filter( 'rest_prepare_post',      $age_gate, 'filter_rest_post', 10, 3 );
+		$this->loader->add_filter( 'oembed_response_data',    $age_gate, 'filter_oembed_data', 10, 2 );
 	}
 
 	/**

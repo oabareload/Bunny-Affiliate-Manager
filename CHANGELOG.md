@@ -5,6 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.9.0] — 2026-10-27 — Protección de contenido sensible (Age Gate 18+) y panel administrativo dedicado de Interstitial & Protection
+
+### Added
+
+- **Protección de contenido sensible / NSFW (Age Gate 18+):** interceptación temprana en el servidor (`template_redirect`, prioridad 1) de publicaciones clasificadas como NSFW o para adultos según etiquetas (`post_tag`) y/o categorías (`category`) activadas.
+- **Pantalla de verificación independiente y aislada (`Age_Gate_Renderer`):** tarjeta visual centrada de advertencia de mayoría de edad (18+), sin exponer título, contenido, extracto ni imágenes de la publicación protegida en el código fuente HTML entregado al visitante no verificado (HTTP 200 con cabeceras `noindex, nofollow, noarchive`).
+- **Autorización por cookie criptográfica HMAC SHA-256:** confirmación segura mediante formulario POST con nonce (`wpam_age_gate_{post_id}`). Al confirmar, se emite una cookie firmada con versión (`v1`), expiración en payload y hash HMAC basado en `wp_salt('auth')`, validada en tiempo constante con `hash_equals()`.
+- **Flujo de rechazo con redirección inteligente SFW:** al rechazar la verificación, el visitante es redirigido mediante HTTP 303 a una publicación segura (SFW) seleccionada dinámicamente mediante `NOT IN` sobre las taxonomías protegidas, con fallback al inicio (`home_url('/')`) sin riesgo de bucles de redirección.
+- **Página administrativa dedicada «Interstitial & Protection» (`wpam-interstitial`):** nuevo submenú en el panel administrativo de Bunny Affiliate Manager que reúne los ajustes del interstitial de afiliados y los nuevos controles de protección de contenido.
+- **Controles administrativos de protección de contenido:**
+  - Interruptor general de activación del Age Gate.
+  - Activación independiente y selección múltiple de etiquetas (`post_tag`) protegidas.
+  - Activación independiente y selección múltiple de categorías (`category`) protegidas.
+  - Nombre de cookie configurable (sanitizado con `sanitize_key()`).
+  - Duración de cookie configurable con umbral mínimo de seguridad (`>= 300s`, por defecto 30 días) y fallback seguro ante valores negativos o inválidos.
+  - Personalización de textos de la tarjeta de verificación: título, mensaje explicativo, texto del botón de confirmación (+18) y texto del botón de rechazo/salida SFW.
+- **Defensa en profundidad en vectores secundarios:**
+  - **REST API (`rest_prepare_post`):** peticiones individuales (`/wp/v2/posts/<id>`) devuelven error HTTP 403 `WP_Error` para visitantes no autorizados; peticiones de colección (`/wp/v2/posts`) redactan contenido y extracto y resetean `featured_media` a 0.
+  - **Feeds RSS/Atom (`pre_get_posts`):** exclusión automática de publicaciones protegidas de las consultas públicas de feed y redacción preventiva en `the_content_feed` y `the_excerpt_rss`.
+  - **oEmbed (`oembed_response_data`):** denegación de oEmbed (retorna `false` generando 404 a consumidores externos) y bloqueo de plantilla iframe oEmbed con HTTP 403 y `noindex`.
+- **Bypass autorizado para editores:** los usuarios autenticados con permiso `edit_post` pueden previsualizar las publicaciones protegidas en el frontend sin necesidad de cookie.
+- **Cabeceras de control de caché e integración con LiteSpeed / Cloudflare:** emisión de cabeceras estrictas `Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0` y disparador del hook `litespeed_control_set_nocache` para prevenir contaminación de cachés públicas.
+
+### Changed
+
+- **Reubicación no destructiva de ajustes del Interstitial:** las secciones `wpam_section_redirect`, `wpam_section_content_slots` y `wpam_section_recaptcha` se trasladan a la página `wpam-interstitial` conservando el 100% de sus claves y valores en `wpam_settings`.
+- **Sanitización multi-sección aislada:** `Settings::sanitize_options()` preserva intactos los valores de otras secciones al guardar cualquiera de las páginas administrativas, garantizando la persistencia y deselección limpia de términos en selectores múltiples HTML.
+
+---
+
 ## [1.8.18] — 2026-10-26 — Búsqueda dinámica de publicaciones relacionadas, optimización de seguimiento de visitas y ajustes de rendimiento
 
 ### Added
