@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.9.5] — 2026-10-28 — Estadísticas del Interstitial NSFW (Age Gate) en Analytics
+
+### Added
+
+- **Pestaña NSFW Gate en Analytics:** nuevo panel integrado en la pantalla de analíticas que expone métricas sobre el uso del interstitial de edad para contenido protegido.
+- **Tarjetas de resumen y métricas clave:** recuento de interstitials mostrados (`shown`), confirmaciones (`confirmed`), rechazos (`rejected`), tasas porcentuales de confirmación y rechazo, y cálculo de abandono estimado (`max(0, shown - confirmed - rejected)`), identificado de forma transparente como estimación analítica derivada.
+- **Desglose por origen UTM:** tabla agregada por `utm_source` que reporta mostrados, confirmaciones, rechazos y tasa de confirmación por canal, presentando el origen predeterminado `direct` bajo la etiqueta comprensible «Directo / sin UTM».
+- **Publicaciones con más interstitials:** ranking de entradas protegidas por volumen de interstitials servidos, con enlaces de edición administrativa según capacidades del usuario y tratamiento de publicaciones eliminadas.
+- **Filtros temporales e integración AJAX:** soporte completo para los rangos estándar (*Today*, *Last 7 Days*, *Last 30 Days*, *All Time*) mediante el mecanismo AJAX existente (`wpam_analytics_filter`), verificación estricta de nonce y permisos (`manage_options`), y persistencia de selección en `localStorage`.
+- **Infraestructura de almacenamiento y tracking:** tabla agregada diaria `{prefix}wpam_age_gate_events` con upsert atómico (`ON DUPLICATE KEY UPDATE count = count + 1`) y protección HMAC para preservar la atribución de `utm_source` entre la presentación del formulario y su envío.
+
+### Fixed
+
+- **Optimización de caché de estadísticas:** eliminación de la invalidación reactiva por evento, preservando la caducidad natural de las entradas de Object Cache (TTL de 300 segundos) para no degradar el rendimiento durante el registro concurrente de eventos.
+
+---
+
 ## [1.9.3] — 2026-10-27 — Corrección de textos y caché del Age Gate
 
 ### Fixed

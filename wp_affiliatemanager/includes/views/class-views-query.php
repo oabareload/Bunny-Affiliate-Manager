@@ -336,18 +336,82 @@ class Views_Query {
 		$month = self::range_to_period_since( 'month' );
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
-		$today_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT SUM(count) FROM %i WHERE resource_type IN ({$placeholders}) AND period >= %s", array_merge( array( $table ), $enabled_types, array( $today ) ) ) );
-		$week_count  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT SUM(count) FROM %i WHERE resource_type IN ({$placeholders}) AND period >= %s", array_merge( array( $table ), $enabled_types, array( $week ) ) ) );
-		$month_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT SUM(count) FROM %i WHERE resource_type IN ({$placeholders}) AND period >= %s", array_merge( array( $table ), $enabled_types, array( $month ) ) ) );
-		$total_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT SUM(count) FROM %i WHERE resource_type IN ({$placeholders})", array_merge( array( $table ), $enabled_types ) ) );
+		$sql = "SELECT
+			SUM(CASE WHEN period >= %s THEN count ELSE 0 END) AS today_count,
+			SUM(CASE WHEN period >= %s THEN count ELSE 0 END) AS week_count,
+			SUM(CASE WHEN period >= %s THEN count ELSE 0 END) AS month_count,
+			SUM(count) AS total_count
+		FROM %i
+		WHERE resource_type IN ({$placeholders})";
+
+		$params = array_merge(
+			array( $today, $week, $month, $table ),
+			$enabled_types
+		);
+
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, $params ), ARRAY_A );
 		// phpcs:enable
 
 		return array(
-			'today' => $today_count,
-			'week'  => $week_count,
-			'month' => $month_count,
-			'total' => $total_count,
+			'today' => (int) ( $row['today_count'] ?? 0 ),
+			'week'  => (int) ( $row['week_count'] ?? 0 ),
+			'month' => (int) ( $row['month_count'] ?? 0 ),
+			'total' => (int) ( $row['total_count'] ?? 0 ),
 		);
+	}
+
+	/**
+	 * Retorna un mapa post_id => view_count para un conjunto de posts en un rango dado.
+	 *
+	 * Solo considera resource_type = 'post', garantizando correspondencia semántica
+	 * con las publicaciones del ranking de afiliados.
+	 *
+	 * @since  2.2.0
+	 * @param  int[]  $post_ids Array de IDs de posts.
+	 * @param  string $range    'today' | 'week' | 'month' | 'total'.
+	 * @return array<int,int>   Mapa post_id => view_count.
+	 */
+	public static function get_view_counts_for_post_ids( array $post_ids, string $range = 'total' ): array {
+		global $wpdb;
+
+		$post_ids = array_values( array_filter( array_map( 'absint', $post_ids ) ) );
+		if ( empty( $post_ids ) ) {
+			return array();
+		}
+
+		$table        = Views_Table::table_name();
+		$placeholders = implode( ',', array_fill( 0, count( $post_ids ), '%d' ) );
+
+		$where_sql = " WHERE resource_type = 'post' AND post_id IN ({$placeholders})";
+		$params    = array_merge( array( $table ), $post_ids );
+
+		if ( 'total' !== $range ) {
+			$since      = self::range_to_period_since( $range );
+			$where_sql .= ' AND period >= %s';
+			$params[]   = $since;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT post_id, SUM(count) AS view_count FROM %i{$where_sql} GROUP BY post_id",
+				$params
+			),
+			ARRAY_A
+		);
+
+		$map = array();
+		foreach ( $post_ids as $id ) {
+			$map[ $id ] = 0;
+		}
+
+		if ( is_array( $rows ) ) {
+			foreach ( $rows as $row ) {
+				$map[ (int) $row['post_id'] ] = (int) $row['view_count'];
+			}
+		}
+
+		return $map;
 	}
 
 	/**

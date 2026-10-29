@@ -207,6 +207,15 @@ class Bunny_Score_Screen {
                     <?php endif; ?>
                 </p>
 
+                <?php if ( $stats && ! empty( $stats['total_posts'] ) ) : ?>
+                    <div class="wpam-stats-grid" style="margin: 16px 0;">
+                        <?php \WP_AffiliateManager\Admin\Analytics_Renderer::render_stat_card( __( 'Promedio', 'wp-affiliatemanager' ), number_format_i18n( (float) ( $stats['avg'] ?? 0 ), 1 ), '📊' ); ?>
+                        <?php \WP_AffiliateManager\Admin\Analytics_Renderer::render_stat_card( __( 'Mediana', 'wp-affiliatemanager' ), number_format_i18n( (float) ( $stats['median'] ?? 0 ), 1 ), '🎯' ); ?>
+                        <?php \WP_AffiliateManager\Admin\Analytics_Renderer::render_stat_card( __( 'Percentil 75 (P75)', 'wp-affiliatemanager' ), number_format_i18n( (float) ( $stats['percentiles']['p75'] ?? 0 ), 1 ), '🟢' ); ?>
+                        <?php \WP_AffiliateManager\Admin\Analytics_Renderer::render_stat_card( __( 'Percentil 95 (P95)', 'wp-affiliatemanager' ), number_format_i18n( (float) ( $stats['percentiles']['p95'] ?? 0 ), 1 ), '⭐' ); ?>
+                    </div>
+                <?php endif; ?>
+
                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
                     <?php wp_nonce_field( 'wpam_regenerate_bunny_score_stats' ); ?>
                     <input type="hidden" name="action" value="wpam_regenerate_bunny_score_stats" />

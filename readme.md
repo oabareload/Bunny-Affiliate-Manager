@@ -12,14 +12,14 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Domain Path: /languages
 - License: GPLv2 or later
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **1.9.3**
+- Current version: **1.9.5**
 
 ## Requirements
 
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v1.9.3)
+## Current scope (v1.9.5)
 
 ### Affiliates
 
@@ -114,7 +114,7 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 ### Analytics & Dashboard (admin)
 
 - **Dashboard** — executive summary: total/active affiliate counts, posts-with-affiliates count, an overview row (Total Score / Views / Clicks / Affiliates), recent activity (last 20 clicks, last 20 views), a Top 10 Overall list (by Score), and quick-access links to the other screens.
-- **Analytics** — dedicated screen with three horizontal tabs (**Score**, **Clicks**, **Views**), each with its own Today / Last 7 Days / Last 30 Days / All Time filter cards and ranking tables (Top Affiliates, Top Clicked Posts, Top Viewed Posts, Top Scored Posts, Recent Clicks, Recent Views). All three tabs share a single AJAX endpoint and a single client-side filter implementation. The **Views** tab additionally has a resource-type selector (Posts/Pages/Categories/Tags/Home/Search/404, Posts by default) — Search and 404 show a simple most-frequent terms/URLs list instead of a post ranking.
+- **Analytics** — dedicated screen with four horizontal tabs (**Score**, **Clicks**, **Views**, **NSFW Gate**), each with its own Today / Last 7 Days / Last 30 Days / All Time filter cards and ranking tables (Top Affiliates, Top Clicked Posts, Top Viewed Posts, Top Scored Posts, Recent Clicks, Recent Views, and NSFW Gate summary / Top UTM Sources / Top Protected Posts). All tabs share a single AJAX endpoint and client-side filter implementation. The **Views** tab includes a resource-type selector; the **NSFW Gate** tab exposes interstitials shown, confirmations, rejections, estimated exits, and confirmation rates by UTM source and protected post.
 - **Settings** — plugin configuration (render mode, disclaimer, views, recently viewed, general options) plus **Maintenance** actions: rebuild the redirect token map, clear analytics, one-time Post Views Counter import.
 - **Broken Reports** — dedicated page listing every reported broken link, with per-report and clear-all actions.
 

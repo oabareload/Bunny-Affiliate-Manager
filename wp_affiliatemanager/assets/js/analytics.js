@@ -120,9 +120,20 @@
 
 		if ( $extraSelect.length ) {
 			$extraSelect.on( 'change', function () {
+				if ( config.extraStorageKey ) {
+					try { localStorage.setItem( config.extraStorageKey, $( this ).val() ); } catch ( e ) {}
+				}
 				var current = $cards.filter( '.wpam-stat-card--active' ).data( 'range' ) || 'total';
 				applyFilter( current, false );
 			} );
+		}
+
+		if ( $extraSelect.length && config.extraStorageKey ) {
+			var savedExtra = '';
+			try { savedExtra = localStorage.getItem( config.extraStorageKey ) || ''; } catch ( e ) {}
+			if ( savedExtra && $extraSelect.find( 'option[value="' + savedExtra + '"]' ).length ) {
+				$extraSelect.val( savedExtra );
+			}
 		}
 
 		var saved = 'total';
@@ -213,6 +224,20 @@
 			storageKey: 'wpam_analytics_filter_views',
 			extraData: { source: 'views' },
 			extraSelector: '#wpam-views-resource-type',
+			extraStorageKey: 'wpam_analytics_views_resource_type',
+		} );
+
+		// Tab NSFW Gate (v2.2.0).
+		initFilterGroup( {
+			cardsSelector: '.wpam-analytics-cards--age-gate .wpam-stat-card',
+			columns: [
+				{ selector: '.wpam-analytics-age-gate-summary-col', dataKey: 'summary_html' },
+				{ selector: '.wpam-analytics-age-gate-utm-col',     dataKey: 'utm_html' },
+				{ selector: '.wpam-analytics-age-gate-posts-col',   dataKey: 'top_posts_html' },
+			],
+			ajaxAction: 'wpam_analytics_filter',
+			storageKey: 'wpam_analytics_filter_age_gate',
+			extraData: { source: 'age_gate' },
 		} );
 	} );
 

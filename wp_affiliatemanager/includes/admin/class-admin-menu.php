@@ -208,7 +208,6 @@ class Admin_Menu {
 				<?php Analytics_Renderer::render_stat_card( __( 'Total Score', 'wp-affiliatemanager' ), number_format_i18n( $score_totals['total'] ), '⭐' ); ?>
 				<?php Analytics_Renderer::render_stat_card( __( 'Total Views', 'wp-affiliatemanager' ), number_format_i18n( $view_totals['total'] ), '👁️' ); ?>
 				<?php Analytics_Renderer::render_stat_card( __( 'Total Clicks', 'wp-affiliatemanager' ), number_format_i18n( $click_totals['total'] ), '🖱️' ); ?>
-				<?php Analytics_Renderer::render_stat_card( __( 'Total Affiliates', 'wp-affiliatemanager' ), (string) $total, '📦' ); ?>
 			</div>
 
 			<h2 class="wpam-section-heading"><?php esc_html_e( 'Daily Activity', 'wp-affiliatemanager' ); ?></h2>

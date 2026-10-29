@@ -216,6 +216,10 @@ class Age_Gate {
 			return;
 		}
 
+		if ( 'HEAD' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
+			return;
+		}
+
 		if ( ! is_singular( 'post' ) ) {
 			return;
 		}
@@ -272,13 +276,27 @@ class Age_Gate {
 
 			$action = sanitize_text_field( wp_unslash( $_POST['wpam_age_gate_action'] ) );
 
+			// Recuperar y validar el origen UTM protegido mediante HMAC.
+			$post_utm      = isset( $_POST['wpam_age_gate_utm'] ) ? sanitize_text_field( wp_unslash( $_POST['wpam_age_gate_utm'] ) ) : '';
+			$post_utm_hash = isset( $_POST['wpam_age_gate_utm_hash'] ) ? sanitize_text_field( wp_unslash( $_POST['wpam_age_gate_utm_hash'] ) ) : '';
+
+			$utm_source = Age_Gate_Tracker::UTM_SOURCE_DIRECT;
+			if ( '' !== $post_utm && '' !== $post_utm_hash ) {
+				$candidate_utm = Age_Gate_Tracker::normalize_utm_source( $post_utm );
+				if ( Age_Gate_Tracker::verify_utm_source( $candidate_utm, $post_id, $post_utm_hash ) ) {
+					$utm_source = $candidate_utm;
+				}
+			}
+
 			if ( 'confirm' === $action ) {
+				Age_Gate_Tracker::record_event( 'confirmed', $post_id, $utm_source );
 				$this->set_signed_cookie();
 				wp_safe_redirect( get_permalink( $post_id ), 303 );
 				exit;
 			}
 
 			if ( 'reject' === $action ) {
+				Age_Gate_Tracker::record_event( 'rejected', $post_id, $utm_source );
 				$fallback_url = $this->get_sfw_fallback_url( $post_id );
 				wp_safe_redirect( $fallback_url, 303 );
 				exit;
@@ -288,6 +306,14 @@ class Age_Gate {
 		// Unverified GET request: render the Age Gate confirmation screen.
 		$this->send_nocache_headers();
 		$this->signal_litespeed_nocache( 'WPAM Age Gate Screen' );
+
+		// Extraer y normalizar utm_source de la solicitud entrante.
+		$raw_utm    = isset( $_GET['utm_source'] ) ? sanitize_text_field( wp_unslash( $_GET['utm_source'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$utm_source = Age_Gate_Tracker::normalize_utm_source( $raw_utm );
+		$utm_hash   = Age_Gate_Tracker::hash_utm_source( $utm_source, $post_id );
+
+		// Registrar evento 'shown' en el momento en que se sirve el interstitial.
+		Age_Gate_Tracker::record_event( 'shown', $post_id, $utm_source );
 
 		$options = get_option( WPAM_OPTION_KEY, array() );
 		$cp      = $options['content_protection'] ?? array();
@@ -305,6 +331,8 @@ class Age_Gate {
 				'message'      => '' !== $message ? $message : __( 'Esta publicación contiene material clasificado para adultos. Debes ser mayor de edad para acceder.', 'wp-affiliatemanager' ),
 				'confirm_text' => '' !== $confirm_text ? $confirm_text : __( 'Tengo 18 años o más — Entrar', 'wp-affiliatemanager' ),
 				'reject_text'  => '' !== $reject_text ? $reject_text : __( 'Soy menor de 18 años — Salir a contenido seguro', 'wp-affiliatemanager' ),
+				'utm_source'   => $utm_source,
+				'utm_hash'     => $utm_hash,
 			)
 		);
 		exit;

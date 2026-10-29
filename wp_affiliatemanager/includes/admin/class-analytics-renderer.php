@@ -214,7 +214,14 @@ class Analytics_Renderer {
 						<span class="wpam-recent-type-badge"><?php echo esc_html( self::type_badge_label( $item['resource_type'] ?? 'post' ) ); ?></span>
 					<?php endif; ?>
 				</div>
-				<span class="wpam-top-count"><?php echo esc_html( number_format_i18n( $item[ $count_field ] ) ); ?></span>
+				<div class="wpam-top-item-meta">
+					<span class="wpam-top-count"><?php echo esc_html( number_format_i18n( $item[ $count_field ] ) ); ?></span>
+					<?php if ( array_key_exists( 'ctr', $item ) ) : ?>
+						<span class="wpam-top-pct" title="<?php esc_attr_e( 'Estimated Click-Through Rate (Clicks / Views)', 'wp-affiliatemanager' ); ?>">
+							<?php echo null !== $item['ctr'] ? esc_html( sprintf( '%.1f%%', $item['ctr'] ) ) : '—'; ?>
+						</span>
+					<?php endif; ?>
+				</div>
 			</li>
 		<?php endforeach; ?>
 		</ul>
@@ -237,6 +244,7 @@ class Analytics_Renderer {
 		<div class="wpam-analytics-card">
 			<h3 class="wpam-analytics-card-title">
 				<span>📝</span> <?php esc_html_e( 'Top Clicked Posts', 'wp-affiliatemanager' ); ?>
+				<span class="wpam-analytics-card-sub"><?php esc_html_e( 'Clicks · CTR (est.)', 'wp-affiliatemanager' ); ?></span>
 			</h3>
 			<?php if ( empty( $posts ) ) : ?>
 				<p class="wpam-analytics-empty"><?php esc_html_e( 'No clicks recorded yet.', 'wp-affiliatemanager' ); ?></p>
@@ -379,7 +387,7 @@ class Analytics_Renderer {
 		<div class="wpam-analytics-card wpam-analytics-card--full">
 			<h3 class="wpam-analytics-card-title">
 				<span>🕐</span> <?php esc_html_e( 'Recent Clicks', 'wp-affiliatemanager' ); ?>
-				<span class="wpam-analytics-card-sub"><?php esc_html_e( 'Last 20', 'wp-affiliatemanager' ); ?></span>
+				<span class="wpam-analytics-card-sub"><?php esc_html_e( 'Last 20 (not filtered by date)', 'wp-affiliatemanager' ); ?></span>
 			</h3>
 			<?php if ( empty( $clicks ) ) : ?>
 				<p class="wpam-analytics-empty"><?php esc_html_e( 'No clicks recorded yet.', 'wp-affiliatemanager' ); ?></p>
@@ -457,7 +465,7 @@ class Analytics_Renderer {
 		<div class="wpam-analytics-card wpam-analytics-card--full">
 			<h3 class="wpam-analytics-card-title">
 				<span>👁️</span> <?php esc_html_e( 'Recent Views', 'wp-affiliatemanager' ); ?>
-				<span class="wpam-analytics-card-sub"><?php esc_html_e( 'Last 20', 'wp-affiliatemanager' ); ?></span>
+				<span class="wpam-analytics-card-sub"><?php esc_html_e( 'Last 20 daily aggregated records (not filtered by date)', 'wp-affiliatemanager' ); ?></span>
 			</h3>
 			<?php if ( empty( $views ) ) : ?>
 				<p class="wpam-analytics-empty"><?php esc_html_e( 'No views recorded yet.', 'wp-affiliatemanager' ); ?></p>
@@ -641,5 +649,197 @@ class Analytics_Renderer {
 		}
 
 		return $resolved;
+	}
+
+	// -------------------------------------------------------------------------
+	// NSFW Age Gate Analytics (v2.2.0)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Renderiza el resumen de métricas del Age Gate para el rango seleccionado.
+	 *
+	 * Incluye interstitials mostrados, confirmaciones, rechazos, abandono estimado
+	 * y sus respectivas tasas de conversión.
+	 *
+	 * @since  2.2.0
+	 * @param  array  $stats Métricas calculadas por Age_Gate_Query::get_stats().
+	 * @param  string $range Rango activo.
+	 * @return void
+	 */
+	public static function render_age_gate_summary( array $stats, string $range = 'total' ): void {
+		$shown         = (int) ( $stats['shown'] ?? 0 );
+		$confirmed     = (int) ( $stats['confirmed'] ?? 0 );
+		$rejected      = (int) ( $stats['rejected'] ?? 0 );
+		$abandoned     = (int) ( $stats['abandoned_estimated'] ?? 0 );
+		$confirm_rate  = (float) ( $stats['confirmation_rate'] ?? 0.0 );
+		$reject_rate   = (float) ( $stats['rejection_rate'] ?? 0.0 );
+		$abandon_rate  = (float) ( $stats['abandonment_rate'] ?? 0.0 );
+		?>
+		<div class="wpam-analytics-card wpam-analytics-card--full" style="margin-top:0;">
+			<h3 class="wpam-analytics-card-title">
+				<span>📊</span> <?php esc_html_e( 'NSFW Gate Summary', 'wp-affiliatemanager' ); ?>
+			</h3>
+			<div class="wpam-stats-grid" style="margin-top: 16px;">
+				<div class="wpam-stat-card">
+					<span class="wpam-stat-icon">🔞</span>
+					<span class="wpam-stat-value"><?php echo esc_html( number_format_i18n( $shown ) ); ?></span>
+					<span class="wpam-stat-label"><?php esc_html_e( 'Interstitials Shown', 'wp-affiliatemanager' ); ?></span>
+				</div>
+				<div class="wpam-stat-card">
+					<span class="wpam-stat-icon">✅</span>
+					<span class="wpam-stat-value"><?php echo esc_html( number_format_i18n( $confirmed ) ); ?></span>
+					<span class="wpam-stat-label">
+						<?php esc_html_e( 'Confirmed', 'wp-affiliatemanager' ); ?>
+						<span class="wpam-top-pct" style="margin-left:4px; font-weight:600; color:var(--wpam-primary, #6c47ff);">
+							(<?php echo esc_html( sprintf( '%.1f%%', $confirm_rate ) ); ?>)
+						</span>
+					</span>
+				</div>
+				<div class="wpam-stat-card">
+					<span class="wpam-stat-icon">🚫</span>
+					<span class="wpam-stat-value"><?php echo esc_html( number_format_i18n( $rejected ) ); ?></span>
+					<span class="wpam-stat-label">
+						<?php esc_html_e( 'Rejected', 'wp-affiliatemanager' ); ?>
+						<span class="wpam-top-pct" style="margin-left:4px; font-weight:600; color:var(--wpam-danger, #e11d48);">
+							(<?php echo esc_html( sprintf( '%.1f%%', $reject_rate ) ); ?>)
+						</span>
+					</span>
+				</div>
+				<div class="wpam-stat-card">
+					<span class="wpam-stat-icon">🚪</span>
+					<span class="wpam-stat-value"><?php echo esc_html( number_format_i18n( $abandoned ) ); ?></span>
+					<span class="wpam-stat-label">
+						<?php esc_html_e( 'Estimated Exit', 'wp-affiliatemanager' ); ?>
+						<span class="wpam-top-pct" style="margin-left:4px; font-weight:600; color:var(--wpam-gray-600, #475569);">
+							(<?php echo esc_html( sprintf( '%.1f%%', $abandon_rate ) ); ?>)
+						</span>
+					</span>
+				</div>
+			</div>
+			<p class="wpam-analytics-card-sub" style="margin: 14px 0 0; font-size: 12px; color: var(--wpam-gray-500, #64748b);">
+				<?php esc_html_e( '* Abandonment is an estimated metric: interstitials served without an explicit user decision (confirmation or exit to SFW).', 'wp-affiliatemanager' ); ?>
+			</p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Renderiza la tabla de desglose por origen UTM del Age Gate.
+	 *
+	 * @since  2.2.0
+	 * @param  array[] $breakdown Filas de Age_Gate_Query::get_utm_breakdown().
+	 * @return void
+	 */
+	public static function render_age_gate_utm_section( array $breakdown ): void {
+		?>
+		<div class="wpam-analytics-card">
+			<h3 class="wpam-analytics-card-title">
+				<span>🔗</span> <?php esc_html_e( 'Top UTM Sources', 'wp-affiliatemanager' ); ?>
+				<span class="wpam-analytics-card-sub"><?php esc_html_e( 'Top 20 sources', 'wp-affiliatemanager' ); ?></span>
+			</h3>
+			<?php if ( empty( $breakdown ) ) : ?>
+				<p class="wpam-analytics-empty"><?php esc_html_e( 'No events recorded yet.', 'wp-affiliatemanager' ); ?></p>
+			<?php else : ?>
+				<div class="wpam-table-wrap">
+					<table class="wpam-table">
+						<thead><tr>
+							<th><?php esc_html_e( 'Source', 'wp-affiliatemanager' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Shown', 'wp-affiliatemanager' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Confirmed', 'wp-affiliatemanager' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Rejected', 'wp-affiliatemanager' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Confirm %', 'wp-affiliatemanager' ); ?></th>
+						</tr></thead>
+						<tbody>
+						<?php foreach ( $breakdown as $row ) :
+							$source_raw   = (string) $row['utm_source'];
+							$source_label = 'direct' === $source_raw ? __( 'Direct / No UTM', 'wp-affiliatemanager' ) : $source_raw;
+						?>
+							<tr>
+								<td>
+									<strong><?php echo esc_html( $source_label ); ?></strong>
+									<?php if ( 'direct' === $source_raw ) : ?>
+										<span class="wpam-recent-type-badge" style="margin-left:6px;"><?php esc_html_e( 'Default', 'wp-affiliatemanager' ); ?></span>
+									<?php endif; ?>
+								</td>
+								<td style="text-align:right;"><?php echo esc_html( number_format_i18n( (int) $row['shown'] ) ); ?></td>
+								<td style="text-align:right;"><?php echo esc_html( number_format_i18n( (int) $row['confirmed'] ) ); ?></td>
+								<td style="text-align:right;"><?php echo esc_html( number_format_i18n( (int) $row['rejected'] ) ); ?></td>
+								<td style="text-align:right;">
+									<span class="wpam-top-pct"><?php echo esc_html( sprintf( '%.1f%%', (float) $row['confirmation_rate'] ) ); ?></span>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+						</tbody>
+					</table>
+				</div>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Renderiza la tabla de publicaciones protegidas con más interstitials.
+	 *
+	 * @since  2.2.0
+	 * @param  array[] $posts Filas de Age_Gate_Query::get_top_posts().
+	 * @return void
+	 */
+	public static function render_age_gate_top_posts_section( array $posts ): void {
+		?>
+		<div class="wpam-analytics-card">
+			<h3 class="wpam-analytics-card-title">
+				<span>🔞</span> <?php esc_html_e( 'Top Protected Posts', 'wp-affiliatemanager' ); ?>
+				<span class="wpam-analytics-card-sub"><?php esc_html_e( 'Ranked by interstitials shown', 'wp-affiliatemanager' ); ?></span>
+			</h3>
+			<?php if ( empty( $posts ) ) : ?>
+				<p class="wpam-analytics-empty"><?php esc_html_e( 'No protected posts activity recorded yet.', 'wp-affiliatemanager' ); ?></p>
+			<?php else : ?>
+				<div class="wpam-table-wrap">
+					<table class="wpam-table">
+						<thead><tr>
+							<th><?php esc_html_e( 'Post', 'wp-affiliatemanager' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Shown', 'wp-affiliatemanager' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Confirmed', 'wp-affiliatemanager' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Rejected', 'wp-affiliatemanager' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Confirm %', 'wp-affiliatemanager' ); ?></th>
+						</tr></thead>
+						<tbody>
+						<?php foreach ( $posts as $p ) :
+							$post_id   = (int) $p['post_id'];
+							$title     = (string) $p['title'];
+							$permalink = (string) $p['permalink'];
+
+							$edit_url = '';
+							if ( $post_id > 0 && current_user_can( 'edit_post', $post_id ) ) {
+								$raw_edit = get_edit_post_link( $post_id, 'raw' );
+								if ( is_string( $raw_edit ) && '' !== $raw_edit ) {
+									$edit_url = $raw_edit;
+								}
+							}
+						?>
+							<tr>
+								<td>
+									<?php if ( '' !== $edit_url ) : ?>
+										<a href="<?php echo esc_url( $edit_url ); ?>"><strong><?php echo esc_html( $title ); ?></strong></a>
+									<?php elseif ( '' !== $permalink ) : ?>
+										<a href="<?php echo esc_url( $permalink ); ?>" target="_blank" rel="noopener noreferrer"><strong><?php echo esc_html( $title ); ?></strong></a>
+									<?php else : ?>
+										<strong><?php echo esc_html( $title ); ?></strong>
+									<?php endif; ?>
+								</td>
+								<td style="text-align:right;"><?php echo esc_html( number_format_i18n( (int) $p['shown'] ) ); ?></td>
+								<td style="text-align:right;"><?php echo esc_html( number_format_i18n( (int) $p['confirmed'] ) ); ?></td>
+								<td style="text-align:right;"><?php echo esc_html( number_format_i18n( (int) $p['rejected'] ) ); ?></td>
+								<td style="text-align:right;">
+									<span class="wpam-top-pct"><?php echo esc_html( sprintf( '%.1f%%', (float) $p['confirmation_rate'] ) ); ?></span>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+						</tbody>
+					</table>
+				</div>
+			<?php endif; ?>
+		</div>
+		<?php
 	}
 }

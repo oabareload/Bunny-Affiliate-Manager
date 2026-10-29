@@ -66,6 +66,12 @@ class Activator {
 			update_option( Plugin::VIEWS_SCHEMA_VERSION_OPTION, Plugin::VIEWS_SCHEMA_TARGET_VERSION );
 		}
 
+		// v2.0.0+: crear tabla SQL de eventos del Age Gate (NSFW Interstitial).
+		$age_gate_schema_ok = Content_Protection\Age_Gate_Events_Table::create_table();
+		if ( $age_gate_schema_ok ) {
+			update_option( Content_Protection\Age_Gate_Events_Table::SCHEMA_VERSION_OPTION, Content_Protection\Age_Gate_Events_Table::SCHEMA_TARGET_VERSION );
+		}
+
 		// v1.7.5: Bunny Score — programar la generación semanal de estadísticas
 		// históricas. IMPORTANTE: en la propia petición de activación, 'plugins_loaded'
 		// ya se disparó ANTES de que este plugin apareciera en active_plugins, así que

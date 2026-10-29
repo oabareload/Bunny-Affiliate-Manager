@@ -42,6 +42,8 @@ class Age_Gate_Renderer {
 		$message      = isset( $data['message'] ) ? trim( (string) $data['message'] ) : '';
 		$confirm_text = isset( $data['confirm_text'] ) ? trim( (string) $data['confirm_text'] ) : '';
 		$reject_text  = isset( $data['reject_text'] ) ? trim( (string) $data['reject_text'] ) : '';
+		$utm_source   = isset( $data['utm_source'] ) ? sanitize_text_field( (string) $data['utm_source'] ) : '';
+		$utm_hash     = isset( $data['utm_hash'] ) ? sanitize_text_field( (string) $data['utm_hash'] ) : '';
 
 		$message      = esc_html( '' !== $message ? $message : __( 'Esta publicación contiene material clasificado para adultos. Debes ser mayor de edad para acceder.', 'wp-affiliatemanager' ) );
 		$confirm_text = esc_html( '' !== $confirm_text ? $confirm_text : __( 'Tengo 18 años o más — Entrar', 'wp-affiliatemanager' ) );
@@ -170,6 +172,10 @@ class Age_Gate_Renderer {
 
 	<form class="wpam-age-gate-form" method="POST" action="<?php echo $action_url; ?>">
 		<input type="hidden" name="wpam_age_gate_nonce" value="<?php echo $nonce; ?>">
+		<?php if ( '' !== $utm_source && 'direct' !== $utm_source && '' !== $utm_hash ) : ?>
+			<input type="hidden" name="wpam_age_gate_utm" value="<?php echo esc_attr( $utm_source ); ?>">
+			<input type="hidden" name="wpam_age_gate_utm_hash" value="<?php echo esc_attr( $utm_hash ); ?>">
+		<?php endif; ?>
 		<button
 			type="submit"
 			name="wpam_age_gate_action"

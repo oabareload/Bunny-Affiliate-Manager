@@ -18,6 +18,7 @@
 namespace WP_AffiliateManager\Admin;
 
 use WP_AffiliateManager\Analytics\Score_Query;
+use WP_AffiliateManager\Content_Protection\Age_Gate_Query;
 use WP_AffiliateManager\Frontend\Top_Posts_Query;
 use WP_AffiliateManager\Views\Resource_Resolver;
 use WP_AffiliateManager\Views\Views_Query;
@@ -52,9 +53,14 @@ class Analytics_Screen {
 		$views_stats     = Views_Query::get_global_stats_cached();
 		$default_views_resource_type = 'global';
 
+		$age_gate_global_stats = Age_Gate_Query::get_global_stats_cached();
+		$age_gate_stats        = Age_Gate_Query::get_stats_cached( 'total' );
+		$age_gate_utm          = Age_Gate_Query::get_utm_breakdown_cached( 'total', 20 );
+		$age_gate_posts        = Age_Gate_Query::get_top_posts_cached( 'total', 10 );
+
 		$top_scored     = Score_Query::get_cached( 'total', 10 );
 		$top_affiliates = Top_Posts_Query::get_top_affiliates( 'total', 10 );
-		$top_clicked    = Top_Posts_Query::get_cached( 'total', 10 );
+		$top_clicked    = self::attach_ctr_to_clicked_posts( Top_Posts_Query::get_cached( 'total', 10 ), 'total' );
 		$top_viewed     = Views_Query::get_global_cached( 'total', 10 );
 		$utm_sources    = Views_Query::get_utm_sources( 'total', 10 );
 
@@ -79,10 +85,24 @@ class Analytics_Screen {
 				<button type="button" class="wpam-tab-item" data-tab="views" role="tab" aria-selected="false">
 					<?php esc_html_e( 'Views', 'wp-affiliatemanager' ); ?>
 				</button>
+				<button type="button" class="wpam-tab-item" data-tab="age_gate" role="tab" aria-selected="false">
+					<?php esc_html_e( 'NSFW Gate', 'wp-affiliatemanager' ); ?>
+				</button>
 			</div>
 
 			<!-- ============================== Tab: Score ============================== -->
 			<div class="wpam-tab-panel wpam-tab-panel--active" data-tab-panel="score">
+				<p class="wpam-analytics-formula-note" style="margin: 0 0 16px; font-size: 13px; color: var(--wpam-gray-600, #475569);">
+					<?php
+					printf(
+						/* translators: 1: views factor, 2: clicks factor */
+						esc_html__( 'Score formula: Post Views × %1$d + Clicks × %2$d', 'wp-affiliatemanager' ),
+						(int) \WP_AffiliateManager\Analytics\Score_Query::DEFAULT_FACTOR_VIEWS,
+						(int) \WP_AffiliateManager\Analytics\Score_Query::DEFAULT_FACTOR_CLICKS
+					);
+					?>
+				</p>
+
 				<div class="wpam-stats-grid wpam-analytics-cards--score">
 					<?php Analytics_Renderer::render_stat_card( __( 'Today', 'wp-affiliatemanager' ), number_format_i18n( $score_stats['today'] ), '⭐' ); ?>
 					<?php Analytics_Renderer::render_stat_card( __( 'Last 7 Days', 'wp-affiliatemanager' ), number_format_i18n( $score_stats['week'] ), '📅' ); ?>
@@ -144,6 +164,29 @@ class Analytics_Screen {
 				<?php Analytics_Renderer::render_recent_views_section( $recent_views ); ?>
 			</div>
 
+			<!-- ============================== Tab: NSFW Gate ============================== -->
+			<div class="wpam-tab-panel" data-tab-panel="age_gate" style="display:none;">
+				<div class="wpam-stats-grid wpam-analytics-cards--age-gate">
+					<?php Analytics_Renderer::render_stat_card( __( 'Today', 'wp-affiliatemanager' ), number_format_i18n( $age_gate_global_stats['today']['shown'] ), '🔞' ); ?>
+					<?php Analytics_Renderer::render_stat_card( __( 'Last 7 Days', 'wp-affiliatemanager' ), number_format_i18n( $age_gate_global_stats['week']['shown'] ), '📅' ); ?>
+					<?php Analytics_Renderer::render_stat_card( __( 'Last 30 Days', 'wp-affiliatemanager' ), number_format_i18n( $age_gate_global_stats['month']['shown'] ), '🗓️' ); ?>
+					<?php Analytics_Renderer::render_stat_card( __( 'All Time', 'wp-affiliatemanager' ), number_format_i18n( $age_gate_global_stats['total']['shown'] ), '📊' ); ?>
+				</div>
+
+				<div class="wpam-analytics-age-gate-summary-col">
+					<?php Analytics_Renderer::render_age_gate_summary( $age_gate_stats, 'total' ); ?>
+				</div>
+
+				<div class="wpam-analytics-cols">
+					<div class="wpam-analytics-col wpam-analytics-age-gate-utm-col">
+						<?php Analytics_Renderer::render_age_gate_utm_section( $age_gate_utm ); ?>
+					</div>
+					<div class="wpam-analytics-col wpam-analytics-age-gate-posts-col">
+						<?php Analytics_Renderer::render_age_gate_top_posts_section( $age_gate_posts ); ?>
+					</div>
+				</div>
+			</div>
+
 		</div>
 		<?php
 	}
@@ -197,7 +240,7 @@ class Analytics_Screen {
 
 			case 'clicks':
 				$affiliates  = Top_Posts_Query::get_top_affiliates( $range, 10 );
-				$clicked     = Top_Posts_Query::get_cached( $range, 10 );
+				$clicked     = self::attach_ctr_to_clicked_posts( Top_Posts_Query::get_cached( $range, 10 ), $range );
 				$range_total = Top_Posts_Query::get_range_total( $range );
 
 				ob_start();
@@ -270,6 +313,37 @@ class Analytics_Screen {
 				) );
 				break;
 
+			case 'age_gate':
+				$stats         = Age_Gate_Query::get_stats( $range );
+				$utm_breakdown = Age_Gate_Query::get_utm_breakdown( $range, 20 );
+				$top_posts     = Age_Gate_Query::get_top_posts( $range, 10 );
+				$global_stats  = Age_Gate_Query::get_global_stats();
+
+				ob_start();
+				Analytics_Renderer::render_age_gate_summary( $stats, $range );
+				$summary_html = ob_get_clean();
+
+				ob_start();
+				Analytics_Renderer::render_age_gate_utm_section( $utm_breakdown );
+				$utm_html = ob_get_clean();
+
+				ob_start();
+				Analytics_Renderer::render_age_gate_top_posts_section( $top_posts );
+				$top_posts_html = ob_get_clean();
+
+				wp_send_json_success( array(
+					'summary_html'   => $summary_html,
+					'utm_html'       => $utm_html,
+					'top_posts_html' => $top_posts_html,
+					'stats'          => array(
+						'today' => number_format_i18n( $global_stats['today']['shown'] ),
+						'week'  => number_format_i18n( $global_stats['week']['shown'] ),
+						'month' => number_format_i18n( $global_stats['month']['shown'] ),
+						'total' => number_format_i18n( $global_stats['total']['shown'] ),
+					),
+				) );
+				break;
+
 			case 'score':
 			default:
 				$scored = Score_Query::get_cached( $range, 10 );
@@ -283,5 +357,36 @@ class Analytics_Screen {
 				) );
 				break;
 		}
+	}
+
+	/**
+	 * Enriquece las publicaciones más clickeadas con su conteo de vistas y CTR estimado.
+	 *
+	 * Fórmula: CTR = (clics / vistas) * 100 si vistas > 0, de lo contrario null.
+	 *
+	 * @since  2.2.0
+	 * @param  array[] $clicked Posts devueltos por Top_Posts_Query::get_cached().
+	 * @param  string  $range   'today' | 'week' | 'month' | 'total'.
+	 * @return array[]
+	 */
+	private static function attach_ctr_to_clicked_posts( array $clicked, string $range ): array {
+		if ( empty( $clicked ) ) {
+			return array();
+		}
+
+		$post_ids  = wp_list_pluck( $clicked, 'id' );
+		$views_map = Views_Query::get_view_counts_for_post_ids( $post_ids, $range );
+
+		foreach ( $clicked as &$item ) {
+			$post_id     = (int) ( $item['id'] ?? 0 );
+			$views_count = $views_map[ $post_id ] ?? 0;
+			$click_count = (int) ( $item['click_count'] ?? 0 );
+
+			$item['view_count'] = $views_count;
+			$item['ctr']        = $views_count > 0 ? ( ( $click_count / $views_count ) * 100 ) : null;
+		}
+		unset( $item );
+
+		return $clicked;
 	}
 }

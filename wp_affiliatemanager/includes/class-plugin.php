@@ -99,6 +99,9 @@ require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-admin.ph
 require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/class-bunny-score-screen.php';
 
 // --- NSFW Age Gate & Content Protection ---
+require_once WPAM_PLUGIN_PATH . 'includes/content-protection/class-age-gate-events-table.php';
+require_once WPAM_PLUGIN_PATH . 'includes/content-protection/class-age-gate-tracker.php';
+require_once WPAM_PLUGIN_PATH . 'includes/content-protection/class-age-gate-query.php';
 require_once WPAM_PLUGIN_PATH . 'includes/content-protection/class-age-gate-renderer.php';
 require_once WPAM_PLUGIN_PATH . 'includes/content-protection/class-age-gate.php';
 
@@ -278,6 +281,9 @@ final class Plugin {
 		// actualización del plugin, no en cada carga de admin.
 		$this->loader->add_action( 'admin_init', $this, 'maybe_upgrade_views_schema' );
 
+		// v2.0.0+: esquema de eventos del Age Gate (NSFW Interstitial).
+		$this->loader->add_action( 'admin_init', $this, 'maybe_upgrade_age_gate_schema' );
+
 		// FASE 2 — Affiliates screen.
 		$affiliates_screen = new Admin\Affiliates_Screen();
 		$this->loader->add_action( 'admin_init', $affiliates_screen, 'handle_actions' );
@@ -438,6 +444,23 @@ final class Plugin {
 
 		if ( $migrated ) {
 			update_option( self::VIEWS_SCHEMA_VERSION_OPTION, self::VIEWS_SCHEMA_TARGET_VERSION );
+		}
+	}
+
+	/**
+	 * Crea o actualiza la tabla de eventos de Age Gate si no está en la versión objetivo.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function maybe_upgrade_age_gate_schema(): void {
+		if ( get_option( Content_Protection\Age_Gate_Events_Table::SCHEMA_VERSION_OPTION ) === Content_Protection\Age_Gate_Events_Table::SCHEMA_TARGET_VERSION ) {
+			return;
+		}
+
+		$created = Content_Protection\Age_Gate_Events_Table::create_table();
+		if ( $created ) {
+			update_option( Content_Protection\Age_Gate_Events_Table::SCHEMA_VERSION_OPTION, Content_Protection\Age_Gate_Events_Table::SCHEMA_TARGET_VERSION );
 		}
 	}
 
