@@ -24,6 +24,7 @@ namespace WP_AffiliateManager\Redirect;
 use WP_AffiliateManager\Posts\Post_Links;
 use WP_AffiliateManager\Affiliates\Repository;
 use WP_AffiliateManager\Views\Views;
+use WP_AffiliateManager\Captcha\Recaptcha_V3;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -227,7 +228,12 @@ class Redirect_Manager {
 	 * @param  int    $goa_affiliate_id
 	 * @return void
 	 */
-	private function continue_authorized_redirect( array $destination, string $token, int $goa_post_id = 0, int $goa_affiliate_id = 0 ): void {
+	private function continue_authorized_redirect(
+		array $destination,
+		string $token,
+		int $goa_post_id = 0,
+		int $goa_affiliate_id = 0
+	): void {
 		$options        = get_option( WPAM_OPTION_KEY, array() );
 		$exclude_admins = ! empty( $options['general']['exclude_admins_from_analytics'] );
 
@@ -294,8 +300,7 @@ class Redirect_Manager {
 
 	/**
 	 * Gestiona el caso en que el navegador no tiene una View válida para este
-	 * recurso. El comportamiento seguro es bloquear el redirect y exigir
-	 * validación reCAPTCHA antes de registrar View o Click.
+	 * recurso. Con reCAPTCHA v3, exige evaluación server-side antes de registrar View o Click.
 	 *
 	 * @param  array  $destination
 	 * @param  string $token
@@ -304,30 +309,49 @@ class Redirect_Manager {
 	 * @return void
 	 */
 	private function handle_missing_view_gate( array $destination, string $token, int $goa_post_id = 0, int $goa_affiliate_id = 0 ): void {
-		$options = get_option( WPAM_OPTION_KEY, array() );
-		$recaptcha_enabled = ! empty( $options['recaptcha']['enabled'] ?? false );
-
-		if ( ! $recaptcha_enabled ) {
-			status_header( 403 );
-			echo '<!doctype html><html><head><meta charset="UTF-8"><title>Access denied</title></head><body><p>' . esc_html__( 'A valid page view is required before this affiliate link may be followed.', 'wp-affiliatemanager' ) . '</p></body></html>';
-			exit;
+		if ( ! Recaptcha_V3::is_active() ) {
+			wp_die(
+				esc_html__( 'A valid page view is required before this affiliate link may be followed.', 'wp-affiliatemanager' ),
+				esc_html__( 'Access denied', 'wp-affiliatemanager' ),
+				array( 'response' => 403 )
+			);
 		}
 
-		if ( 'POST' === strtoupper( (string) $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
-			$token_response = isset( $_POST['g-recaptcha-response'] ) ? sanitize_text_field( wp_unslash( $_POST['g-recaptcha-response'] ) ) : '';
-			if ( '' !== $token_response && $this->verify_recaptcha( $token_response ) ) {
+		if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) {
+			$token_response = isset( $_POST['wpam_recaptcha_token'] )
+				? sanitize_text_field( wp_unslash( $_POST['wpam_recaptcha_token'] ) )
+				: ( isset( $_POST['g-recaptcha-response'] ) ? sanitize_text_field( wp_unslash( $_POST['g-recaptcha-response'] ) ) : '' );
+
+			$result = Recaptcha_V3::verify( $token_response, Recaptcha_V3::ACTION_AFFILIATE_GO );
+
+			if ( $result['success'] ) {
+				if ( $result['blocked'] ) {
+					wp_die(
+						esc_html__( 'Puntuación de seguridad inferior al umbral mínimo requerido.', 'wp-affiliatemanager' ),
+						esc_html__( 'Access denied', 'wp-affiliatemanager' ),
+						array( 'response' => 403 )
+					);
+				}
+
 				$views = new Views();
 				$views->record_valid_view( 'post', (int) $destination['post_id'] );
 				$this->continue_authorized_redirect( $destination, $token, $goa_post_id, $goa_affiliate_id );
 				return;
 			}
+
+			// Error de evaluación o verificación rechazada.
+			wp_die(
+				esc_html__( 'No se pudo verificar la seguridad de la solicitud. Por favor intenta de nuevo.', 'wp-affiliatemanager' ),
+				esc_html__( 'Verification error', 'wp-affiliatemanager' ),
+				array( 'response' => 403 )
+			);
 		}
 
 		$this->render_recaptcha_page( $destination, $token, $goa_post_id, $goa_affiliate_id );
 	}
 
 	/**
-	 * Renderiza una pantalla con reCAPTCHA v2 Checkbox antes de permitir el redirect.
+	 * Renderiza una pantalla de verificación con Google reCAPTCHA v3 antes de permitir el redirect.
 	 *
 	 * @param  array  $destination
 	 * @param  string $token
@@ -336,8 +360,7 @@ class Redirect_Manager {
 	 * @return void
 	 */
 	private function render_recaptcha_page( array $destination, string $token, int $goa_post_id = 0, int $goa_affiliate_id = 0 ): void {
-		$options = get_option( WPAM_OPTION_KEY, array() );
-		$site_key = sanitize_text_field( $options['recaptcha']['site_key'] ?? '' );
+		$site_key = Recaptcha_V3::get_site_key();
 		$action_url = add_query_arg(
 			array(
 				self::QUERY_VAR => $token,
@@ -348,9 +371,11 @@ class Redirect_Manager {
 		);
 
 		if ( '' === $site_key ) {
-			status_header( 403 );
-			echo '<!doctype html><html><head><meta charset="UTF-8"><title>reCAPTCHA not configured</title></head><body><p>' . esc_html__( 'Google reCAPTCHA is enabled but not configured. Please contact the site administrator.', 'wp-affiliatemanager' ) . '</p></body></html>';
-			exit;
+			wp_die(
+				esc_html__( 'Google reCAPTCHA v3 is enabled but not configured. Please contact the site administrator.', 'wp-affiliatemanager' ),
+				esc_html__( 'reCAPTCHA not configured', 'wp-affiliatemanager' ),
+				array( 'response' => 403 )
+			);
 		}
 
 		header( 'Content-Type: text/html; charset=UTF-8' );
@@ -363,67 +388,46 @@ class Redirect_Manager {
 			<title><?php esc_html_e( 'Verify before continuing', 'wp-affiliatemanager' ); ?></title>
 			<style>
 				body{font-family:Arial,sans-serif;background:#f3f4f6;color:#1f2937;padding:32px 16px;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0} 
-				.card{max-width:460px;background:#fff;border-radius:12px;padding:24px;box-shadow:0 12px 30px rgba(0,0,0,.08)}
-				h1{margin-top:0;font-size:1.4rem} p{color:#4b5563;line-height:1.5} .g-recaptcha{margin:20px 0}.btn{display:inline-block;padding:10px 16px;border-radius:8px;background:#111827;color:#fff;text-decoration:none}
+				.card{max-width:460px;background:#fff;border-radius:12px;padding:24px;box-shadow:0 12px 30px rgba(0,0,0,.08);text-align:center}
+				h1{margin-top:0;font-size:1.4rem} p{color:#4b5563;line-height:1.5}
+				.spinner{width:36px;height:36px;border:3px solid #e5e7eb;border-top-color:#111827;border-radius:50%;animation:spin 1s linear infinite;margin:16px auto}
+				@keyframes spin{to{transform:rotate(360deg)}}
+				.btn{display:inline-block;padding:10px 16px;border-radius:8px;background:#111827;color:#fff;text-decoration:none;border:none;cursor:pointer;font-size:15px;font-weight:600}
 			</style>
-			<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+			<script src="https://www.google.com/recaptcha/api.js?render=<?php echo esc_attr( $site_key ); ?>"></script>
 		</head>
 		<body>
 			<div class="card">
-				<h1><?php esc_html_e( 'Confirm you are human', 'wp-affiliatemanager' ); ?></h1>
-				<p><?php esc_html_e( 'A valid page view is required before this affiliate link can be opened.', 'wp-affiliatemanager' ); ?></p>
-				<form method="post" action="<?php echo esc_url( $action_url ); ?>">
+				<div class="spinner" aria-hidden="true"></div>
+				<h1><?php esc_html_e( 'Verificando seguridad...', 'wp-affiliatemanager' ); ?></h1>
+				<p><?php esc_html_e( 'Un momento mientras validamos tu solicitud antes de continuar al destino.', 'wp-affiliatemanager' ); ?></p>
+				<form id="wpam-recaptcha-form" method="post" action="<?php echo esc_url( $action_url ); ?>">
 					<?php if ( '' !== $token ) : ?><input type="hidden" name="wpam_go" value="<?php echo esc_attr( $token ); ?>" /><?php endif; ?>
 					<?php if ( $goa_post_id > 0 ) : ?><input type="hidden" name="wpam_goa_post" value="<?php echo esc_attr( (string) $goa_post_id ); ?>" /><?php endif; ?>
 					<?php if ( $goa_affiliate_id > 0 ) : ?><input type="hidden" name="wpam_goa_affiliate" value="<?php echo esc_attr( (string) $goa_affiliate_id ); ?>" /><?php endif; ?>
-					<div class="g-recaptcha" data-sitekey="<?php echo esc_attr( $site_key ); ?>"></div>
-					<p><button type="submit" class="btn"><?php esc_html_e( 'Continue', 'wp-affiliatemanager' ); ?></button></p>
+					<input type="hidden" name="wpam_recaptcha_token" id="wpam_recaptcha_token" value="" />
+					<p><button type="submit" id="wpam-continue-btn" class="btn"><?php esc_html_e( 'Continuar', 'wp-affiliatemanager' ); ?></button></p>
 				</form>
+				<script>
+					(function(){
+						if (typeof grecaptcha !== 'undefined' && grecaptcha.ready) {
+							grecaptcha.ready(function(){
+								grecaptcha.execute('<?php echo esc_js( $site_key ); ?>', {action: '<?php echo esc_js( Recaptcha_V3::ACTION_AFFILIATE_GO ); ?>'})
+									.then(function(token){
+										var el = document.getElementById('wpam_recaptcha_token');
+										if (el) { el.value = token; }
+										var form = document.getElementById('wpam-recaptcha-form');
+										if (form) { form.submit(); }
+									}).catch(function(){});
+							});
+						}
+					})();
+				</script>
 			</div>
 		</body>
 		</html>
 		<?php
 		exit;
-	}
-
-	/**
-	 * Verifica el token de Google reCAPTCHA v2 Checkbox server-side.
-	 *
-	 * @param  string $response
-	 * @return bool
-	 */
-	private function verify_recaptcha( string $response ): bool {
-		$options = get_option( WPAM_OPTION_KEY, array() );
-		$secret = sanitize_text_field( $options['recaptcha']['secret_key'] ?? '' );
-		if ( '' === $secret || '' === $response ) {
-			return false;
-		}
-
-		$body = array(
-			'secret'   => $secret,
-			'response' => $response,
-			'remoteip' => isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '',
-		);
-
-		$resp = wp_remote_post(
-			'https://www.google.com/recaptcha/api/siteverify',
-			array(
-				'timeout' => 10,
-				'body'    => $body,
-			)
-		);
-
-		if ( is_wp_error( $resp ) ) {
-			return false;
-		}
-
-		$code = wp_remote_retrieve_response_code( $resp );
-		if ( 200 !== $code ) {
-			return false;
-		}
-
-		$data = json_decode( wp_remote_retrieve_body( $resp ), true );
-		return is_array( $data ) && ! empty( $data['success'] );
 	}
 
 	/**

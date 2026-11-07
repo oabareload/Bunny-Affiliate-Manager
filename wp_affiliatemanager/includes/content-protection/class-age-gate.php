@@ -289,6 +289,25 @@ class Age_Gate {
 			}
 
 			if ( 'confirm' === $action ) {
+				if ( class_exists( '\WP_AffiliateManager\Captcha\Recaptcha_V3' ) && \WP_AffiliateManager\Captcha\Recaptcha_V3::is_active() ) {
+					$token  = isset( $_POST['wpam_recaptcha_token'] ) ? sanitize_text_field( wp_unslash( $_POST['wpam_recaptcha_token'] ) ) : '';
+					$result = \WP_AffiliateManager\Captcha\Recaptcha_V3::verify( $token, \WP_AffiliateManager\Captcha\Recaptcha_V3::ACTION_AGE_GATE_CONFIRM );
+
+					if ( ! $result['success'] ) {
+						// Error de evaluación, token ausente o fallo devuelto por Google.
+						$redirect_url = add_query_arg( 'wpam_ag_error', 'eval_error', get_permalink( $post_id ) );
+						wp_safe_redirect( $redirect_url, 303 );
+						exit;
+					}
+
+					if ( $result['blocked'] ) {
+						// Puntuación inferior al umbral (cuando la aplicación del umbral está activada).
+						$redirect_url = add_query_arg( 'wpam_ag_error', 'low_score', get_permalink( $post_id ) );
+						wp_safe_redirect( $redirect_url, 303 );
+						exit;
+					}
+				}
+
 				Age_Gate_Tracker::record_event( 'confirmed', $post_id, $utm_source );
 				$this->set_signed_cookie();
 				wp_safe_redirect( get_permalink( $post_id ), 303 );
@@ -312,6 +331,15 @@ class Age_Gate {
 		$utm_source = Age_Gate_Tracker::normalize_utm_source( $raw_utm );
 		$utm_hash   = Age_Gate_Tracker::hash_utm_source( $utm_source, $post_id );
 
+		// Mensaje de error si venimos de un intento fallido de reCAPTCHA.
+		$error_code    = isset( $_GET['wpam_ag_error'] ) ? sanitize_key( wp_unslash( $_GET['wpam_ag_error'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$error_message = '';
+		if ( 'low_score' === $error_code ) {
+			$error_message = __( 'La verificación de seguridad obtuvo una puntuación inferior al umbral mínimo requerido. Por favor intenta de nuevo.', 'wp-affiliatemanager' );
+		} elseif ( 'eval_error' === $error_code ) {
+			$error_message = __( 'No se pudo verificar la solicitud con Google reCAPTCHA. Por favor intenta de nuevo.', 'wp-affiliatemanager' );
+		}
+
 		// Registrar evento 'shown' en el momento en que se sirve el interstitial.
 		Age_Gate_Tracker::record_event( 'shown', $post_id, $utm_source );
 
@@ -325,14 +353,15 @@ class Age_Gate {
 		$renderer = new Age_Gate_Renderer();
 		$renderer->render(
 			array(
-				'action_url'   => get_permalink( $post_id ),
-				'nonce'        => wp_create_nonce( 'wpam_age_gate_' . $post_id ),
-				'title'        => get_the_title( $post_id ),
-				'message'      => '' !== $message ? $message : __( 'Esta publicación contiene material clasificado para adultos. Debes ser mayor de edad para acceder.', 'wp-affiliatemanager' ),
-				'confirm_text' => '' !== $confirm_text ? $confirm_text : __( 'Tengo 18 años o más — Entrar', 'wp-affiliatemanager' ),
-				'reject_text'  => '' !== $reject_text ? $reject_text : __( 'Soy menor de 18 años — Salir a contenido seguro', 'wp-affiliatemanager' ),
-				'utm_source'   => $utm_source,
-				'utm_hash'     => $utm_hash,
+				'action_url'    => get_permalink( $post_id ),
+				'nonce'         => wp_create_nonce( 'wpam_age_gate_' . $post_id ),
+				'title'         => get_the_title( $post_id ),
+				'message'       => '' !== $message ? $message : __( 'Esta publicación contiene material clasificado para adultos. Debes ser mayor de edad para acceder.', 'wp-affiliatemanager' ),
+				'confirm_text'  => '' !== $confirm_text ? $confirm_text : __( 'Tengo 18 años o más — Entrar', 'wp-affiliatemanager' ),
+				'reject_text'   => '' !== $reject_text ? $reject_text : __( 'Soy menor de 18 años — Salir a contenido seguro', 'wp-affiliatemanager' ),
+				'utm_source'    => $utm_source,
+				'utm_hash'      => $utm_hash,
+				'error_message' => $error_message,
 			)
 		);
 		exit;

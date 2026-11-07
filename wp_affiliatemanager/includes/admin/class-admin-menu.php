@@ -618,6 +618,23 @@ class Admin_Menu {
 			<?php
 		}
 
+		if ( isset( $_GET['wpam_age_gate_reset'] ) && '1' === $_GET['wpam_age_gate_reset'] ) {
+			$deleted = absint( $_GET['wpam_deleted'] ?? 0 );
+			?>
+			<div class="notice notice-success is-dismissible" style="margin:16px 0 0;">
+				<p>
+					<?php
+					printf(
+						/* translators: %d: deleted age gate event records */
+						esc_html__( 'Age Gate statistics reset successfully. %d record(s) deleted.', 'wp-affiliatemanager' ),
+						$deleted
+					);
+					?>
+				</p>
+			</div>
+			<?php
+		}
+
 		if ( isset( $_GET['wpam_pvc_imported'] ) && '1' === $_GET['wpam_pvc_imported'] ) {
 			$new     = absint( $_GET['wpam_pvc_new']     ?? 0 );
 			$updated = absint( $_GET['wpam_pvc_updated'] ?? 0 );
@@ -698,6 +715,20 @@ class Admin_Menu {
 					<?php wp_nonce_field( 'wpam_clear_views', 'wpam_nonce' ); ?>
 					<button type="submit" class="button button-secondary">
 						<?php esc_html_e( 'Clear Views', 'wp-affiliatemanager' ); ?>
+					</button>
+				</form>
+			</div>
+
+			<div class="wpam-maintenance-row">
+				<div class="wpam-maintenance-info">
+					<strong><?php esc_html_e( 'Reiniciar estadísticas del Age Gate', 'wp-affiliatemanager' ); ?></strong>
+					<p class="description"><?php esc_html_e( 'Elimina exclusivamente las estadísticas del NSFW Gate (mostrados, confirmados y rechazados). Views, Clicks, configuración y afiliados se conservan intactos.', 'wp-affiliatemanager' ); ?></p>
+				</div>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return window.confirm('<?php echo esc_js( __( '¿Reiniciar todas las estadísticas del Age Gate? Esta acción no se puede deshacer y no afectará a views, clicks ni afiliados.', 'wp-affiliatemanager' ) ); ?>');">
+					<input type="hidden" name="action" value="wpam_reset_age_gate_stats" />
+					<?php wp_nonce_field( 'wpam_reset_age_gate_stats', 'wpam_nonce' ); ?>
+					<button type="submit" class="button button-secondary">
+						<?php esc_html_e( 'Reiniciar Age Gate', 'wp-affiliatemanager' ); ?>
 					</button>
 				</form>
 			</div>
@@ -888,6 +919,52 @@ class Admin_Menu {
 				'wpam_deleted'       => $clicks_rows + $deleted_views,
 				'wpam_deleted_clicks' => $clicks_rows,
 				'wpam_deleted_views'  => $deleted_views,
+			),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	/**
+	 * Restablece exclusivamente las estadísticas del Age Gate.
+	 *
+	 * Elimina todos los registros de {prefix}wpam_age_gate_events, invalida
+	 * la caché asociada y redirige a la página de Maintenance.
+	 *
+	 * @since 2.3.0
+	 * @return void
+	 */
+	public function handle_reset_age_gate_stats(): void {
+		if (
+			! isset( $_POST['wpam_nonce'] ) ||
+			! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wpam_nonce'] ) ), 'wpam_reset_age_gate_stats' )
+		) {
+			wp_die( esc_html__( 'Security check failed.', 'wp-affiliatemanager' ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to perform this action.', 'wp-affiliatemanager' ) );
+		}
+
+		global $wpdb;
+		$table = \WP_AffiliateManager\Content_Protection\Age_Gate_Events_Table::table_name();
+
+		$deleted = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i', $table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
+		// Invalidación de caché en el grupo 'wpam'.
+		wp_cache_delete( 'wpam_age_gate_global_stats', 'wpam' );
+		foreach ( array( 'today', 'week', 'month', 'year', 'total' ) as $r ) {
+			wp_cache_delete( 'wpam_age_gate_stats_' . $r, 'wpam' );
+			wp_cache_delete( 'wpam_age_gate_top_posts_' . $r . '_10', 'wpam' );
+			wp_cache_delete( 'wpam_age_gate_utm_' . $r . '_20', 'wpam' );
+		}
+
+		wp_safe_redirect( add_query_arg(
+			array(
+				'page'                => 'wpam-maintenance',
+				'wpam_age_gate_reset' => '1',
+				'wpam_deleted'        => $deleted,
 			),
 			admin_url( 'admin.php' )
 		) );

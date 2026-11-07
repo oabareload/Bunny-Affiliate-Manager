@@ -48,6 +48,12 @@ class Age_Gate_Renderer {
 		$message      = esc_html( '' !== $message ? $message : __( 'Esta publicación contiene material clasificado para adultos. Debes ser mayor de edad para acceder.', 'wp-affiliatemanager' ) );
 		$confirm_text = esc_html( '' !== $confirm_text ? $confirm_text : __( 'Tengo 18 años o más — Entrar', 'wp-affiliatemanager' ) );
 		$reject_text  = esc_html( '' !== $reject_text ? $reject_text : __( 'Soy menor de 18 años — Salir a contenido seguro', 'wp-affiliatemanager' ) );
+		$error_message = isset( $data['error_message'] ) ? trim( (string) $data['error_message'] ) : '';
+
+		$v3_site_key = '';
+		if ( class_exists( '\WP_AffiliateManager\Captcha\Recaptcha_V3' ) && \WP_AffiliateManager\Captcha\Recaptcha_V3::is_active() ) {
+			$v3_site_key = \WP_AffiliateManager\Captcha\Recaptcha_V3::get_site_key();
+		}
 
 		$css_url = defined( 'WPAM_PLUGIN_URL' )
 			? WPAM_PLUGIN_URL . 'assets/css/interstitial.css?v=' . WPAM_VERSION
@@ -70,6 +76,9 @@ class Age_Gate_Renderer {
 		?>
 <?php if ( $css_url ) : ?>
 <link rel="stylesheet" href="<?php echo esc_url( $css_url ); ?>">
+<?php endif; ?>
+<?php if ( '' !== $v3_site_key ) : ?>
+<script src="https://www.google.com/recaptcha/api.js?render=<?php echo esc_attr( $v3_site_key ); ?>"></script>
 <?php endif; ?>
 <style>
 	:root {
@@ -170,8 +179,15 @@ class Age_Gate_Renderer {
 		<?php echo $message; ?>
 	</p>
 
+	<?php if ( '' !== $error_message ) : ?>
+		<div class="wpam-age-gate-error" style="background:#fee2e2;color:#991b1b;padding:10px 14px;border-radius:8px;font-size:13px;line-height:1.4;margin:8px 0;border:1px solid #f87171;">
+			<?php echo esc_html( $error_message ); ?>
+		</div>
+	<?php endif; ?>
+
 	<form class="wpam-age-gate-form" method="POST" action="<?php echo $action_url; ?>">
 		<input type="hidden" name="wpam_age_gate_nonce" value="<?php echo $nonce; ?>">
+		<input type="hidden" name="wpam_recaptcha_token" id="wpam_recaptcha_token" value="">
 		<?php if ( '' !== $utm_source && 'direct' !== $utm_source && '' !== $utm_hash ) : ?>
 			<input type="hidden" name="wpam_age_gate_utm" value="<?php echo esc_attr( $utm_source ); ?>">
 			<input type="hidden" name="wpam_age_gate_utm_hash" value="<?php echo esc_attr( $utm_hash ); ?>">
@@ -197,6 +213,42 @@ class Age_Gate_Renderer {
 	<p class="wpam-age-gate-footer">
 		<?php esc_html_e( 'Al confirmar, se guardará una cookie en tu navegador para recordar tu verificación.', 'wp-affiliatemanager' ); ?>
 	</p>
+
+	<?php if ( '' !== $v3_site_key ) : ?>
+	<script>
+		(function(){
+			var form = document.querySelector('.wpam-age-gate-form');
+			if (!form) return;
+			var confirmBtn = form.querySelector('.wpam-age-gate-btn--confirm');
+			if (!confirmBtn) return;
+			confirmBtn.addEventListener('click', function(e) {
+				if (typeof grecaptcha !== 'undefined' && grecaptcha.ready) {
+					e.preventDefault();
+					confirmBtn.disabled = true;
+					confirmBtn.style.opacity = '0.7';
+					grecaptcha.ready(function() {
+						grecaptcha.execute('<?php echo esc_js( $v3_site_key ); ?>', {action: '<?php echo esc_js( \WP_AffiliateManager\Captcha\Recaptcha_V3::ACTION_AGE_GATE_CONFIRM ); ?>'})
+							.then(function(token) {
+								var tokenInput = document.getElementById('wpam_recaptcha_token');
+								if (tokenInput) tokenInput.value = token;
+								var actionInput = document.createElement('input');
+								actionInput.type = 'hidden';
+								actionInput.name = 'wpam_age_gate_action';
+								actionInput.value = 'confirm';
+								form.appendChild(actionInput);
+								form.submit();
+							})
+							.catch(function() {
+								confirmBtn.disabled = false;
+								confirmBtn.style.opacity = '';
+								form.submit();
+							});
+					});
+				}
+			});
+		})();
+	</script>
+	<?php endif; ?>
 
 </div>
 

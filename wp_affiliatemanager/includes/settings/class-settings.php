@@ -498,35 +498,51 @@ class Settings {
 		);
 
 		// ---------------------------------------------------------------------------
-		// 4. Sección: Google reCAPTCHA — v2 Checkbox
+		// 4. Sección: Google reCAPTCHA v3
 		// ---------------------------------------------------------------------------
 		add_settings_section(
 			'wpam_section_recaptcha',
-			__( 'Google reCAPTCHA', 'wp-affiliatemanager' ),
+			__( 'Google reCAPTCHA v3', 'wp-affiliatemanager' ),
 			array( $this, 'render_section_recaptcha' ),
 			self::INTERSTITIAL_PAGE_SLUG
 		);
 
 		add_settings_field(
 			'wpam_field_recaptcha_enabled',
-			__( 'Enable reCAPTCHA protection', 'wp-affiliatemanager' ),
+			__( 'Enable reCAPTCHA v3 evaluation', 'wp-affiliatemanager' ),
 			array( $this, 'render_field_recaptcha_enabled' ),
 			self::INTERSTITIAL_PAGE_SLUG,
 			'wpam_section_recaptcha'
 		);
 
 		add_settings_field(
-			'wpam_field_recaptcha_site_key',
-			__( 'Site Key', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_recaptcha_site_key' ),
+			'wpam_field_recaptcha_site_key_v3',
+			__( 'reCAPTCHA v3 Site Key', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_recaptcha_site_key_v3' ),
 			self::INTERSTITIAL_PAGE_SLUG,
 			'wpam_section_recaptcha'
 		);
 
 		add_settings_field(
-			'wpam_field_recaptcha_secret_key',
-			__( 'Secret Key', 'wp-affiliatemanager' ),
-			array( $this, 'render_field_recaptcha_secret_key' ),
+			'wpam_field_recaptcha_secret_key_v3',
+			__( 'reCAPTCHA v3 Secret Key', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_recaptcha_secret_key_v3' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_recaptcha'
+		);
+
+		add_settings_field(
+			'wpam_field_recaptcha_threshold',
+			__( 'Minimum Score Threshold', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_recaptcha_threshold' ),
+			self::INTERSTITIAL_PAGE_SLUG,
+			'wpam_section_recaptcha'
+		);
+
+		add_settings_field(
+			'wpam_field_recaptcha_enforce_threshold',
+			__( 'Threshold Enforcement', 'wp-affiliatemanager' ),
+			array( $this, 'render_field_recaptcha_enforce_threshold' ),
 			self::INTERSTITIAL_PAGE_SLUG,
 			'wpam_section_recaptcha'
 		);
@@ -634,7 +650,7 @@ class Settings {
 	 * @return void
 	 */
 	public function render_section_recaptcha(): void {
-		echo '<p>' . esc_html__( 'Protege los clicks que no tengan una View válida con Google reCAPTCHA v2 Checkbox.', 'wp-affiliatemanager' ) . '</p>';
+		echo '<p>' . esc_html__( 'Protege el NSFW Gate, vistas y enlaces de afiliados evaluando el tráfico con Google reCAPTCHA v3. Importante: debes registrar y utilizar claves específicas para reCAPTCHA v3 (las claves v2 no son válidas).', 'wp-affiliatemanager' ) . '</p>';
 	}
 
 	/**
@@ -1432,39 +1448,88 @@ class Settings {
 				value="1"
 				<?php checked( $value ); ?>
 			/>
-			<?php esc_html_e( 'Enable Google reCAPTCHA protection before redirecting when no valid View cookie exists.', 'wp-affiliatemanager' ); ?>
+			<?php esc_html_e( 'Activar evaluación con Google reCAPTCHA v3 para NSFW Gate, views y clicks.', 'wp-affiliatemanager' ); ?>
 		</label>
-		<p class="description"><?php esc_html_e( 'When disabled, the plugin does not allow a click to bypass the view gate without a valid cookie.', 'wp-affiliatemanager' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Permite evaluar la puntuación de riesgo en las solicitudes protegidas y clasificar las estadísticas en niveles 0-9.', 'wp-affiliatemanager' ); ?></p>
 		<?php
 	}
 
-	public function render_field_recaptcha_site_key(): void {
+	public function render_field_recaptcha_site_key_v3(): void {
 		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
-		$value   = $options['recaptcha']['site_key'] ?? '';
+		$value   = $options['recaptcha']['site_key_v3'] ?? '';
 		?>
 		<input
 			type="text"
-			name="<?php echo esc_attr( self::OPTION_NAME . '[recaptcha][site_key]' ); ?>"
+			name="<?php echo esc_attr( self::OPTION_NAME . '[recaptcha][site_key_v3]' ); ?>"
 			value="<?php echo esc_attr( $value ); ?>"
 			class="regular-text"
-			placeholder="6Le..."
+			placeholder="6Lf..."
 		/>
-		<p class="description"><?php esc_html_e( 'Public site key from Google reCAPTCHA v2 Checkbox.', 'wp-affiliatemanager' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Clave pública del sitio de Google reCAPTCHA v3 (tipo Score based).', 'wp-affiliatemanager' ); ?></p>
 		<?php
 	}
 
-	public function render_field_recaptcha_secret_key(): void {
+	public function render_field_recaptcha_secret_key_v3(): void {
 		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
-		$value   = $options['recaptcha']['secret_key'] ?? '';
+		$value   = $options['recaptcha']['secret_key_v3'] ?? '';
 		?>
 		<input
 			type="password"
-			name="<?php echo esc_attr( self::OPTION_NAME . '[recaptcha][secret_key]' ); ?>"
+			name="<?php echo esc_attr( self::OPTION_NAME . '[recaptcha][secret_key_v3]' ); ?>"
 			value="<?php echo esc_attr( $value ); ?>"
 			class="regular-text"
-			placeholder="6Le..."
+			placeholder="6Lf..."
 		/>
-		<p class="description"><?php esc_html_e( 'Secret key remains server-side only and is never exposed to frontend JavaScript.', 'wp-affiliatemanager' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Clave secreta de Google reCAPTCHA v3. Solo se utiliza en el servidor y nunca se expone al navegador.', 'wp-affiliatemanager' ); ?></p>
+		<?php
+	}
+
+	public function render_field_recaptcha_threshold(): void {
+		$options   = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$threshold = isset( $options['recaptcha']['threshold'] ) ? (float) $options['recaptcha']['threshold'] : 0.10;
+		?>
+		<select name="<?php echo esc_attr( self::OPTION_NAME . '[recaptcha][threshold]' ); ?>" id="wpam-recaptcha-threshold">
+			<?php
+			for ( $i = 0; $i <= 20; $i++ ) {
+				$val   = round( $i * 0.05, 2 );
+				$label = number_format( $val, 2 );
+				printf(
+					'<option value="%s"%s>%s</option>',
+					esc_attr( $label ),
+					selected( abs( $threshold - $val ) < 0.001, true, false ),
+					esc_html( $label )
+				);
+			}
+			?>
+		</select>
+		<p class="description">
+			<?php
+			printf(
+				/* translators: %s: current threshold value */
+				esc_html__( 'Puntuación mínima requerida (de 0.00 a 1.00 en incrementos de 0.05). Valor actual seleccionado: %s. Valor inicial por defecto: 0.10.', 'wp-affiliatemanager' ),
+				'<strong>' . esc_html( number_format( $threshold, 2 ) ) . '</strong>'
+			);
+			?>
+		</p>
+		<?php
+	}
+
+	public function render_field_recaptcha_enforce_threshold(): void {
+		$options = get_option( self::OPTION_NAME, $this->get_defaults() );
+		$value   = ! isset( $options['recaptcha']['enforce_threshold'] )
+			? ( ! isset( $options['recaptcha']['block_on_threshold'] ) || ! empty( $options['recaptcha']['block_on_threshold'] ) )
+			: ! empty( $options['recaptcha']['enforce_threshold'] );
+		?>
+		<label>
+			<input
+				type="checkbox"
+				name="<?php echo esc_attr( self::OPTION_NAME . '[recaptcha][enforce_threshold]' ); ?>"
+				value="1"
+				<?php checked( $value ); ?>
+			/>
+			<?php esc_html_e( 'Activar aplicación del umbral mínimo de seguridad.', 'wp-affiliatemanager' ); ?>
+		</label>
+		<p class="description"><?php esc_html_e( 'Si está activado, se bloquearán las solicitudes cuya puntuación sea inferior al umbral configurado. Si se desactiva, el token se seguirá verificando en el servidor (bloqueando tokens inválidos, ausentes o con errores), pero la puntuación no se usará para bloquear.', 'wp-affiliatemanager' ); ?></p>
 		<?php
 	}
 
@@ -2029,11 +2094,18 @@ class Settings {
 			$sanitized['views']['resource_types'] = $sanitized_types;
 		}
 
-		// Google reCAPTCHA v2 Checkbox.
+		// Google reCAPTCHA v3 — v2.3.0.
 		if ( isset( $input['recaptcha'] ) && is_array( $input['recaptcha'] ) ) {
-			$sanitized['recaptcha']['enabled'] = ! empty( $input['recaptcha']['enabled'] );
-			$sanitized['recaptcha']['site_key'] = sanitize_text_field( $input['recaptcha']['site_key'] ?? '' );
-			$sanitized['recaptcha']['secret_key'] = sanitize_text_field( $input['recaptcha']['secret_key'] ?? '' );
+			$sanitized['recaptcha']['enabled']            = ! empty( $input['recaptcha']['enabled'] );
+			$sanitized['recaptcha']['site_key_v3']        = sanitize_text_field( $input['recaptcha']['site_key_v3'] ?? '' );
+			$sanitized['recaptcha']['secret_key_v3']      = sanitize_text_field( $input['recaptcha']['secret_key_v3'] ?? '' );
+			$raw_threshold                                = isset( $input['recaptcha']['threshold'] ) ? (float) $input['recaptcha']['threshold'] : 0.10;
+			$sanitized['recaptcha']['threshold']          = max( 0.0, min( 1.0, round( $raw_threshold, 2 ) ) );
+			$enforce                                      = isset( $input['recaptcha']['enforce_threshold'] )
+				? ! empty( $input['recaptcha']['enforce_threshold'] )
+				: ! empty( $input['recaptcha']['block_on_threshold'] );
+			$sanitized['recaptcha']['enforce_threshold']  = $enforce;
+			$sanitized['recaptcha']['block_on_threshold'] = $enforce;
 		}
 
 		// Recently Viewed Posts — v1.3.0.
@@ -2324,9 +2396,12 @@ class Settings {
 				'resource_types'        => Views::default_resource_type_toggles(),
 			),
 			'recaptcha' => array(
-				'enabled'    => false,
-				'site_key'   => '',
-				'secret_key' => '',
+				'enabled'            => false,
+				'site_key_v3'        => '',
+				'secret_key_v3'      => '',
+				'threshold'          => 0.10,
+				'enforce_threshold'  => true,
+				'block_on_threshold' => true,
 			),
 			'recently_viewed' => array(
 				'enabled'     => false,

@@ -51,32 +51,65 @@
 		}
 	}
 
-	var params = {
-		action:        config.action,
-		resource_type: config.resourceType,
-		resource_id:   config.resourceId,
-		nonce:         config.nonce
-	};
+	function sendBeacon( token ) {
+		var params = {
+			action:        config.action,
+			resource_type: config.resourceType,
+			resource_id:   config.resourceId,
+			nonce:         config.nonce
+		};
 
-	if ( config.utmSource ) {
-		params.utm_source = config.utmSource;
+		if ( token ) {
+			params.recaptcha_token = token;
+		}
+
+		if ( config.utmSource ) {
+			params.utm_source = config.utmSource;
+		}
+
+		if ( config.searchTerm ) {
+			params.search_term = config.searchTerm;
+		}
+
+		if ( config.requestedUrl ) {
+			params.requested_url = config.requestedUrl;
+		}
+
+		var body = new URLSearchParams( params );
+
+		fetch( config.ajaxUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			credentials: 'same-origin',
+			body: body,
+			keepalive: true
+		} ).catch( function () {} );
 	}
 
-	if ( config.searchTerm ) {
-		params.search_term = config.searchTerm;
+	function executeRecaptcha( retries ) {
+		retries = retries || 0;
+		if ( typeof window.grecaptcha !== 'undefined' && window.grecaptcha.ready ) {
+			window.grecaptcha.ready( function () {
+				window.grecaptcha.execute( config.siteKeyV3, { action: 'view' } )
+					.then( function ( token ) {
+						sendBeacon( token );
+					} )
+					.catch( function () {
+						sendBeacon( '' );
+					} );
+			} );
+		} else if ( retries < 10 ) {
+			setTimeout( function () {
+				executeRecaptcha( retries + 1 );
+			}, 200 );
+		} else {
+			sendBeacon( '' );
+		}
 	}
 
-	if ( config.requestedUrl ) {
-		params.requested_url = config.requestedUrl;
+	if ( config.siteKeyV3 ) {
+		executeRecaptcha( 0 );
+	} else {
+		sendBeacon( '' );
 	}
-
-	var body = new URLSearchParams( params );
-
-	fetch( config.ajaxUrl, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-		credentials: 'same-origin',
-		body: body,
-		keepalive: true
-	} ).catch( function () {} );
 } )();

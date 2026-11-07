@@ -7,19 +7,30 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Plugin Name: Bunny Affiliate Manager
 - Plugin URI: https://bunnychase.net/bunny-affiliate-manager/
 - Author: BunnyChase
-- Author URI: https://bunnychase.net/
+- Author URI / Sitio oficial: https://bunnychase.net/
 - Text Domain: wp-affiliatemanager
 - Domain Path: /languages
-- License: GPLv2 or later
+- License: GNU General Public License v2.0 (GPL-2.0-only)
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **1.9.5**
+- Current version: **2.3.0**
 
 ## Requirements
 
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v1.9.5)
+## Current scope (v2.3.0)
+
+### reCAPTCHA v3 & Content Protection (v2.3.0)
+
+- **Centralized Google reCAPTCHA v3 Service:** Integrated protection for the Age Gate (NSFW confirmation) and Affiliate Link redirects (`/go/` and `/goa/`). Score evaluation operates client-side via Google's JavaScript API and executes full server-side verification against Google's `siteverify` endpoint without storing tokens in the database.
+- **Configurable Risk Threshold:** Settings allow configuring public site key v3, secret key v3, a minimum score threshold (from `0.00` to `1.00` in steps of `0.05`, default `0.10`), and a toggle to enforce score blocking or run in observation-only mode.
+- **Dual Origin Classification (`legacy` vs `captcha`):**
+  - Historical data and existing records are categorized as `legacy` (with default baseline score 1.0, Level 9).
+  - New evaluated traffic is categorized as `captcha`, tracking granular score levels (0 to 9) and evaluation error states (-1).
+  - Total/Global metrics default to `legacy + captcha (meeting threshold)`, preserving statistics continuity.
+- **Admin Analytics Filtering:** Score, Clicks, Views, and Age Gate tabs support filtering by traffic origin (`All / Both`, `Historical / Legacy`, `reCAPTCHA v3`) and granular score levels (0 to 9, or Error / Unverified).
+- **Age Gate Statistics Maintenance Reset:** Dedicated action in **Settings → Maintenance** allows administrators to clear all Age Gate events and flush associated caches without deleting or altering views, clicks, or affiliate link tracking data.
 
 ### Affiliates
 
@@ -101,6 +112,15 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
   - **oEmbed:** external responses are denied (`false` -> 404) and iframe embeds are blocked with HTTP 403.
 - **Searchable tag and category selectors:** filter terms by name, select multiple tags/categories as removable chips, and keep the saved taxonomy IDs separate. Suggestions are loaded only as searched and the selectors' assets are enqueued only on `wpam-interstitial`.
 - **Dedicated admin panel:** managed under **Bunny Affiliates → Interstitial & Protection** (`wpam-interstitial`), integrating existing affiliate interstitial settings alongside Age Gate controls without storage fragmentation.
+
+### Google reCAPTCHA v3 Protection (v2.3.0)
+
+- **Centralized reCAPTCHA v3 Service (`Recaptcha_V3`):** server-side verification against Google's `siteverify` endpoint with a 10s timeout, token and action validation (`age_gate_confirm`, `view`, `affiliate_redirect`), graceful non-blocking behavior when keys are missing (preserving standard plugin flows without blocking visitors or throwing 403 errors), and clear admin configuration notices.
+- **Independent Threshold Enforcement Setting:** reCAPTCHA can be enabled while independently toggling threshold enforcement (`enforce_threshold`). When enforcement is enabled, scores below the configurable threshold (`0.00` to `1.00`, in increments of `0.05`) are blocked. When enforcement is disabled, tokens are still verified on the server (blocking invalid tokens, spoofed actions, timeouts, and Google communication errors) without rejecting visits purely based on score.
+- **Age Gate Protection:** invisible execution on confirmation; invalid tokens or scores below threshold (when enforced) redirect visitors with an error notice. The reject button bypasses reCAPTCHA completely.
+- **Affiliate Redirects Protection (`/go/` and `/goa/`):** verifies that the visitor has a valid view cookie or authenticates via reCAPTCHA v3 before proceeding to the external destination. If no valid token is present, an interstitial seamlessly collects verification. External links (`/goext/`) are intentionally excluded.
+- **Views Tracking Beacon:** AJAX view beacon requests verify the reCAPTCHA v3 token server-side before counting a view.
+- **Age Gate Maintenance Action:** one-click reset action under **Settings → Maintenance** that empties only `wpam_age_gate_events` and clears its cache without altering Views, Clicks, or Affiliate data.
 
 ### Top Posts / Top Viewed Posts / Top Scored Posts
 
@@ -200,6 +220,8 @@ Bunny-Affiliate-Manager/
 │   │   │   ├── class-bunny-score-manager.php  — calculation orchestrator (no persistence)
 │   │   │   ├── class-bunny-score-factors.php  — manual factor percent computation
 │   │   │   └── class-bunny-score-stats-generator.php — weekly historical distribution (WP-Cron)
+│   │   ├── captcha/                          — Google reCAPTCHA v3 service (v2.3.0)
+│   │   │   └── class-recaptcha-v3.php
 │   │   ├── content-protection/               — NSFW Age Gate (v1.9.3)
 │   │   │   ├── class-age-gate.php            — orchestrator, criteria & HMAC cookie
 │   │   │   └── class-age-gate-renderer.php   — isolated 18+ verification card

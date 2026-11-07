@@ -116,8 +116,12 @@ class Views {
 	 * cualquier SQL directo fuera de este módulo.
 	 *
 	 * @since  1.8.0
-	 * @param  string $resource_type
-	 * @param  int    $resource_id
+	 * @since  2.3.0 Soporte para origin, score_level y score.
+	 * @param  string     $resource_type
+	 * @param  int        $resource_id
+	 * @param  string     $origin
+	 * @param  int        $score_level
+	 * @param  float|null $score
 	 * @return bool
 	 */
 	public function record_valid_view( string $resource_type, int $resource_id ): bool {
@@ -347,10 +351,31 @@ class Views {
 			return;
 		}
 
+		// reCAPTCHA v3 para views beacon si está activado y configurado.
+		$v3_site_key = '';
+		if ( class_exists( '\WP_AffiliateManager\Captcha\Recaptcha_V3' ) && \WP_AffiliateManager\Captcha\Recaptcha_V3::is_active() ) {
+			$k = \WP_AffiliateManager\Captcha\Recaptcha_V3::get_site_key();
+			if ( '' !== $k ) {
+				$v3_site_key = $k;
+				wp_enqueue_script(
+					'wpam-recaptcha-v3-api',
+					'https://www.google.com/recaptcha/api.js?render=' . rawurlencode( $k ),
+					array(),
+					null,
+					true
+				);
+			}
+		}
+
+		$deps = array();
+		if ( '' !== $v3_site_key ) {
+			$deps[] = 'wpam-recaptcha-v3-api';
+		}
+
 		wp_enqueue_script(
 			'wpam-views-beacon',
 			WPAM_PLUGIN_URL . 'assets/js/views-beacon.js',
-			array(),
+			$deps,
 			WPAM_VERSION,
 			true
 		);
@@ -361,6 +386,7 @@ class Views {
 			'resourceType' => $resource['resource_type'],
 			'resourceId'   => $resource['resource_id'],
 			'nonce'        => wp_create_nonce( self::AJAX_ACTION ),
+			'siteKeyV3'    => $v3_site_key,
 		);
 
 		// v1.8.9: utm_source de la visita actual, capturado una única vez aquí
@@ -444,6 +470,15 @@ class Views {
 
 		if ( $this->has_viewed_today( $dedup_key ) ) {
 			wp_send_json_success( array( 'counted' => false ) );
+		}
+
+		if ( class_exists( '\WP_AffiliateManager\Captcha\Recaptcha_V3' ) && \WP_AffiliateManager\Captcha\Recaptcha_V3::is_active() ) {
+			$token  = isset( $_POST['recaptcha_token'] ) ? sanitize_text_field( wp_unslash( $_POST['recaptcha_token'] ) ) : '';
+			$result = \WP_AffiliateManager\Captcha\Recaptcha_V3::verify( $token, \WP_AffiliateManager\Captcha\Recaptcha_V3::ACTION_VIEW );
+
+			if ( ! $result['success'] || $result['blocked'] ) {
+				wp_send_json_success( array( 'counted' => false ) );
+			}
 		}
 
 		$this->tracker->record( $resource_type, $resource_id );

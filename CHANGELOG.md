@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.3.0] — 2026-10-28 — Google reCAPTCHA v3, Protección de Puertas y Mantenimiento Age Gate
+
+### Added
+
+- **Servicio centralizado de Google reCAPTCHA v3 (`Recaptcha_V3`):** Servicio unificado en `includes/captcha/class-recaptcha-v3.php` para verificación en servidor contra el endpoint `siteverify` de Google, con validación de tokens, control de acciones (`age_gate_confirm`, `view`, `affiliate_redirect`), timeout de 10s y estado activo exclusivamente cuando está habilitado y con claves completas (`is_active()`).
+- **Configuración de reCAPTCHA v3 en Settings:** Sección completa en Ajustes con site key v3, secret key v3, selector de umbral mínimo de puntuación (`0.00` a `1.00` en pasos de `0.05`, valor inicial `0.10`) y opción explícita e independiente para activar o desactivar la aplicación del umbral (`enforce_threshold`). Aviso administrativo (`notice-warning`) cuando reCAPTCHA está activado pero faltan claves, informando que la protección permanecerá inactiva para no bloquear visitantes.
+- **Protección del NSFW Age Gate con reCAPTCHA v3:** Ejecución de reCAPTCHA v3 en el botón de confirmación solo cuando el servicio está activo (`is_active()`); validación en servidor del token y acción `age_gate_confirm`; bloqueo seguro ante tokens inválidos, expirados, ausentes o puntuación inferior al umbral (cuando el umbral está activado). Si reCAPTCHA está desactivado o con configuración incompleta, se mantiene el flujo habitual de confirmación de edad sin bloquear visitantes.
+- **Protección de enlaces de afiliados (`/go/` y `/goa/`):** Verificación de view gate previo a la redirección. Los visitantes con cookie de vista válida o token v3 verificado continúan de inmediato sin fricción; la ausencia de claves no introduce bloqueos adicionales ni errores HTTP 403 respecto al comportamiento original del plugin. Se excluyen las redirecciones externas (`/goext/`).
+- **Protección del AJAX Views Beacon:** Verificación de token reCAPTCHA v3 en el endpoint de tracking AJAX cuando el servicio está activo (`is_active()`). Cuando reCAPTCHA está desactivado o no configurado, la visita se contabiliza conforme al funcionamiento original.
+- **Acción de mantenimiento para reiniciar estadísticas del Age Gate:** Botón con confirmación modal en **Settings → Mantenimiento** que vacía exclusivamente la tabla `{prefix}wpam_age_gate_events` e invalida sus cachés, sin alterar las estadísticas de Views, Clicks ni enlaces de afiliados.
+- **Suite de pruebas automatizadas en CLI:** Script `tests/test-recaptcha-v3-and-stats.php` con 85 aserciones unitarias y de integración que validan los 5 estados de configuración de reCAPTCHA, la no interrupción del tráfico por configuración incompleta, el bloqueo seguro ante fallos reales de verificación, la alerta administrativa, la independencia de la aplicación del umbral, la integración con Age Gate, la preservación íntegra de esquemas de base de datos sin sobrecarga analítica, el beacon de Views, el cálculo de Bunny Score y el aislamiento del reinicio de mantenimiento.
+
+### Removed
+
+- Eliminado el concepto obsoleto de «modo observación» en favor del control explícito e independiente de aplicación de umbral (`enforce_threshold`).
+- Eliminadas las columnas y agregaciones estadísticas complejas (`origin`, `score_level`, `score`) para mantener el modelo de estadísticas agregadas limpio y ligero.
+
+---
+
 ## [1.9.5] — 2026-10-28 — Estadísticas del Interstitial NSFW (Age Gate) en Analytics
 
 ### Added

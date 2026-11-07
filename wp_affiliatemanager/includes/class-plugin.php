@@ -84,6 +84,9 @@ require_once WPAM_PLUGIN_PATH . 'includes/views/class-recently-viewed.php';
 require_once WPAM_PLUGIN_PATH . 'includes/analytics/class-score-query.php';
 require_once WPAM_PLUGIN_PATH . 'includes/admin/class-analytics-screen.php';
 
+// --- v2.3.0: Centralized reCAPTCHA v3 Service ---
+require_once WPAM_PLUGIN_PATH . 'includes/captcha/class-recaptcha-v3.php';
+
 // --- v2.0.0+: Bunny Score feature ---
 require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/factor-types/interface-factor-type.php';
 require_once WPAM_PLUGIN_PATH . 'includes/bunny-score/factor-types/class-factor-type-boolean.php';
@@ -248,6 +251,7 @@ final class Plugin {
 		// Admin core.
 		$admin = new Admin\Admin( $this->version );
 		$this->loader->add_action( 'admin_init', $admin, 'init' );
+		$this->loader->add_action( 'admin_notices', $admin, 'render_recaptcha_configuration_notice' );
 
 		// Menú.
 		$admin_menu = new Admin\Admin_Menu();
@@ -320,6 +324,7 @@ final class Plugin {
 		$this->loader->add_action( 'admin_post_wpam_clear_all',          $admin_menu_maint, 'handle_clear_all' );
 		$this->loader->add_action( 'admin_post_wpam_clear_clicks',       $admin_menu_maint, 'handle_clear_clicks' );
 		$this->loader->add_action( 'admin_post_wpam_clear_views',        $admin_menu_maint, 'handle_clear_views' );
+		$this->loader->add_action( 'admin_post_wpam_reset_age_gate_stats', $admin_menu_maint, 'handle_reset_age_gate_stats' );
 		$this->loader->add_action( 'admin_post_wpam_import_post_views_counter', $admin_menu_maint, 'handle_import_post_views_counter' );
 
 		// v0.2.7: Broken link report clear actions (admin-only).

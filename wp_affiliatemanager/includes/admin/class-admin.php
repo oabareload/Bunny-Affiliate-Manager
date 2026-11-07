@@ -80,4 +80,53 @@ class Admin {
 	public function get_version(): string {
 		return $this->version;
 	}
+
+	/**
+	 * Muestra una advertencia en el panel de administración si reCAPTCHA v3 está activado
+	 * pero la configuración de claves está incompleta.
+	 *
+	 * Evita un bypass silencioso y alerta al administrador de que el sistema opera en modo degradado.
+	 *
+	 * @since  2.3.0
+	 * @return void
+	 */
+	public function render_recaptcha_configuration_notice(): void {
+		if ( ! function_exists( 'current_user_can' ) || ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! class_exists( '\WP_AffiliateManager\Captcha\Recaptcha_V3' ) ) {
+			return;
+		}
+
+		if ( ! \WP_AffiliateManager\Captcha\Recaptcha_V3::is_enabled() || \WP_AffiliateManager\Captcha\Recaptcha_V3::is_configured() ) {
+			return;
+		}
+
+		$status = \WP_AffiliateManager\Captcha\Recaptcha_V3::get_status();
+		$reason = '';
+		switch ( $status ) {
+			case 'missing_site_key':
+				$reason = __( 'Falta la Clave del Sitio (Site Key).', 'wp-affiliatemanager' );
+				break;
+			case 'missing_secret_key':
+				$reason = __( 'Falta la Clave Secreta (Secret Key).', 'wp-affiliatemanager' );
+				break;
+			case 'missing_keys':
+			default:
+				$reason = __( 'Faltan tanto la Clave del Sitio como la Clave Secreta.', 'wp-affiliatemanager' );
+				break;
+		}
+
+		$settings_url = admin_url( 'admin.php?page=wpam-settings' );
+		printf(
+			'<div class="notice notice-warning is-dismissible"><p><strong>%1$s</strong> %2$s <em>%3$s</em><br>%4$s <a href="%5$s">%6$s</a></p></div>',
+			esc_html__( 'Bunny Affiliate Manager — Advertencia de Configuración reCAPTCHA v3:', 'wp-affiliatemanager' ),
+			esc_html__( 'Google reCAPTCHA v3 está activado pero su configuración está incompleta:', 'wp-affiliatemanager' ),
+			esc_html( $reason ),
+			esc_html__( 'Para no bloquear a los visitantes, la protección de reCAPTCHA permanecerá inactiva hasta que se configuren las claves en Ajustes.', 'wp-affiliatemanager' ),
+			esc_url( $settings_url ),
+			esc_html__( 'Completar configuración en Ajustes', 'wp-affiliatemanager' )
+		);
+	}
 }
