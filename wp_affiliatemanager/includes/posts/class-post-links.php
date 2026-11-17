@@ -631,6 +631,73 @@ class Post_Links {
 	}
 
 	/**
+	 * Returns the active affiliates linked to a post, together with their URLs.
+	 *
+	 * Read-only layer over get_links(): only links explicitly saved in _wpam_links
+	 * are considered (no Default URL fallback) and links whose affiliate is missing
+	 * or inactive are excluded.
+	 *
+	 * 'url' is the final URL built by wpam_generate_affiliate_url(), which keeps
+	 * every query parameter of the stored URL. 'original_url' is the stored URL
+	 * as saved.
+	 *
+	 * @since  2.4.1
+	 * @param  int|string $post Post ID (numeric, int or digit string) or post slug.
+	 * @return array[] Each item: affiliate_id (int), affiliate (string), label (string),
+	 *                 url (string), original_url (string). Empty array if the post is
+	 *                 not found or has no active affiliates.
+	 */
+	public function get_affiliate_links( int|string $post ): array {
+		if ( is_string( $post ) && ! ctype_digit( $post ) ) {
+			$slug = sanitize_title( $post );
+			if ( '' === $slug ) {
+				return array();
+			}
+
+			$ids     = get_posts( array(
+				'name'           => $slug,
+				'post_type'      => $this->supported_post_types,
+				'post_status'    => 'any',
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+			) );
+			$post_id = $ids ? (int) $ids[0] : 0;
+		} else {
+			$post_id = (int) $post;
+		}
+
+		if ( $post_id <= 0 ) {
+			return array();
+		}
+
+		$links = $this->get_links( $post_id, array( 'active_only' => true ) );
+		if ( empty( $links ) ) {
+			return array();
+		}
+
+		$repo   = new Repository();
+		$result = array();
+
+		foreach ( $links as $link ) {
+			$affiliate = $repo->find( $link['provider_id'] );
+			if ( null === $affiliate || '' === $link['final_url'] ) {
+				continue;
+			}
+
+			$result[] = array(
+				'affiliate_id' => (int) $affiliate['id'],
+				'affiliate'    => $affiliate['title'],
+				'label'        => $link['custom_label'],
+				'url'          => $link['final_url'],
+				'original_url' => $link['original_url'],
+			);
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Agrega links sintéticos de fallback (Default URL) para afiliados activos
 	 * que no tienen ya un link específico válido en $links.
 	 *

@@ -778,6 +778,64 @@ class Analytics_Renderer {
 	}
 
 	/**
+	 * Renderiza la tabla de publicaciones protegidas con más confirmaciones exitosas.
+	 *
+	 * @since  2.4.0
+	 * @param  array[] $posts Filas de Age_Gate_Query::get_top_confirmed_posts().
+	 * @return void
+	 */
+	public static function render_age_gate_top_confirmed_posts_section( array $posts ): void {
+		?>
+		<div class="wpam-analytics-card">
+			<h3 class="wpam-analytics-card-title">
+				<span>✅</span> <?php esc_html_e( 'Top Protected Confirmed Posts', 'wp-affiliatemanager' ); ?>
+				<span class="wpam-analytics-card-sub"><?php esc_html_e( 'Ranked by successful confirmations', 'wp-affiliatemanager' ); ?></span>
+			</h3>
+			<?php if ( empty( $posts ) ) : ?>
+				<p class="wpam-analytics-empty"><?php esc_html_e( 'No confirmed access recorded yet.', 'wp-affiliatemanager' ); ?></p>
+			<?php else : ?>
+				<div class="wpam-table-wrap">
+					<table class="wpam-table">
+						<thead><tr>
+							<th><?php esc_html_e( 'Post', 'wp-affiliatemanager' ); ?></th>
+							<th style="text-align:right;"><?php esc_html_e( 'Confirmed', 'wp-affiliatemanager' ); ?></th>
+						</tr></thead>
+						<tbody>
+						<?php foreach ( $posts as $p ) :
+							$post_id   = (int) $p['post_id'];
+							$title     = (string) $p['title'];
+							$permalink = (string) $p['permalink'];
+
+							$edit_url = '';
+							if ( $post_id > 0 && current_user_can( 'edit_post', $post_id ) ) {
+								$raw_edit = get_edit_post_link( $post_id, 'raw' );
+								if ( is_string( $raw_edit ) && '' !== $raw_edit ) {
+									$edit_url = $raw_edit;
+								}
+							}
+						?>
+							<tr>
+								<td>
+									<?php if ( '' !== $edit_url ) : ?>
+										<a href="<?php echo esc_url( $edit_url ); ?>"><strong><?php echo esc_html( $title ); ?></strong></a>
+									<?php elseif ( '' !== $permalink ) : ?>
+										<a href="<?php echo esc_url( $permalink ); ?>" target="_blank" rel="noopener noreferrer"><strong><?php echo esc_html( $title ); ?></strong></a>
+									<?php else : ?>
+										<strong><?php echo esc_html( $title ); ?></strong>
+									<?php endif; ?>
+								</td>
+								<td style="text-align:right;"><?php echo esc_html( number_format_i18n( (int) $p['confirmed'] ) ); ?></td>
+							</tr>
+						<?php endforeach; ?>
+						</tbody>
+					</table>
+				</div>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/**
 	 * Renderiza la tabla de publicaciones protegidas con más interstitials.
 	 *
 	 * @since  2.2.0

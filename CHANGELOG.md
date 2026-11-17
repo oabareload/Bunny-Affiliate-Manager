@@ -5,6 +5,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.4.1] — 2026-11-16 — Método público para obtener los enlaces de afiliado de un post
+
+### Added
+
+- **`Post_Links::get_affiliate_links( int|string $post )`:** nuevo método público que devuelve los afiliados activos asociados a una publicación junto con sus URLs. Acepta el ID numérico (int o string numérico) o el slug del post.
+  - Cada elemento devuelto contiene `affiliate_id`, `affiliate`, `label`, `url` y `original_url`. `url` es la URL final generada por `wpam_generate_affiliate_url()`, que conserva todos los parámetros originales guardados; `original_url` es la URL tal como se guardó.
+  - Devuelve un array vacío si el post no existe o no tiene afiliados activos. Los afiliados desactivados o eliminados se excluyen.
+  - Solo considera los enlaces guardados explícitamente en `_wpam_links` (sin fallback por Default URL).
+  - Reutiliza `Post_Links::get_links()` (con `active_only`) y `Repository::find()`; la resolución por slug usa una única consulta `get_posts()` ligera (`fields => ids`, `no_found_rows`) limitada a los post types soportados.
+
+### Changed
+
+- Sin cambios de almacenamiento ni de comportamiento existente: no hay clases, endpoints REST, API HTTP, tablas ni opciones nuevas. Los contratos públicos existentes (`WPAM_API`, `Top_Posts_Query`, `wpam_get_post_links()`, `wpam_get_resolved_post_links()`) permanecen intactos.
+
+---
+
+## [2.4.0] — 2026-11-13 — Top Protected Confirmed Posts en Analytics → NSFW Gate
+
+### Added
+
+- **Nuevo bloque «Top Protected Confirmed Posts»** en la pestaña NSFW Gate de Analytics: ranking de publicaciones protegidas ordenado por confirmaciones exitosas del Age Gate. Cuenta únicamente eventos `confirmed`, que se registran tras superar nonce y reCAPTCHA (cuando está activa); no cuenta avisos mostrados (`shown`), rechazos (`rejected`), visitas que no confirmaron ni intentos bloqueados o fallidos. No usa ni almacena puntuaciones de reCAPTCHA.
+- `Age_Gate_Query::get_top_confirmed_posts()` y `get_top_confirmed_posts_cached()`: una única consulta agregada sobre `{prefix}wpam_age_gate_events` (`event_type = 'confirmed'` + filtro por `period`) que aprovecha la UNIQUE KEY `(event_type, period, post_id, utm_source)`; títulos resueltos en un solo batch y caché de objeto de 300 s, igual que el resto de consultas del Age Gate.
+- `Analytics_Renderer::render_age_gate_top_confirmed_posts_section()`: mismo diseño de tarjeta y tabla que los bloques existentes.
+- El nuevo bloque responde a los filtros Today / Last 7 Days / Last 30 Days / All Time mediante el mismo endpoint AJAX (`wpam_analytics_filter`, `source=age_gate`), con la nueva clave de respuesta `top_confirmed_html`.
+
+### Changed
+
+- **Orden visual de los bloques de la pestaña NSFW Gate:** 1) Top Protected Confirmed Posts, 2) Top Protected Posts, 3) Top UTM Sources. Antes el orden era Top UTM Sources → Top Protected Posts.
+- Sin cambios de almacenamiento: no hay tablas, columnas ni opciones nuevas. Top Protected Posts, Top UTM Sources, Views, Clicks y el cálculo de Bunny Score permanecen intactos.
+
+---
+
 ## [2.3.0] — 2026-10-28 — Google reCAPTCHA v3, Protección de Puertas y Mantenimiento Age Gate
 
 ### Added

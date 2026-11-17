@@ -12,14 +12,27 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 - Domain Path: /languages
 - License: GNU General Public License v2.0 (GPL-2.0-only)
 - License URI: https://www.gnu.org/licenses/gpl-2.0.html
-- Current version: **2.3.0**
+- Current version: **2.4.1**
 
 ## Requirements
 
 - WordPress 6.0 or newer.
 - PHP 8.0 or newer.
 
-## Current scope (v2.3.0)
+## Current scope (v2.4.1)
+
+### Post affiliate links getter (v2.4.1)
+
+- `Post_Links::get_affiliate_links( int|string $post ): array` is a public, read-only method that returns the **active** affiliates linked to a post together with their URLs. `$post` is a numeric post ID (int or numeric string) or a post slug.
+- Each item has `affiliate_id`, `affiliate`, `label`, `url` and `original_url`. `url` is the final affiliate URL built at runtime by `wpam_generate_affiliate_url()`, so every query parameter of the stored URL is preserved; `original_url` is the URL exactly as saved.
+- Returns an empty array when the post doesn't exist or has no active affiliates; inactive or deleted affiliates are excluded. Only links explicitly saved on the post are returned (no Default URL fallback).
+- It reuses `Post_Links::get_links()` and `Repository::find()`; a slug costs a single lightweight `get_posts()` lookup restricted to the supported post types. No new classes, REST endpoints, tables or options.
+
+### NSFW Gate Analytics — Top Protected Confirmed Posts (v2.4.0)
+
+- The **NSFW Gate** tab in Analytics shows three blocks in this order: **Top Protected Confirmed Posts**, **Top Protected Posts**, **Top UTM Sources**.
+- **Top Protected Confirmed Posts** ranks protected posts by *successful* Age Gate confirmations only. It reads the existing `confirmed` events from `wpam_age_gate_events` (recorded after the nonce and, when active, the reCAPTCHA check pass, right before the signed cookie is issued), so it never counts interstitials merely shown, rejections, or blocked/failed attempts. No reCAPTCHA scores are stored or used, and no new tables, columns or options were added.
+- It follows the same Today / Last 7 Days / Last 30 Days / All Time filter as the rest of the tab, through the existing AJAX endpoint, using a single aggregated query that relies on the table's `(event_type, period, post_id, utm_source)` unique index and the standard 300s object cache.
 
 ### reCAPTCHA v3 & Content Protection (v2.3.0)
 
@@ -134,7 +147,7 @@ A modular and scalable affiliate link management plugin for WordPress. Lets crea
 ### Analytics & Dashboard (admin)
 
 - **Dashboard** — executive summary: total/active affiliate counts, posts-with-affiliates count, an overview row (Total Score / Views / Clicks / Affiliates), recent activity (last 20 clicks, last 20 views), a Top 10 Overall list (by Score), and quick-access links to the other screens.
-- **Analytics** — dedicated screen with four horizontal tabs (**Score**, **Clicks**, **Views**, **NSFW Gate**), each with its own Today / Last 7 Days / Last 30 Days / All Time filter cards and ranking tables (Top Affiliates, Top Clicked Posts, Top Viewed Posts, Top Scored Posts, Recent Clicks, Recent Views, and NSFW Gate summary / Top UTM Sources / Top Protected Posts). All tabs share a single AJAX endpoint and client-side filter implementation. The **Views** tab includes a resource-type selector; the **NSFW Gate** tab exposes interstitials shown, confirmations, rejections, estimated exits, and confirmation rates by UTM source and protected post.
+- **Analytics** — dedicated screen with four horizontal tabs (**Score**, **Clicks**, **Views**, **NSFW Gate**), each with its own Today / Last 7 Days / Last 30 Days / All Time filter cards and ranking tables (Top Affiliates, Top Clicked Posts, Top Viewed Posts, Top Scored Posts, Recent Clicks, Recent Views, and NSFW Gate summary / Top Protected Confirmed Posts / Top Protected Posts / Top UTM Sources). All tabs share a single AJAX endpoint and client-side filter implementation. The **Views** tab includes a resource-type selector; the **NSFW Gate** tab exposes interstitials shown, confirmations, rejections, estimated exits, and confirmation rates by UTM source and protected post, plus a ranking of protected posts by successful confirmations.
 - **Settings** — plugin configuration (render mode, disclaimer, views, recently viewed, general options) plus **Maintenance** actions: rebuild the redirect token map, clear analytics, one-time Post Views Counter import.
 - **Broken Reports** — dedicated page listing every reported broken link, with per-report and clear-all actions.
 

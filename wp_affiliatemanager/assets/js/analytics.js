@@ -232,6 +232,7 @@
 			cardsSelector: '.wpam-analytics-cards--age-gate .wpam-stat-card',
 			columns: [
 				{ selector: '.wpam-analytics-age-gate-summary-col', dataKey: 'summary_html' },
+				{ selector: '.wpam-analytics-age-gate-confirmed-col', dataKey: 'top_confirmed_html' },
 				{ selector: '.wpam-analytics-age-gate-utm-col',     dataKey: 'utm_html' },
 				{ selector: '.wpam-analytics-age-gate-posts-col',   dataKey: 'top_posts_html' },
 			],

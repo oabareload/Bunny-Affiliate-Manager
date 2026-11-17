@@ -57,6 +57,7 @@ class Analytics_Screen {
 		$age_gate_stats        = Age_Gate_Query::get_stats_cached( 'total' );
 		$age_gate_utm          = Age_Gate_Query::get_utm_breakdown_cached( 'total', 20 );
 		$age_gate_posts        = Age_Gate_Query::get_top_posts_cached( 'total', 10 );
+		$age_gate_confirmed    = Age_Gate_Query::get_top_confirmed_posts_cached( 'total', 10 );
 
 		$top_scored     = Score_Query::get_cached( 'total', 10 );
 		$top_affiliates = Top_Posts_Query::get_top_affiliates( 'total', 10 );
@@ -178,11 +179,14 @@ class Analytics_Screen {
 				</div>
 
 				<div class="wpam-analytics-cols">
-					<div class="wpam-analytics-col wpam-analytics-age-gate-utm-col">
-						<?php Analytics_Renderer::render_age_gate_utm_section( $age_gate_utm ); ?>
+					<div class="wpam-analytics-col wpam-analytics-age-gate-confirmed-col">
+						<?php Analytics_Renderer::render_age_gate_top_confirmed_posts_section( $age_gate_confirmed ); ?>
 					</div>
 					<div class="wpam-analytics-col wpam-analytics-age-gate-posts-col">
 						<?php Analytics_Renderer::render_age_gate_top_posts_section( $age_gate_posts ); ?>
+					</div>
+					<div class="wpam-analytics-col wpam-analytics-age-gate-utm-col">
+						<?php Analytics_Renderer::render_age_gate_utm_section( $age_gate_utm ); ?>
 					</div>
 				</div>
 			</div>
@@ -317,6 +321,7 @@ class Analytics_Screen {
 				$stats         = Age_Gate_Query::get_stats( $range );
 				$utm_breakdown = Age_Gate_Query::get_utm_breakdown( $range, 20 );
 				$top_posts     = Age_Gate_Query::get_top_posts( $range, 10 );
+				$top_confirmed = Age_Gate_Query::get_top_confirmed_posts( $range, 10 );
 				$global_stats  = Age_Gate_Query::get_global_stats();
 
 				ob_start();
@@ -328,14 +333,19 @@ class Analytics_Screen {
 				$utm_html = ob_get_clean();
 
 				ob_start();
+				Analytics_Renderer::render_age_gate_top_confirmed_posts_section( $top_confirmed );
+				$top_confirmed_html = ob_get_clean();
+
+				ob_start();
 				Analytics_Renderer::render_age_gate_top_posts_section( $top_posts );
 				$top_posts_html = ob_get_clean();
 
 				wp_send_json_success( array(
-					'summary_html'   => $summary_html,
-					'utm_html'       => $utm_html,
-					'top_posts_html' => $top_posts_html,
-					'stats'          => array(
+					'summary_html'         => $summary_html,
+					'utm_html'             => $utm_html,
+					'top_confirmed_html'   => $top_confirmed_html,
+					'top_posts_html'       => $top_posts_html,
+					'stats'                => array(
 						'today' => number_format_i18n( $global_stats['today']['shown'] ),
 						'week'  => number_format_i18n( $global_stats['week']['shown'] ),
 						'month' => number_format_i18n( $global_stats['month']['shown'] ),

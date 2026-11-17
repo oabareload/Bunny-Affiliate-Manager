@@ -359,6 +359,129 @@ class Age_Gate_Query {
 	}
 
 	// -------------------------------------------------------------------------
+	// Top Publicaciones Protegidas con más confirmaciones exitosas
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Retorna las publicaciones protegidas con más confirmaciones exitosas del Age Gate.
+	 *
+	 * Cuenta exclusivamente eventos 'confirmed', que Age_Gate registra solo después de
+	 * superar nonce y verificación reCAPTCHA (cuando está activa), inmediatamente antes de
+	 * emitir la cookie firmada. No cuenta 'shown' ni 'rejected', ni intentos bloqueados o
+	 * fallidos (esos redirigen antes de registrar nada). No usa puntuaciones de reCAPTCHA.
+	 *
+	 * Una única consulta agregada filtra por event_type y period, aprovechando la UNIQUE KEY
+	 * (event_type, period, post_id, utm_source). Los títulos se resuelven en un único batch.
+	 *
+	 * @since  2.4.0
+	 * @param  string $range today|week|month|year|total. Default 'total'.
+	 * @param  int    $limit Número máximo de publicaciones a retornar.
+	 * @return array<int, array{
+	 *     post_id: int,
+	 *     title: string,
+	 *     permalink: string,
+	 *     confirmed: int
+	 * }>
+	 */
+	public static function get_top_confirmed_posts( string $range = 'total', int $limit = 10 ): array {
+		global $wpdb;
+
+		$table     = Age_Gate_Events_Table::table_name();
+		$sql_limit = max( 1, min( 100, $limit ) );
+		$where     = " WHERE event_type = 'confirmed'";
+
+		if ( 'total' !== $range ) {
+			$since  = self::range_to_period_since( $range );
+			$where .= $wpdb->prepare( ' AND period >= %s', $since );
+		}
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT post_id, SUM(count) AS confirmed
+				 FROM %i{$where}
+				 GROUP BY post_id
+				 ORDER BY confirmed DESC, post_id ASC
+				 LIMIT %d",
+				$table,
+				$sql_limit
+			),
+			ARRAY_A
+		);
+		// phpcs:enable
+
+		if ( empty( $rows ) || ! is_array( $rows ) ) {
+			return array();
+		}
+
+		$post_ids = array_map(
+			static function ( array $r ): int {
+				return (int) $r['post_id'];
+			},
+			$rows
+		);
+
+		// Batch fetch de posts para evitar N+1 queries.
+		$posts = get_posts(
+			array(
+				'post__in'            => $post_ids,
+				'post_type'           => 'any',
+				'post_status'         => 'any',
+				'posts_per_page'      => count( $post_ids ),
+				'ignore_sticky_posts' => true,
+				'no_found_rows'       => true,
+			)
+		);
+
+		$post_titles = array();
+		$permalinks  = array();
+		foreach ( $posts as $p ) {
+			$post_titles[ $p->ID ] = $p->post_title;
+			$permalinks[ $p->ID ]  = get_permalink( $p->ID );
+		}
+
+		$results = array();
+		foreach ( $rows as $row ) {
+			$post_id = (int) $row['post_id'];
+
+			$results[] = array(
+				'post_id'   => $post_id,
+				'title'     => $post_titles[ $post_id ] ?? sprintf(
+					/* translators: %d: ID de la publicación */
+					__( '(Publicación eliminada #%d)', 'wp-affiliatemanager' ),
+					$post_id
+				),
+				'permalink' => $permalinks[ $post_id ] ?? '',
+				'confirmed' => max( 0, (int) $row['confirmed'] ),
+			);
+		}
+
+		return $results;
+	}
+
+	/**
+	 * Versión cacheada de get_top_confirmed_posts().
+	 *
+	 * @since  2.4.0
+	 * @param  string $range today|week|month|year|total.
+	 * @param  int    $limit
+	 * @return array
+	 */
+	public static function get_top_confirmed_posts_cached( string $range = 'total', int $limit = 10 ): array {
+		$cache_key = 'wpam_age_gate_top_confirmed_posts_' . $range . '_' . $limit;
+		$cached    = wp_cache_get( $cache_key, self::CACHE_GROUP );
+
+		if ( false !== $cached && is_array( $cached ) ) {
+			return $cached;
+		}
+
+		$posts = self::get_top_confirmed_posts( $range, $limit );
+		wp_cache_set( $cache_key, $posts, self::CACHE_GROUP, self::CACHE_TTL );
+
+		return $posts;
+	}
+
+	// -------------------------------------------------------------------------
 	// Desglose por UTM Source
 	// -------------------------------------------------------------------------
 
